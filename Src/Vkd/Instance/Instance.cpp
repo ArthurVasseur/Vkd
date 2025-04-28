@@ -27,7 +27,8 @@ namespace vkd
 	};
 
 	Instance::Instance() :
-		ObjectBase(ObjectType)
+		ObjectBase(ObjectType),
+		m_physicalDevicesAlreadyEnumerated(false)
 	{
 	}
 
@@ -73,7 +74,7 @@ namespace vkd
 		if (!instance)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
 
-		instance->object.SetAllocationCallbacks(pAllocator);
+		instance->Object.SetAllocationCallbacks(pAllocator);
 		
 		*pInstance = VKD_TO_HANDLE(VkInstance, instance);
 
@@ -86,8 +87,8 @@ namespace vkd
 		if (!instance)
 			return;
 
-		auto* dispatchable = reinterpret_cast<mem::DispatchableObject<Instance>*>(pInstance);
-		mem::Delete(dispatchable);
+		auto* dispatchable = reinterpret_cast<DispatchableObject<Instance>*>(pInstance);
+		mem::DeleteDispatchable(dispatchable);
 	}
 
 	PFN_vkVoidFunction Instance::GetInstanceProcAddr(VkInstance instance, const char* pName)
@@ -119,7 +120,7 @@ namespace vkd
 
 	VkResult Instance::EnumeratePlatformPhysicalDevices()
 	{
-		if (!GetPhysicalDevices().empty())
+		if (m_physicalDevicesAlreadyEnumerated)
 			return VK_SUCCESS; // Enumerate Physical devices only once during the lifetime of this VkInstance
 
 #ifdef CCT_PLATFORM_WINDOWS
@@ -133,15 +134,16 @@ namespace vkd
 		auto physicalDevices = std::move(result).GetValue();
 		for (auto* physicalDevice : physicalDevices)
 			AddPhysicalDevice(physicalDevice);
+		m_physicalDevicesAlreadyEnumerated = true;
 		return VK_SUCCESS;
 	}
 
-	void Instance::AddPhysicalDevice(mem::DispatchableObject<PhysicalDevice>* physicalDevice)
+	void Instance::AddPhysicalDevice(DispatchableObject<PhysicalDevice>* physicalDevice)
 	{
 		m_physicalDevices.emplace_back(physicalDevice);
 	}
 
-	std::span<mem::DispatchableObject<PhysicalDevice>*> Instance::GetPhysicalDevices()
+	std::span<DispatchableObject<PhysicalDevice>*> Instance::GetPhysicalDevices()
 	{
 		return m_physicalDevices;
 	}

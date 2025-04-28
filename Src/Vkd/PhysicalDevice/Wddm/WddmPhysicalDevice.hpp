@@ -13,12 +13,13 @@
 
 namespace vkd
 {
-	class WddmPhysicalDevice : public PhysicalDevice
+	class WddmPhysicalDevice final : public PhysicalDevice
 	{
 	public:
 		WddmPhysicalDevice() = default;
 		void SetLuid(LUID luid);
-		LUID GetLuid() const;
+		[[nodiscard]] LUID GetLuid() const;
+
 	private:
 		LUID m_luid;
 	};

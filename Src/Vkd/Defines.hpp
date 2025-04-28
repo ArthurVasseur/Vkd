@@ -33,15 +33,15 @@
 #define VKD_DISPATCHABLE_HANDLE(type)															\
 		static inline type* FromHandle(Vk##type instance)										\
 		{																						\
-			auto* dispatchable = reinterpret_cast<mem::DispatchableObject<type>*>(instance);	\
+			auto* dispatchable = reinterpret_cast<DispatchableObject<type>*>(instance);			\
 			if (!dispatchable)																	\
 				return nullptr;																	\
-			if (dispatchable->object.GetObjectType() != type::ObjectType)						\
+			if (dispatchable->Object.GetObjectType() != type::ObjectType)						\
 			{																					\
 				CCT_ASSERT_FALSE("Invalid Object Type for: " #type);							\
 				return nullptr;																	\
 			}																					\
-			return &dispatchable->object;														\
+			return &dispatchable->Object;														\
 		}
 
 
@@ -59,7 +59,7 @@ namespace vkd
 
 	// TODO: Move this class to ConcertoCore
 	template<typename F>
-	class DeferredExit
+	class DeferredExit final
 	{
 	public:
 		DeferredExit(F&& functor) : m_functor(std::move(functor)) {}

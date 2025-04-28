@@ -4,16 +4,10 @@
 
 #pragma once
 #include "Vkd/Defines.hpp"
+#include "Vkd/ObjectBase/ObjectBase.hpp"
 
 namespace vkd::mem
 {
-	template<typename T>
-	struct DispatchableObject
-	{
-		VK_LOADER_DATA loaderData;
-		T object;
-	};
-
 	template<typename T>
 	T* Allocate(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope);
 
@@ -23,10 +17,12 @@ namespace vkd::mem
 	T* New(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope);
 
 	template<typename T>
+	requires std::is_base_of_v<ObjectBase, T>
 	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope);
 
 	template<typename T>
-	void Delete(T* object);
+	requires std::is_base_of_v<ObjectBase, T>
+	void DeleteDispatchable(DispatchableObject<T>* object);
 }
 
 #include "Vkd/Memory/Memory.inl"

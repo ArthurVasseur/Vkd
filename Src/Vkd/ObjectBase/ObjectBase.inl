@@ -9,7 +9,7 @@
 namespace vkd
 {
 	inline ObjectBase::ObjectBase(VkObjectType objectType) :
-		m_AllocationCallbacks(nullptr),
+		m_allocationCallbacks(nullptr),
 		m_objectType(objectType)
 	{
 	}
@@ -21,11 +21,11 @@ namespace vkd
 
 	const VkAllocationCallbacks* ObjectBase::GetAllocationCallbacks() const
 	{
-		return m_AllocationCallbacks;
+		return m_allocationCallbacks;
 	}
 
 	inline void ObjectBase::SetAllocationCallbacks(const VkAllocationCallbacks* allocationCallbacks)
 	{
-		m_AllocationCallbacks = allocationCallbacks;
+		m_allocationCallbacks = allocationCallbacks;
 	}
 }

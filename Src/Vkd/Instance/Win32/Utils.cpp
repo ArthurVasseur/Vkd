@@ -25,9 +25,9 @@ namespace
 }
 namespace vkd::utils
 {
-	cct::Result<std::vector<mem::DispatchableObject<PhysicalDevice>*>, VkResult> EnumerateWddmPhysicalDevices(Instance& instance)
+	cct::Result<std::vector<DispatchableObject<PhysicalDevice>*>, VkResult> EnumerateWddmPhysicalDevices(Instance& instance)
 	{
-		std::vector<mem::DispatchableObject<PhysicalDevice>*> physicalDevices;
+		std::vector<DispatchableObject<PhysicalDevice>*> physicalDevices;
 		std::array<D3DKMT_ADAPTERINFO, MAX_ENUM_ADAPTERS> adapterInfos;
 
 		D3DKMT_ENUMADAPTERS2 enumAdapters = {
@@ -122,7 +122,7 @@ namespace vkd::utils
 				else
 				{
 					auto* wddmPhysicalDevice = physicalDeviceResult.GetValue();
-					auto* physicalDevice = reinterpret_cast<mem::DispatchableObject<PhysicalDevice>*>(wddmPhysicalDevice);
+					auto* physicalDevice = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(wddmPhysicalDevice);
 					physicalDevices.emplace_back(physicalDevice);
 				}
 				/* Incompatible DRM device, skip. */
@@ -140,7 +140,7 @@ namespace vkd::utils
 		return physicalDevices;
 	}
 
-	cct::Result<mem::DispatchableObject<WddmPhysicalDevice>*, VkResult> TryCreatePhysicalDevice(Instance& instance, const WddmAdapterInfo& adapterInfo)
+	cct::Result<DispatchableObject<WddmPhysicalDevice>*, VkResult> TryCreatePhysicalDevice(Instance& instance, const WddmAdapterInfo& adapterInfo)
 	{
 		D3DKMT_OPENADAPTERFROMLUID openAdapter = {
 			  .AdapterLuid = {
@@ -234,7 +234,7 @@ namespace vkd::utils
 			}
 		}
 
-		mem::DispatchableObject<WddmPhysicalDevice>* physicalDevice = mem::NewDispatchable<WddmPhysicalDevice>(instance.GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+		DispatchableObject<WddmPhysicalDevice>* physicalDevice = mem::NewDispatchable<WddmPhysicalDevice>(instance.GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
 
 		if (!physicalDevice)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Could not allocate WddmPhysicalDevice.");
@@ -253,10 +253,10 @@ namespace vkd::utils
 
 		std::memcpy(properties.deviceName, name.data(), std::min(sizeof(properties.deviceName), name.size()));
 
-		physicalDevice->object.SetAllocationCallbacks(instance.GetAllocationCallbacks());
-		physicalDevice->object.SetInstance(instance);
-		physicalDevice->object.SetPhysicalDeviceProperties(properties);
-		physicalDevice->object.SetLuid(LUID{.LowPart = static_cast<DWORD>(adapterInfo.luid.low), .HighPart = static_cast<LONG>(adapterInfo.luid.high)});
+		physicalDevice->Object.SetAllocationCallbacks(instance.GetAllocationCallbacks());
+		physicalDevice->Object.SetInstance(instance);
+		physicalDevice->Object.SetPhysicalDeviceProperties(properties);
+		physicalDevice->Object.SetLuid(LUID{.LowPart = static_cast<DWORD>(adapterInfo.luid.low), .HighPart = static_cast<LONG>(adapterInfo.luid.high)});
 
 		return physicalDevice;
 	}

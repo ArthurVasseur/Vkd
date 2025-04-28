@@ -24,9 +24,9 @@ namespace vkd
 		
 		void SetInstance(Instance& instance);
 		void SetPhysicalDeviceProperties(const VkPhysicalDeviceProperties& physicalDeviceProperties);
-		const VkPhysicalDeviceProperties& GetPhysicalDeviceProperties() const;
+		[[nodiscard]] const VkPhysicalDeviceProperties& GetPhysicalDeviceProperties() const;
 		void SetQueueFamilyProperties(const VkQueueFamilyProperties& queueFamilyProperties);
-		const VkQueueFamilyProperties& GetQueueFamilyProperties() const;
+		[[nodiscard]] const VkQueueFamilyProperties& GetQueueFamilyProperties() const;
 
 		virtual VkResult Create(const VkPhysicalDeviceProperties& physicalDeviceProperties);
 

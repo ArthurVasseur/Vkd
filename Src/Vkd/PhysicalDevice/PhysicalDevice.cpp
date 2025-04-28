@@ -14,7 +14,8 @@ namespace vkd
 	PhysicalDevice::PhysicalDevice() :
 		ObjectBase(ObjectType),
 		m_instance(nullptr),
-		m_physicalDeviceProperties()
+		m_physicalDeviceProperties(),
+		m_queueFamilyProperties()
 	{
 	}
 
@@ -133,7 +134,7 @@ namespace vkd
 		if (!physicalDevice)
 			return;
 
-		auto* dispatchable = reinterpret_cast<mem::DispatchableObject<PhysicalDevice>*>(pPhysicalDevice);
-		mem::Delete(dispatchable);
+		auto* dispatchable = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(pPhysicalDevice);
+		mem::DeleteDispatchable(dispatchable);
 	}
 }

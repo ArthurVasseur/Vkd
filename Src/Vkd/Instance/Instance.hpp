@@ -32,8 +32,8 @@ namespace vkd
 		static VkResult EnumeratePhysicalDevices(VkInstance instance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices);
 
 		VkResult EnumeratePlatformPhysicalDevices();
-		void AddPhysicalDevice(mem::DispatchableObject<PhysicalDevice>* physicalDevice);
-		std::span<mem::DispatchableObject<PhysicalDevice>*> GetPhysicalDevices();
+		void AddPhysicalDevice(DispatchableObject<PhysicalDevice>* physicalDevice);
+		std::span<DispatchableObject<PhysicalDevice>*> GetPhysicalDevices();
 	private:
 		static void* AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
 		static void* ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
@@ -42,6 +42,7 @@ namespace vkd
 		static std::array<VkExtensionProperties, 4> s_supportedExtensions;
 		static VkAllocationCallbacks s_allocationCallbacks;
 
-		std::vector<mem::DispatchableObject<PhysicalDevice>*> m_physicalDevices;
+		std::vector<DispatchableObject<PhysicalDevice>*> m_physicalDevices;
+		bool m_physicalDevicesAlreadyEnumerated;
 	};
 }
