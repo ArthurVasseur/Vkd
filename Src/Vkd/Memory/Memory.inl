@@ -28,20 +28,22 @@ namespace vkd::mem
 	}
 
 	template <typename T>
+	requires std::is_base_of_v<ObjectBase, T>
 	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope)
 	{
 		auto* dispatchableObject = Allocate<DispatchableObject<T>>(pAllocator, allocationScope);
 
-		dispatchableObject->loaderData.loaderMagic = ICD_LOADER_MAGIC;
-		new (&dispatchableObject->object) T;
+		dispatchableObject->LoaderData.loaderMagic = ICD_LOADER_MAGIC;
+		new (&dispatchableObject->Object) T;
 		return dispatchableObject;
 	}
 
 	template <typename T>
-	void Delete(T* object)
+	requires std::is_base_of_v<ObjectBase, T>
+	void DeleteDispatchable(DispatchableObject<T>* object)
 	{
-		const VkAllocationCallbacks* pAllocator = object->object.GetAllocationCallbacks();
-		object->~T();
+		const VkAllocationCallbacks* pAllocator = object->Object.GetAllocationCallbacks();
+		object->Object.~T();
 		Free(pAllocator, object);
 	}
 }

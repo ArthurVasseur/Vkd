@@ -80,11 +80,10 @@ VkResult vk_icdEnumerateAdapterPhysicalDevices(VkInstance pInstance, LUID adapte
 
 	auto physicalDevices = instance->GetPhysicalDevices();
 
-	VkPhysicalDevice physicalDeviceForLuid = nullptr;
 	std::size_t swapWith = 0;
 	for (std::size_t i = 0; i < *pPhysicalDeviceCount; ++i)
 	{
-		auto luid = static_cast<vkd::WddmPhysicalDevice&>(physicalDevices[i]->object).GetLuid();
+		auto luid = static_cast<vkd::WddmPhysicalDevice&>(physicalDevices[i]->Object).GetLuid();
 		
 		if (*reinterpret_cast<cct::UInt64*>(&luid) == *reinterpret_cast<cct::UInt64*>(&adapterLUID))
 		{

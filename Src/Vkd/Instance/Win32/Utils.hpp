@@ -56,8 +56,8 @@ namespace vkd::utils
 		bool valid;
 	};
 
-	cct::Result<std::vector<mem::DispatchableObject<PhysicalDevice>*>, VkResult> EnumerateWddmPhysicalDevices(Instance& instance);
-	cct::Result<mem::DispatchableObject<WddmPhysicalDevice>*, VkResult> TryCreatePhysicalDevice(Instance& instance, const WddmAdapterInfo& info);
+	cct::Result<std::vector<DispatchableObject<PhysicalDevice>*>, VkResult> EnumerateWddmPhysicalDevices(Instance& instance);
+	cct::Result<DispatchableObject<WddmPhysicalDevice>*, VkResult> TryCreatePhysicalDevice(Instance& instance, const WddmAdapterInfo& info);
 }
 
 #endif
