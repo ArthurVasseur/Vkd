@@ -38,9 +38,9 @@ if is_plat("windows") then
     target("wddm-dump")
         set_languages("cxx20")
         set_kind("binary")
-        add_files("Src/WddmDump/*.cpp")
-        add_includedirs("Src/WddmDump", { public = true })
-        add_headerfiles("Src/WddmDump/(**.hpp)", "Src/WddmDump/(**.inl)")
+        add_files("Src/WddmDump/**.cpp")
+        add_includedirs("Src", { public = true })
+        add_headerfiles("Src/(WddmDump/**.hpp)", "Src/(WddmDump/Api/**.hpp)")
         add_packages("directx-headers", "concerto-core", "microsoft-detours", "nlohmann_json")
         add_syslinks("d3d12", "dxgi", "d3dcompiler", "dxguid")
 
@@ -54,8 +54,13 @@ if is_plat("windows") then
             target:add("includedirs", out_folder, {public = true})
             target:add("files", out_cpp_file, {public = true})
             
-            out_hpp_file = path.join(out_folder, "WddmDump", "WddmJson.hpp")
-            os.execv("python.exe", { "./gen_wddm_to_json.py", "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared/d3dkmthk.h", out_hpp_file})
-            target:add("headerfiles", out_hpp_file, {public = true})
+            -- local windows_kit = "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared"
+            -- local d3dukmdt = path.join(windows_kit, "d3dukmdt.h")
+            -- local d3dkmthk = path.join(windows_kit, "d3dkmthk.h")
+            -- local d3dkmdt = path.join(windows_kit, "d3dkmdt.h")
+
+            -- out_hpp_file = path.join(out_folder, "WddmDump", "WddmJson.hpp")
+            -- os.execv("python.exe", { "./gen_wddm_to_json.py", d3dukmdt, d3dkmthk, d3dkmdt, out_hpp_file})
+            -- target:add("headerfiles", out_hpp_file, {public = true})
         end)
 end
