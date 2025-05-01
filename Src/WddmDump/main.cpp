@@ -3,16 +3,16 @@
 #include <Concerto/Core/Assert.hpp>
 #include <Windows.h>
 #include <d3dkmthk.h>
-#include <d3d12.h>
-#include <dxgi1_4.h>
 #include <vector>
-#include <wrl/client.h>
 #include <detours.h>
 #include "WddmDump/WddmFunction.hpp"
+#include <vcruntime.h>
 
 #undef min
 #undef max
-using namespace Microsoft::WRL;
+#include "Api/Instance.hpp"
+#include "Api/Device.hpp"
+#include "Api/CommandQueue.hpp"
 
 template<typename F>
 class DeferredExit final
@@ -52,21 +52,8 @@ inline std::string ToUtf8(const wchar_t* wstr)
 	return name;
 }
 
-void CreateCommandList(ID3D12Device& device)
-{
-	std::array commandListType = {
-		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		D3D12_COMMAND_LIST_TYPE_COMPUTE,
-		D3D12_COMMAND_LIST_TYPE_COPY
-	};
 
-	for (auto type : commandListType)
-	{
-		ComPtr<ID3D12CommandQueue> cmdQueue;
-		D3D12_COMMAND_QUEUE_DESC desc = {.Type = type, .Priority = 0, .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE, .NodeMask = 0};
-		device.CreateCommandQueue(&desc, IID_PPV_ARGS(&cmdQueue));
-	}
-}
+//}
 
 int main()
 {
@@ -75,42 +62,39 @@ int main()
 	LoadWddmFunctions(hGdi32);
 	AttachWddmToDetour();
 	DeferredExit _([&]()
-	{
-		DetachWddmFromDetour();
-		FreeLibrary(hGdi32);
-	});
-	UINT dxgiFactoryFlags = 0;
-	ComPtr<IDXGIFactory4> factory;
-	CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory));
-
-	std::vector<ComPtr<ID3D12Device>> devices;
-
-	for (UINT adapterIndex = 0; ; ++adapterIndex)
-	{
-		ComPtr<IDXGIAdapter1> pAdapter = nullptr;
-		if (factory->EnumAdapters1(adapterIndex, &pAdapter) == DXGI_ERROR_NOT_FOUND)
-			break;
-
-		DXGI_ADAPTER_DESC adapterDesc = {};
-		HRESULT result = pAdapter->GetDesc(&adapterDesc);
-		if (FAILED(result))
-			continue;
-
-		result = D3D12CreateDevice(pAdapter.Get(), D3D_FEATURE_LEVEL_12_0, _uuidof(ID3D12Device), nullptr);
-		if (FAILED(result))
 		{
-			cct::Logger::Error("Device '{}' does not support D3D12", ToUtf8(adapterDesc.Description));
-			continue;
-		}
+			DetachWddmFromDetour();
+			FreeLibrary(hGdi32);
+		});
 
-		cct::Logger::Info("Found device: {}", ToUtf8(adapterDesc.Description));
-		ComPtr<ID3D12Device> device;
-		D3D12CreateDevice(pAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&device));
-		devices.emplace_back(std::move(device));
+	auto instance = wddmDump::CreateInstance(wddmDump::InstanceType::D3D12);
+
+	std::vector<std::unique_ptr<wddmDump::Device>> devices;
+	auto deviceCount = instance->GetDeviceCount();
+
+	for (std::size_t i = 0; i < deviceCount; ++i)
+	{
+		auto device = instance->CreateDevice(i);
+		devices.push_back(std::move(device));
 	}
 
+	std::unordered_map<wddmDump::Device*, std::vector<std::unique_ptr<wddmDump::CommandQueue>>> commandQueues;
+
 	for (auto& device : devices)
-		CreateCommandList(*device.Get());
+	{
+		for (auto& type : { wddmDump::CommandQueue::Type::Compute, wddmDump::CommandQueue::Type::Copy, wddmDump::CommandQueue::Type::Direct })
+		{
+			auto commandQueue = device->CreateCommandQueue(type);
+			auto it = commandQueues.find(device.get());
+			if (it == commandQueues.end())
+			{
+				auto r = commandQueues.emplace(device.get(), std::vector<std::unique_ptr<wddmDump::CommandQueue>>{});
+				r.first->second.emplace_back(std::move(commandQueue));
+			}
+			else
+				it->second.emplace_back(std::move(commandQueue));
+		}
+	}
 
 	return 0;
 }
