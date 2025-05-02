@@ -123,7 +123,7 @@ def generate_cpp_from_json(json_path: str, cpp_path: str):
             hook_name = f'Hooked{name}'
 
             cpp.write(f'{ret} {hook_name}({sig}) {{\n')
-            cpp.write(f'    nlohmann::json j = {{\n')
+            cpp.write(f'    nlohmann::json j = {{ "{name}", {{\n')
             for i, p in enumerate(params):
                 pname = f'param{i}'
                 if p['type'] == 'HANDLE':
@@ -132,7 +132,7 @@ def generate_cpp_from_json(json_path: str, cpp_path: str):
                     cpp.write(f'        {{"{pname}", std::format("{{}}", *{pname})}},\n')
                 else:
                     cpp.write(f'        {{"{p["type"]}", {"*" + pname if "*" in p["type"] else pname}}},\n')
-            cpp.write('    };\n')
+            cpp.write('    } };\n')
             cpp.write('    GetWddmJson().push_back(j);\n')
             cpp.write(f'    return g_{name}({args});\n')
             cpp.write('}\n\n')
