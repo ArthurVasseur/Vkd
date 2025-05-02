@@ -41,7 +41,7 @@ if is_plat("windows") then
         add_files("Src/WddmDump/**.cpp")
         add_includedirs("Src", { public = true })
         add_headerfiles("Src/(WddmDump/**.hpp)", "Src/(WddmDump/Api/**.hpp)")
-        add_packages("directx-headers", "concerto-core", "microsoft-detours", "nlohmann_json", "concerto-graphics", "cppcodec")
+        add_packages("directx-headers", "concerto-core", "microsoft-detours", "nlohmann_json", "concerto-graphics")
         add_syslinks("d3d12", "dxgi", "d3dcompiler", "dxguid")
 
         on_config(function(target)
