@@ -3,7 +3,24 @@
 
 namespace wddmDump::vk
 {
-	CommandQueue::CommandQueue(Device& device, wddmDump::CommandQueue::Type type)
+	using namespace cct::gfx;
+	CommandQueue::CommandQueue(cct::gfx::rhi::Device& device, wddmDump::CommandQueue::Type type) :
+		m_commandPool()
 	{
+		rhi::QueueFamily queueFamily = {};
+
+		switch (type)
+		{
+		case CommandQueue::Type::Compute:
+			queueFamily = rhi::QueueFamily::Compute;
+			break;
+		case CommandQueue::Type::Direct:
+			queueFamily = rhi::QueueFamily::Graphics;
+			break;
+		case CommandQueue::Type::Copy:
+			queueFamily = rhi::QueueFamily::Transfer;
+			break;
+		}
+		m_commandPool = device.CreateCommandPool(queueFamily);
 	}
 }

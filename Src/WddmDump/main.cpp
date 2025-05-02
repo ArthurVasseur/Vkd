@@ -1,6 +1,7 @@
 #include <array>
 #include <Concerto/Core/Logger.hpp>
 #include <Concerto/Core/Assert.hpp>
+#include <Concerto/Core/DeferredExit.hpp>
 #include <Windows.h>
 #include <d3dkmthk.h>
 #include <vector>
@@ -10,32 +11,19 @@
 
 #undef min
 #undef max
+#include <fstream>
+
 #include "Api/Instance.hpp"
 #include "Api/Device.hpp"
 #include "Api/CommandQueue.hpp"
 
-template<typename F>
-class DeferredExit final
-{
-public:
-	DeferredExit(F&& functor) : m_functor(std::move(functor)) {}
-	DeferredExit(DeferredExit&) = delete;
-
-	~DeferredExit()
-	{
-		m_functor();
-	}
-private:
-	F m_functor;
-};
-
 inline std::string ToUtf8(const wchar_t* wstr)
 {
 	char* oldLocale = std::setlocale(LC_CTYPE, "en_US.utf8");
-	DeferredExit _([&]()
-		{
-			std::setlocale(LC_CTYPE, oldLocale);
-		});
+	cct::DeferredExit _([&]()
+	{
+		std::setlocale(LC_CTYPE, oldLocale);
+	});
 
 	std::mbstate_t state = {};
 	std::size_t len = std::wcsrtombs(nullptr, &wstr, 0, &state);
@@ -52,22 +40,21 @@ inline std::string ToUtf8(const wchar_t* wstr)
 	return name;
 }
 
-
-//}
-
 int main()
 {
 	HMODULE hGdi32 = LoadLibraryW(L"gdi32.dll");
 
 	LoadWddmFunctions(hGdi32);
 	AttachWddmToDetour();
-	DeferredExit _([&]()
-		{
-			DetachWddmFromDetour();
-			FreeLibrary(hGdi32);
-		});
+	cct::DeferredExit _([&]()
+	{
+		DetachWddmFromDetour();
+		FreeLibrary(hGdi32);
+	});
 
-	auto instance = wddmDump::CreateInstance(wddmDump::InstanceType::D3D12);
+	auto instance = CreateInstance(wddmDump::InstanceType::D3D12);
+	if (instance == nullptr)
+		return EXIT_FAILURE;
 
 	std::vector<std::unique_ptr<wddmDump::Device>> devices;
 	auto deviceCount = instance->GetDeviceCount();
@@ -96,5 +83,9 @@ int main()
 		}
 	}
 
-	return 0;
+	auto json = GetWddmJson().dump(4);
+	std::ofstream jsonFile;
+	jsonFile.open("./dump.json");
+	jsonFile << json;
+	return EXIT_SUCCESS;
 }

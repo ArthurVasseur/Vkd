@@ -4,13 +4,17 @@
 
 #pragma once
 
+#include <Concerto/Graphics/RHI/Device.hpp>
+
 #include "WddmDump/Api/Device.hpp"
 
 namespace wddmDump::vk
 {
-	class Device;
 	class CommandQueue : public wddmDump::CommandQueue
 	{
-		CommandQueue(Device& device, wddmDump::CommandQueue::Type type);
+	public:
+		CommandQueue(cct::gfx::rhi::Device& device, wddmDump::CommandQueue::Type type);
+	private:
+		std::unique_ptr<cct::gfx::rhi::CommandPool> m_commandPool;
 	};
 }
