@@ -1,6 +1,8 @@
 #include "WddmDump/Api/Instance.hpp"
 
 #include "WddmDump/Api/D3d12/Instance/Instance.hpp"
+#undef min
+#undef max
 #include "WddmDump/Api/Vulkan/Instance/Instance.hpp"
 
 namespace wddmDump
