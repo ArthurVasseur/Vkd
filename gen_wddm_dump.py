@@ -15,8 +15,9 @@ def generate_hpp_from_json(json_path: str, hpp_path: str):
         hpp.write('#include <Concerto/Core/Logger.hpp>\n\n')
         hpp.write('#include <Concerto/Core/Assert.hpp>\n\n')
         hpp.write('#include <unordered_map>\n')
+        hpp.write('#include <nlohmann/json.hpp>\n')
         hpp.write('#include <detours.h>\n\n')
-
+        hpp.write('nlohmann::json& GetWddmJson();\n\n')
         for fn in functions:
             name = fn['name']
             ret = fn['returns']
@@ -57,19 +58,24 @@ def generate_cpp_from_json(json_path: str, cpp_path: str):
         cpp.write('#include <Concerto/Core/Logger.hpp>\n')
         cpp.write('#include "WddmDump/WddmFunction.hpp"\n')
         cpp.write('#include "WddmDump/WddmJson.hpp"\n')
-        
+        cpp.write('\n\n')
+
+        cpp.write('nlohmann::json g_wddm_json = nlohmann::json::array();\n')
+        cpp.write('nlohmann::json& GetWddmJson()\n{\n')
+        cpp.write('return g_wddm_json;\n')
+        cpp.write('}\n\n')
         for fn in functions:
             name = fn['name']
-            cpp.write(f'extern PFN_{name} g_{name} = nullptr;\n\n')
-
-        cpp.write('void LoadWddmFunctions(HMODULE hGdi32) {\n')
+            cpp.write(f'PFN_{name} g_{name} = nullptr;\n')
+        cpp.write('\n\n')
+        cpp.write('void LoadWddmFunctions(HMODULE hGdi32)\n{\n')
         for fn in functions:
             name = fn['name']
             cpp.write(f'    g_{name} = reinterpret_cast<PFN_{name}>(GetProcAddress(hGdi32, "{name}"));\n')
         cpp.write('}\n\n')
 
 
-        cpp.write('void AttachWddmToDetour() {\n')
+        cpp.write('void AttachWddmToDetour()\n{\n')
         cpp.write('    DetourTransactionBegin();\n')
         cpp.write('    DetourUpdateThread(GetCurrentThread());\n')
         cpp.write('    NTSTATUS status;\n')
@@ -85,7 +91,7 @@ def generate_cpp_from_json(json_path: str, cpp_path: str):
         cpp.write('}\n\n')
         
         # Generate Undetour function
-        cpp.write('void DetachWddmFromDetour() {\n')
+        cpp.write('void DetachWddmFromDetour()\n{\n')
         cpp.write('    DetourTransactionBegin();\n')
         cpp.write('    DetourUpdateThread(GetCurrentThread());\n')
         for fn in functions:
@@ -117,11 +123,17 @@ def generate_cpp_from_json(json_path: str, cpp_path: str):
             hook_name = f'Hooked{name}'
 
             cpp.write(f'{ret} {hook_name}({sig}) {{\n')
-            cpp.write(f'    nlohmann::json j;\n')
+            cpp.write(f'    nlohmann::json j = {{\n')
             for i, p in enumerate(params):
                 pname = f'param{i}'
-                cpp.write(f'    j["{p["type"]}"] = ToJson({pname});\n')
-            cpp.write(f'    cct::Logger::Info("{name}, {{}}", j);\n')
+                if p['type'] == 'HANDLE':
+                    cpp.write(f'        {{"{pname}", std::format("{{}}", {pname})}},\n')
+                elif p['type'] == 'HANDLE*':
+                    cpp.write(f'        {{"{pname}", std::format("{{}}", *{pname})}},\n')
+                else:
+                    cpp.write(f'        {{"{p["type"]}", {"*" + pname if "*" in p["type"] else pname}}},\n')
+            cpp.write('    };\n')
+            cpp.write('    GetWddmJson().push_back(j);\n')
             cpp.write(f'    return g_{name}({args});\n')
             cpp.write('}\n\n')
 
