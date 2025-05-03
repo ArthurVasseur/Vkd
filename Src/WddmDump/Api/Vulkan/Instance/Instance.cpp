@@ -11,6 +11,8 @@ namespace wddmDump::vk
 
 	std::unique_ptr<wddmDump::Device> Instance::CreateDevice(std::size_t index)
 	{
+		auto& deviceInfo = m_instance.EnumerateDevices()[index];
+		cct::Logger::Warning("Creating Device name: '{}', vendor: '{}'", deviceInfo.name, deviceInfo.vendor);
 		auto device = m_instance.CreateDevice(index);
 		return std::make_unique<vk::Device>(std::move(device));
 	}
