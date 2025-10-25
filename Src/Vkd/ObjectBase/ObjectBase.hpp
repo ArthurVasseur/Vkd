@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <Concerto/Core/Result/Result.hpp>
 #include "Vkd/Defines.hpp"
 
 namespace vkd
@@ -19,20 +20,22 @@ namespace vkd
 		ObjectBase& operator=(const ObjectBase&) = delete;
 
 		[[nodiscard]] inline VkObjectType GetObjectType() const;
-		[[nodiscard]] inline const VkAllocationCallbacks* GetAllocationCallbacks() const;
-		inline void SetAllocationCallbacks(const VkAllocationCallbacks* allocationCallbacks);
+		[[nodiscard]] inline const VkAllocationCallbacks& GetAllocationCallbacks() const;
+		inline void SetAllocationCallbacks(const VkAllocationCallbacks& allocationCallbacks);
 	private:
 		const VkAllocationCallbacks* m_allocationCallbacks;
 		VkObjectType m_objectType;
 	};
 
 	template<typename T>
-	requires std::is_base_of_v<ObjectBase, T>
 	struct DispatchableObject
 	{
 		VK_LOADER_DATA LoaderData;
 		T* Object;
 	};
+
+	template<typename T>
+	using DispatchableObjectResult = cct::Result<DispatchableObject<T>*, VkResult>;
 }
 
 #include "Vkd/ObjectBase/ObjectBase.inl"

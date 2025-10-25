@@ -23,9 +23,23 @@ function add_files_to_target(p, hpp_as_files)
     end
 end
 
+local drivers = {
+    Software = {
+        Files = {
+            ".",
+            "Device",
+            "PhysicalDevice",
+            "Queue",
+        },
+        Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true} },
+        Deps = {},
+    }
+}
+
+
 target("vkd")
     set_languages("cxx20")
-    set_kind("shared")
+    set_kind("static")
     add_files("Src/Vkd/**.cpp")
     add_includedirs("Src", { public = true })
     add_headerfiles("Src/(Vkd/**.hpp)", "Src/(Vkd/**.inl)")
@@ -43,29 +57,56 @@ target("vkd")
         "Memory",
         "ObjectBase",
         "PhysicalDevice",
-        "SoftwareDevice",
-        "SoftwarePhysicalDevice"
+        "Queue"
     }
     for _, dir in ipairs(files) do
         add_files_to_target("Src/Vkd/" .. dir, false)
     end
-    after_build(function(target)
-        local lib_path = path.absolute(target:targetfile())
-        local json_content = string.format([[
-        {
-            "file_format_version": "1.0.1",
-            "ICD": {
-                "library_path": %q,
-                "api_version": "1.4.304",
-                "library_arch" : "64",
-                "is_portability_driver": false
-            }
-        },
-        ]], lib_path)
-
-        io.writefile("vkd.json", json_content)
-    end)
 target_end()
+
+for driver_name, driver in pairs(drivers) do
+    target("vkd-" .. driver_name)
+        set_kind("shared")
+        set_languages("cxx20")
+        add_defines("VKD_" .. driver_name:upper() .. "_BUILD", { public = false })
+        add_includedirs("Src/", { public = true })
+        add_defines("VK_NO_PROTOTYPES")
+        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries")
+        for _, pkg in ipairs(driver.Packages) do
+            add_packages(pkg)
+        end
+
+        for _, dep in ipairs(driver.Deps) do
+            add_deps(dep, { public = true })
+        end
+        
+        if is_mode("debug") then
+            set_symbols("debug")
+        end
+
+        for _, dir in ipairs(driver.Files) do
+            add_files_to_target("Src/Vkd" .. driver_name .. "/" .. dir, false)
+        end
+        add_deps("vkd")
+
+        after_build(function(target)
+            local lib_path = path.absolute(target:targetfile())
+            local json_content = string.format([[
+            {
+                "file_format_version": "1.0.1",
+                "ICD": {
+                    "library_path": %q,
+                    "api_version": "1.4.304",
+                    "library_arch" : "64",
+                    "is_portability_driver": false
+                }
+            },
+            ]], lib_path)
+
+            io.writefile("vkd-" .. driver_name .. ".json", json_content)
+        end)
+    target_end()
+end
 
 target("vkd-test")
     set_languages("cxx20")
@@ -74,5 +115,8 @@ target("vkd-test")
     add_includedirs("Src", { public = true })
     add_packages("concerto-core", "concerto-graphics", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
     add_defines("VK_NO_PROTOTYPES")
-    add_deps("vkd")
     add_files("Src/Test/*.cpp")
+
+    for driver_name, driver in pairs(drivers) do
+        add_deps("vkd-" .. driver_name)
+    end
