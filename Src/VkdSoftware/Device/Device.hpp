@@ -14,6 +14,6 @@ namespace vkd::software
 		SoftwareDevice() = default;
 
 	protected:
-		DispatchableObjectResult<vkd::Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex) override;
+		DispatchableObjectResult<vkd::Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;
 	};
 }

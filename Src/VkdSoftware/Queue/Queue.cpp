@@ -4,9 +4,9 @@
 
 namespace vkd::software
 {
-	VkResult Queue::Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex)
+	VkResult Queue::Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags)
 	{
-		return vkd::Queue::Create(owner, queueFamilyIndex, queueIndex);
+		return vkd::Queue::Create(owner, queueFamilyIndex, queueIndex, flags);
 	}
 
 	VkResult Queue::Submit(uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence)

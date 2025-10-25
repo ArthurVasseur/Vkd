@@ -22,20 +22,20 @@ namespace vkd::software
 		};
 
 		using namespace std::string_view_literals;
-		std::string_view deviceName = "Vkd software device"sv;
+		constexpr std::string_view deviceName = "Vkd software device"sv;
 		std::memcpy(physicalDeviceProperties.deviceName, deviceName.data(), deviceName.size());
 
 		std::array queueFamilyProperties = {
 			VkQueueFamilyProperties
 			{
-				.queueFlags = VK_QUEUE_GRAPHICS_BIT,
+				.queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT,
 				.queueCount = 1,
 				.timestampValidBits = 0,
-				.minImageTransferGranularity = {1, 1, 1},
+				.minImageTransferGranularity = {1, 1, 1}
 			},
 			VkQueueFamilyProperties
 			{
-				.queueFlags = VK_QUEUE_COMPUTE_BIT,
+				.queueFlags = VK_QUEUE_GRAPHICS_BIT,
 				.queueCount = 1,
 				.timestampValidBits = 0,
 				.minImageTransferGranularity = {1, 1, 1},
