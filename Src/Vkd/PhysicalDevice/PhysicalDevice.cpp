@@ -44,9 +44,8 @@ namespace vkd
 		return m_queueFamilyProperties;
 	}
 
-	VkResult PhysicalDevice::Create(const VkPhysicalDeviceProperties& physicalDeviceProperties)
+	VkResult PhysicalDevice::Create()
 	{
-		m_physicalDeviceProperties = physicalDeviceProperties;
 		return VK_SUCCESS;
 	}
 
@@ -77,16 +76,16 @@ namespace vkd
 		*pProperties = physicalDevice->GetPhysicalDeviceProperties();
 	}
 
-		void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties)
-		{
-			VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties)
+	{
+		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 
-			if (pQueueFamilyPropertyCount && !pQueueFamilyProperties)
-			{
-				*pQueueFamilyPropertyCount = 0;
-			}
-			CCT_ASSERT_FALSE("Not Implemented");
+		if (pQueueFamilyPropertyCount && !pQueueFamilyProperties)
+		{
+			*pQueueFamilyPropertyCount = 0;
 		}
+		CCT_ASSERT_FALSE("Not Implemented");
+	}
 
 	void PhysicalDevice::GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice,
 		VkPhysicalDeviceMemoryProperties* pMemoryProperties)

@@ -32,9 +32,12 @@ namespace vkd::mem
 	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope)
 	{
 		auto* dispatchableObject = Allocate<DispatchableObject<T>>(pAllocator, allocationScope);
+		if (dispatchableObject == nullptr)
+			return nullptr;
 
 		dispatchableObject->LoaderData.loaderMagic = ICD_LOADER_MAGIC;
-		new (&dispatchableObject->Object) T;
+		dispatchableObject->Object = New<T>(pAllocator, allocationScope);
+
 		return dispatchableObject;
 	}
 
@@ -42,8 +45,9 @@ namespace vkd::mem
 	requires std::is_base_of_v<ObjectBase, T>
 	void DeleteDispatchable(DispatchableObject<T>* object)
 	{
-		const VkAllocationCallbacks* pAllocator = object->Object.GetAllocationCallbacks();
-		object->Object.~T();
+		const VkAllocationCallbacks* pAllocator = object->Object->GetAllocationCallbacks();
+		object->Object->~T();
+		Free(pAllocator, object->Object);
 		Free(pAllocator, object);
 	}
 }

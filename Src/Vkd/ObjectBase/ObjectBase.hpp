@@ -31,7 +31,7 @@ namespace vkd
 	struct DispatchableObject
 	{
 		VK_LOADER_DATA LoaderData;
-		T Object;
+		T* Object;
 	};
 }
 

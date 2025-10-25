@@ -6,7 +6,6 @@
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Device/Device.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
-#include "Vkd/PhysicalDevice/Wddm/WddmPhysicalDevice.hpp"
 
 VkResult vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t* pVersion)
 {
@@ -83,12 +82,12 @@ VkResult vk_icdEnumerateAdapterPhysicalDevices(VkInstance pInstance, LUID adapte
 	std::size_t swapWith = 0;
 	for (std::size_t i = 0; i < *pPhysicalDeviceCount; ++i)
 	{
-		auto luid = static_cast<vkd::WddmPhysicalDevice&>(physicalDevices[i]->Object).GetLuid();
-		
-		if (*reinterpret_cast<cct::UInt64*>(&luid) == *reinterpret_cast<cct::UInt64*>(&adapterLUID))
-		{
-			swapWith = i;
-		}
+		//auto luid = static_cast<vkd::WddmPhysicalDevice&>(*physicalDevices[i]->Object).GetLuid();
+		//
+		//if (*reinterpret_cast<cct::UInt64*>(&luid) == *reinterpret_cast<cct::UInt64*>(&adapterLUID))
+		//{
+		//	swapWith = i;
+		//}
 
 		pPhysicalDevices[i] = VKD_TO_HANDLE(VkPhysicalDevice, physicalDevices[i]);
 	}
