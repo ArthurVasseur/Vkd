@@ -7,6 +7,9 @@
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Device/Device.hpp"
 #include "Vkd/Queue/Queue.hpp"
+#include "Vkd/CommandPool/CommandPool.hpp"
+#include "Vkd/CommandBuffer/CommandBuffer.hpp"
+#include "Vkd/Synchronization/Fence/Fence.hpp"
 #include "Vkd/Memory/Memory.hpp"
 
 namespace vkd
@@ -199,9 +202,26 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue2);
+
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueBindSparse);
+
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandPool, CreateCommandPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandPool, DestroyCommandPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandPool, ResetCommandPool);
+
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, AllocateCommandBuffers);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, FreeCommandBuffers);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, BeginCommandBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, EndCommandBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, ResetCommandBuffer);
+
+		VKD_ENTRYPOINT_LOOKUP(vkd::Fence, CreateFence);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Fence, DestroyFence);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Fence, WaitForFences);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Fence, ResetFences);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Fence, GetFenceStatus);
 #undef VKD_ENTRYPOINT_LOOKUP
 
 		return nullptr;

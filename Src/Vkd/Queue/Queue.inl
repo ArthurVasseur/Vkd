@@ -14,7 +14,7 @@ namespace vkd
 	{
 	}
 
-	inline VkResult Queue::Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags)
+	inline VkResult Queue::Create(Device& owner, cct::UInt32 queueFamilyIndex, cct::UInt32 queueIndex, VkDeviceQueueCreateFlags flags)
 	{
 		m_owner = &owner;
 		m_queueFamilyIndex = queueFamilyIndex;
@@ -31,12 +31,12 @@ namespace vkd
 		return m_owner;
 	}
 
-	inline uint32_t Queue::GetQueueFamilyIndex() const
+	inline cct::UInt32 Queue::GetQueueFamilyIndex() const
 	{
 		return m_queueFamilyIndex;
 	}
 
-	inline uint32_t Queue::GetQueueIndex() const
+	inline cct::UInt32 Queue::GetQueueIndex() const
 	{
 		return m_queueIndex;
 	}

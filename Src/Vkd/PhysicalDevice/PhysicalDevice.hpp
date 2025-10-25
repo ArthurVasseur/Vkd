@@ -29,6 +29,7 @@ namespace vkd
 		virtual VkResult Create(Instance& owner, const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual DispatchableObjectResult<Device> CreateDevice() = 0;
 
+		// Vulkan API entry points
 		static void VKAPI_CALL GetPhysicalDeviceFeatures(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures* pFeatures);
 		static void VKAPI_CALL GetPhysicalDeviceFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkFormatProperties* pFormatProperties);
 		static VkResult VKAPI_CALL GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags, VkImageFormatProperties* pImageFormatProperties);
