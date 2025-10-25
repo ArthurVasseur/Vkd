@@ -1,6 +1,27 @@
 add_rules("mode.debug", "mode.release")
 add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.git main")
-add_requires("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
+add_requires("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "concerto-graphics")
+
+function add_files_to_target(p, hpp_as_files)
+    for _, dir in ipairs(os.filedirs(p)) do
+        relative_dir = path.relative(dir, "Src/")
+        if os.isdir(dir) then
+            add_files(path.join("Src", relative_dir, "*.cpp"))
+            if hpp_as_files then
+                add_files(path.join("Src", relative_dir, "*.hpp"))
+            end
+            add_headerfiles(path.join("Src", "(" .. relative_dir .. "/*.hpp)"))
+            add_headerfiles(path.join("Src", "(" .. relative_dir .. "/*.inl)"))
+        else
+            local ext = path.extension(relative_dir)
+            if ext == ".hpp" or ext == ".inl" then
+                add_headerfiles(path.join("Src", "(" .. relative_dir .. ")"))
+            elseif ext == ".cpp" then
+                add_files(path.join("Src", relative_dir))
+            end
+        end
+    end
+end
 
 target("vkd")
     set_languages("cxx20")
@@ -11,7 +32,22 @@ target("vkd")
     add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
     add_defines("VK_NO_PROTOTYPES")
     if is_plat("windows") then
-        add_syslinks("Gdi32")
+        add_syslinks("Gdi32", "SetupAPI")
+    end
+
+    local files = {
+        ".",
+        "Device",
+        "Icd",
+        "Instance",
+        "Memory",
+        "ObjectBase",
+        "PhysicalDevice",
+        "SoftwareDevice",
+        "SoftwarePhysicalDevice"
+    }
+    for _, dir in ipairs(files) do
+        add_files_to_target("Src/Vkd/" .. dir, false)
     end
     after_build(function(target)
         local lib_path = path.absolute(target:targetfile())
@@ -31,36 +67,12 @@ target("vkd")
     end)
 target_end()
 
-
-if is_plat("windows") then
-    add_requires("directx-headers", "microsoft-detours", "nlohmann_json", "concerto-graphics", "cppcodec")
-
-    target("wddm-dump")
-        set_languages("cxx20")
-        set_kind("binary")
-        add_files("Src/WddmDump/**.cpp")
-        add_includedirs("Src", { public = true })
-        add_headerfiles("Src/(WddmDump/**.hpp)", "Src/(WddmDump/Api/**.hpp)")
-        add_packages("directx-headers", "concerto-core", "microsoft-detours", "nlohmann_json", "concerto-graphics")
-        add_syslinks("d3d12", "dxgi", "d3dcompiler", "dxguid")
-
-        on_config(function(target)
-            local out_folder = target:autogendir()
-            local out_hpp_file = path.join(out_folder, "WddmDump", "WddmFunction.hpp")
-            local out_cpp_file = path.join(out_folder, "WddmDump", "WddmFunction.cpp")
-            os.execv("python.exe", { "./gen_wddm_dump.py", path.absolute("./wddm.json"), path.absolute(out_hpp_file), path.absolute(out_cpp_file)})
-            local header_file = target:autogendir() .. "/(WddmDump/*.hpp)"
-            target:add("headerfiles", header_file, out_hpp_file)
-            target:add("includedirs", out_folder, {public = true})
-            target:add("files", out_cpp_file, {public = true})
-            
-            local windows_kit = "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared"
-            local d3dukmdt = path.join(windows_kit, "d3dukmdt.h")
-            local d3dkmthk = path.join(windows_kit, "d3dkmthk.h")
-            local d3dkmdt = path.join(windows_kit, "d3dkmdt.h")
-
-            out_hpp_file = path.join(out_folder, "WddmDump", "WddmJson.hpp")
-            os.execv("python.exe", { "./gen_wddm_to_json.py", d3dukmdt, d3dkmthk, d3dkmdt, out_hpp_file})
-            target:add("headerfiles", out_hpp_file, {public = true})
-        end)
-end
+target("vkd-test")
+    set_languages("cxx20")
+    set_kind("binary")
+    add_files("Tests/**.cpp")
+    add_includedirs("Src", { public = true })
+    add_packages("concerto-core", "concerto-graphics", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
+    add_defines("VK_NO_PROTOTYPES")
+    add_deps("vkd")
+    add_files("Src/Test/*.cpp")

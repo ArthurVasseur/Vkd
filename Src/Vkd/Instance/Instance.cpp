@@ -6,7 +6,7 @@
 
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Icd/Icd.hpp"
-#include "Win32/Utils.hpp"
+#include "Vkd/SoftwarePhysicalDevice/SoftwarePhysicalDevice.hpp"
 
 namespace vkd
 {
@@ -74,10 +74,17 @@ namespace vkd
 		if (!instance)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
 
-		instance->Object.SetAllocationCallbacks(pAllocator);
+		instance->Object->SetAllocationCallbacks(pAllocator);
 		
-		*pInstance = VKD_TO_HANDLE(VkInstance, instance);
 
+		auto result = instance->Object->EnumeratePlatformPhysicalDevices(); // Force physical device enumeration
+		if (result != VK_SUCCESS)
+		{
+			mem::DeleteDispatchable(instance);
+			return result;
+		}
+
+		*pInstance = VKD_TO_HANDLE(VkInstance, instance);
 		return VK_SUCCESS;
 	}
 
@@ -123,17 +130,14 @@ namespace vkd
 		if (m_physicalDevicesAlreadyEnumerated)
 			return VK_SUCCESS; // Enumerate Physical devices only once during the lifetime of this VkInstance
 
-#ifdef CCT_PLATFORM_WINDOWS
-		auto result =  vkd::utils::EnumerateWddmPhysicalDevices(*this);
-#else
-		CCT_ASSERT_FALSE("Not Implemented");
-		return VK_SUCCESS;
-#endif
-		if (result.IsError())
-			return result.GetError();
-		auto physicalDevices = std::move(result).GetValue();
-		for (auto* physicalDevice : physicalDevices)
-			AddPhysicalDevice(physicalDevice);
+		DispatchableObject<SoftwarePhysicalDevice>* softwarePhysicalDevice = mem::NewDispatchable<SoftwarePhysicalDevice>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+		if (!softwarePhysicalDevice)
+			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
+		DispatchableObject<PhysicalDevice>* physicalDevice = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(softwarePhysicalDevice);
+		physicalDevice->Object->Create();
+		physicalDevice->Object->SetAllocationCallbacks(GetAllocationCallbacks());
+
+		AddPhysicalDevice(physicalDevice);
 		m_physicalDevicesAlreadyEnumerated = true;
 		return VK_SUCCESS;
 	}

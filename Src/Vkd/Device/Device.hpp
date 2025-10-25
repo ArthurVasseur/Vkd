@@ -3,10 +3,12 @@
 //
 
 #pragma once
+
 #include "Vkd/ObjectBase/ObjectBase.hpp"
 
 namespace vkd
 {
+	class PhysicalDevice;
 	class Device : ObjectBase
 	{
 	public:
@@ -19,5 +21,7 @@ namespace vkd
 		static void VKAPI_CALL DestroyDevice(VkDevice pDevice, const VkAllocationCallbacks* pAllocator);
 		static PFN_vkVoidFunction VKAPI_CALL GetDeviceProcAddr(VkDevice pDevice, const char* pName);
 		static void VKAPI_CALL GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue);
+	private:
+		PhysicalDevice* m_owner;
 	};
 }

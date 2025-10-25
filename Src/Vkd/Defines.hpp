@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <Concerto/Core/Types.hpp>
+#include <Concerto/Core/Types/Types.hpp>
 #include <Concerto/Core/Assert.hpp>
 
 #include <vulkan/vulkan_core.h>
@@ -36,12 +36,12 @@
 			auto* dispatchable = reinterpret_cast<DispatchableObject<type>*>(instance);			\
 			if (!dispatchable)																	\
 				return nullptr;																	\
-			if (dispatchable->Object.GetObjectType() != type::ObjectType)						\
+			if (dispatchable->Object->GetObjectType() != type::ObjectType)						\
 			{																					\
 				CCT_ASSERT_FALSE("Invalid Object Type for: " #type);							\
 				return nullptr;																	\
 			}																					\
-			return &dispatchable->Object;														\
+			return dispatchable->Object;														\
 		}
 
 
@@ -50,7 +50,7 @@ namespace vkd
 	enum class VendorId : cct::UInt32
 	{
 		Microsoft = 0x1414,
-		Amd = 0x1022,
+		Amd = 0x1002,//0x1022,
 		Nvidia = 0x10DE,
 		Qualcomm = 0x17CB,
 		Intel = 0x8086

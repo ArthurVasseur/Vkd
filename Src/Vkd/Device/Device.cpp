@@ -8,7 +8,8 @@
 namespace vkd
 {
 	Device::Device() :
-		ObjectBase(ObjectType)
+		ObjectBase(ObjectType),
+		m_owner(nullptr)
 	{
 	}
 
@@ -17,10 +18,14 @@ namespace vkd
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		if (!pAllocator)
 			pAllocator = physicalDevice->GetAllocationCallbacks();
-		auto dispachableDevice = mem::NewDispatchable<Device>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
 
-		*pDevice = VKD_TO_HANDLE(VkDevice, dispachableDevice);
-		CCT_ASSERT_FALSE("Not Implemented");
+		auto* device = physicalDevice->CreateDevice();
+		if (!device)
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+
+		device->Object->SetAllocationCallbacks(pAllocator);
+
+		*pDevice = VKD_TO_HANDLE(VkDevice, device);
 		return VK_SUCCESS;
 	}
 

@@ -4,11 +4,10 @@
 
 #pragma once
 
-// STL
 #include <array>
 
-// Project
 #include "Vkd/ObjectBase/ObjectBase.hpp"
+#include "Vkd/Device/Device.hpp"
 
 namespace vkd
 {
@@ -21,6 +20,7 @@ namespace vkd
 		VKD_DISPATCHABLE_HANDLE(PhysicalDevice);
 
 		PhysicalDevice();
+		~PhysicalDevice() override = default;
 		
 		void SetInstance(Instance& instance);
 		void SetPhysicalDeviceProperties(const VkPhysicalDeviceProperties& physicalDeviceProperties);
@@ -28,7 +28,8 @@ namespace vkd
 		void SetQueueFamilyProperties(const VkQueueFamilyProperties& queueFamilyProperties);
 		[[nodiscard]] const VkQueueFamilyProperties& GetQueueFamilyProperties() const;
 
-		virtual VkResult Create(const VkPhysicalDeviceProperties& physicalDeviceProperties);
+		virtual VkResult Create();
+		virtual DispatchableObject<Device>* CreateDevice() = 0;
 
 		static void VKAPI_CALL GetPhysicalDeviceFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures* pFeatures);
 		static void VKAPI_CALL GetPhysicalDeviceFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format, VkFormatProperties* pFormatProperties);
