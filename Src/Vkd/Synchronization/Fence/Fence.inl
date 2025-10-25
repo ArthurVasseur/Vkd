@@ -1,0 +1,34 @@
+#pragma once
+
+#include "Vkd/Synchronization/Fence/Fence.hpp"
+#include "Vkd/Device/Device.hpp"
+
+namespace vkd
+{
+	inline Fence::Fence() :
+		ObjectBase(VK_OBJECT_TYPE_FENCE),
+		m_owner(nullptr),
+		m_flags(0)
+	{
+	}
+
+	inline VkResult Fence::Create(Device& owner, const VkFenceCreateInfo& createInfo)
+	{
+		m_owner = &owner;
+		m_flags = createInfo.flags;
+
+		SetAllocationCallbacks(m_owner->GetAllocationCallbacks());
+
+		return VK_SUCCESS;
+	}
+
+	inline Device* Fence::GetOwner() const
+	{
+		return m_owner;
+	}
+
+	inline VkFenceCreateFlags Fence::GetFlags() const
+	{
+		return m_flags;
+	}
+}

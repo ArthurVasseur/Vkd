@@ -11,6 +11,7 @@ namespace vkd
 	class Icd
 	{
 	public:
+		// Vulkan API entry points
 		static VKAPI_ATTR VkResult VKAPI_CALL NegotiateLoaderICDInterfaceVersion(uint32_t* pVersion);
 		static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetInstanceProcAddr(VkInstance instance, const char* pName);
 		static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetPhysicalDeviceProcAddr(VkInstance instance, const char* pName);

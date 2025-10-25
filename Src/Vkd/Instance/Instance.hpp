@@ -25,13 +25,14 @@ namespace vkd
 
 		VkResult Create(const VkAllocationCallbacks& allocationCallbacks);
 
-		static VkResult EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties);
-		static VkResult EnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties);
-		static VkResult EnumerateInstanceVersion(uint32_t* pApiVersion);
-		static VkResult CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance);
-		static void DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator);
-		static PFN_vkVoidFunction GetInstanceProcAddr(VkInstance instance, const char* pName);
-		static VkResult EnumeratePhysicalDevices(VkInstance instance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices);
+		// Vulkan API entry points
+		static  VkResult VKAPI_CALL EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties);
+		static  VkResult VKAPI_CALL EnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties);
+		static  VkResult VKAPI_CALL EnumerateInstanceVersion(uint32_t* pApiVersion);
+		static  VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance);
+		static  void VKAPI_CALL DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator);
+		static  PFN_vkVoidFunction VKAPI_CALL GetInstanceProcAddr(VkInstance instance, const char* pName);
+		static  VkResult VKAPI_CALL EnumeratePhysicalDevices(VkInstance instance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices);
 
 		VkResult EnumeratePlatformPhysicalDevices();
 		void AddPhysicalDevice(DispatchableObject<PhysicalDevice>* physicalDevice);

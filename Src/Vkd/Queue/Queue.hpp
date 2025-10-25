@@ -17,11 +17,11 @@ namespace vkd
 		Queue();
 		~Queue() override = default;
 
-		virtual VkResult Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags);
+		virtual VkResult Create(Device& owner, cct::UInt32 queueFamilyIndex, cct::UInt32 queueIndex, VkDeviceQueueCreateFlags flags);
 
 		[[nodiscard]] inline Device* GetOwner() const;
-		[[nodiscard]] inline uint32_t GetQueueFamilyIndex() const;
-		[[nodiscard]] inline uint32_t GetQueueIndex() const;
+		[[nodiscard]] inline cct::UInt32 GetQueueFamilyIndex() const;
+		[[nodiscard]] inline cct::UInt32 GetQueueIndex() const;
 		[[nodiscard]] inline VkDeviceQueueCreateFlags GetFlags() const;
 
 		// Vulkan API entry points
@@ -36,8 +36,8 @@ namespace vkd
 
 	private:
 		Device* m_owner;
-		uint32_t m_queueFamilyIndex;
-		uint32_t m_queueIndex;
+		cct::UInt32 m_queueFamilyIndex;
+		cct::UInt32 m_queueIndex;
 		VkDeviceQueueCreateFlags m_flags;
 	};
 }

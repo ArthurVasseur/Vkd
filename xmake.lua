@@ -27,9 +27,13 @@ local drivers = {
     Software = {
         Files = {
             ".",
+            "CommandBuffer",
+            "CommandPool",
             "Device",
             "PhysicalDevice",
             "Queue",
+            "Synchronization",
+            "Synchronization/Fence",
         },
         Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true} },
         Deps = {},
@@ -51,13 +55,17 @@ target("vkd")
 
     local files = {
         ".",
+        "CommandBuffer",
+        "CommandPool",
         "Device",
         "Icd",
         "Instance",
         "Memory",
         "ObjectBase",
         "PhysicalDevice",
-        "Queue"
+        "Queue",
+        "Synchronization",
+        "Synchronization/Fence",
     }
     for _, dir in ipairs(files) do
         add_files_to_target("Src/Vkd/" .. dir, false)

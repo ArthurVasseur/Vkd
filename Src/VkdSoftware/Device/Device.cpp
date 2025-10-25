@@ -2,10 +2,13 @@
 // Created by arthur on 23/04/2025.
 //
 
-#include "VkdSoftware/Device/Device.hpp"
-#include "VkdSoftware/Queue/Queue.hpp"
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
+
+#include "VkdSoftware/Device/Device.hpp"
+#include "VkdSoftware/Queue/Queue.hpp"
+#include "VkdSoftware/CommandPool/CommandPool.hpp"
+#include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 
 namespace vkd::software
 {
@@ -31,5 +34,29 @@ namespace vkd::software
 			return result;
 
 		return reinterpret_cast<DispatchableObject<vkd::Queue>*>(queue);
+	}
+
+	DispatchableObjectResult<vkd::CommandPool> SoftwareDevice::CreateCommandPool()
+	{
+		auto* pool = mem::NewDispatchable<CommandPool>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+		if (!pool)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate CommandPool");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return reinterpret_cast<DispatchableObject<vkd::CommandPool>*>(pool);
+	}
+
+	DispatchableObjectResult<vkd::Fence> SoftwareDevice::CreateFence()
+	{
+		auto* fence = mem::NewDispatchable<Fence>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!fence)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Fence");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return reinterpret_cast<DispatchableObject<vkd::Fence>*>(fence);
 	}
 }
