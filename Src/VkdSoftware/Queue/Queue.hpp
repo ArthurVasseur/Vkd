@@ -14,7 +14,7 @@ namespace vkd::software
 		Queue() = default;
 		~Queue() override = default;
 
-		VkResult Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex) override;
+		VkResult Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;
 
 	protected:
 		VkResult Submit(uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence) override;

@@ -46,6 +46,6 @@ namespace vkd
 
 		Instance* m_instance;
 		VkPhysicalDeviceProperties m_physicalDeviceProperties;
-		std::array<VkQueueFamilyProperties, 3 /*graphics, compute, transfer*/> m_queueFamilyProperties;
+		std::array<VkQueueFamilyProperties, 3 /*(graphics + compute + transfer), graphics, transfer*/> m_queueFamilyProperties;
 	};
 }

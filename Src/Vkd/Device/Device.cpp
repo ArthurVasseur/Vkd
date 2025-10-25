@@ -22,7 +22,7 @@ namespace vkd
 	{
 		for (auto& queueFamily : m_queues)
 		{
-			for (auto* queue : queueFamily)
+			for (auto* queue : queueFamily.second)
 			{
 				if (queue)
 					mem::DeleteDispatchable(queue);
@@ -49,34 +49,51 @@ namespace vkd
 		if (pCreateInfo.queueCreateInfoCount == 0)
 			return VK_SUCCESS;
 
-		// Find the maximum queue family index to size our vector
-		uint32_t maxQueueFamilyIndex = 0;
-		for (uint32_t i = 0; i < pCreateInfo.queueCreateInfoCount; ++i)
-		{
-			maxQueueFamilyIndex = std::max(pCreateInfo.pQueueCreateInfos[i].queueFamilyIndex, maxQueueFamilyIndex);
-		}
-
-		m_queues.resize(maxQueueFamilyIndex + 1);
-
-		// Create queues for each family
+		std::unordered_map<uint32_t, uint32_t> totalPerFamily;
 		for (uint32_t i = 0; i < pCreateInfo.queueCreateInfoCount; ++i)
 		{
 			const auto& queueCreateInfo = pCreateInfo.pQueueCreateInfos[i];
-			uint32_t queueFamilyIndex = queueCreateInfo.queueFamilyIndex;
-			uint32_t queueCount = queueCreateInfo.queueCount;
 
-			m_queues[queueFamilyIndex].resize(queueCount);
-
-			for (uint32_t queueIndex = 0; queueIndex < queueCount; ++queueIndex)
+			if (queueCreateInfo.pQueuePriorities == nullptr && queueCreateInfo.queueCount > 0)
 			{
-				auto queue = CreateQueueForFamily(queueFamilyIndex, queueIndex);
+				CCT_ASSERT_FALSE("pQueuePriorities is null but queueCount > 0");
+				return VK_ERROR_INITIALIZATION_FAILED;
+			}
+
+			totalPerFamily[queueCreateInfo.queueFamilyIndex] += queueCreateInfo.queueCount;
+		}
+
+		for (const auto& [family, total] : totalPerFamily)
+		{
+			auto& vec = m_queues[family];
+			vec.clear();
+			vec.resize(total);
+		}
+
+		std::unordered_map<uint32_t, uint32_t> nextOffset;
+		for (uint32_t i = 0; i < pCreateInfo.queueCreateInfoCount; ++i)
+		{
+			const auto& queueCreateInfo = pCreateInfo.pQueueCreateInfos[i];
+			const uint32_t family = queueCreateInfo.queueFamilyIndex;
+			const uint32_t count = queueCreateInfo.queueCount;
+			const VkDeviceQueueCreateFlags flags = queueCreateInfo.flags;
+
+			auto& vec = m_queues[family];
+			uint32_t& at = nextOffset[family];
+
+			for (uint32_t q = 0; q < count; ++q)
+			{
+				auto queue = CreateQueueForFamily(family, at + q, flags);
 				if (queue.IsError())
 				{
 					CCT_ASSERT_FALSE("Failed to create queue");
 					return queue.GetError();
 				}
-				m_queues[queueFamilyIndex][queueIndex] = std::move(queue).GetValue();
+
+				vec[at + q] = std::move(queue).GetValue();
 			}
+
+			at += count;
 		}
 
 		return VK_SUCCESS;
@@ -84,13 +101,54 @@ namespace vkd
 
 	DispatchableObject<Queue>* Device::GetQueue(uint32_t queueFamilyIndex, uint32_t queueIndex) const
 	{
-		if (queueFamilyIndex >= m_queues.size())
+		auto it = m_queues.find(queueFamilyIndex);
+		if (it == m_queues.end())
+		{
+			CCT_ASSERT_FALSE("GetQueue: unknown queueFamilyIndex '{}'", queueFamilyIndex);
+			return nullptr;
+		}
+
+		const auto& familyQueues = it->second;
+		if (queueIndex >= familyQueues.size())
+		{
+			CCT_ASSERT_FALSE("GetQueue: queueIndex '{}' out of range (size '{}') for family '{}'",
+				queueIndex, familyQueues.size(), queueFamilyIndex);
+			return nullptr;
+		}
+
+		return familyQueues[queueIndex];
+	}
+
+	DispatchableObject<Queue>* Device::GetQueue(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) const
+	{
+		auto it = m_queues.find(queueFamilyIndex);
+		if (it == m_queues.end())
+		{
+			CCT_ASSERT_FALSE("GetQueue: unknown queueFamilyIndex '{}'", queueFamilyIndex);
+			return nullptr;
+		}
+
+		const auto& familyQueues = it->second;
+		if (queueIndex >= familyQueues.size())
+		{
+			CCT_ASSERT_FALSE("GetQueue: queueIndex '{}' out of range (size '{}') for family '{}'",
+				queueIndex, familyQueues.size(), queueFamilyIndex);
+			return nullptr;
+		}
+
+		auto* queue = familyQueues[queueIndex];
+		if (!queue)
 			return nullptr;
 
-		if (queueIndex >= m_queues[queueFamilyIndex].size())
+		// Verify that the queue has the matching flags
+		if (queue->Object->GetFlags() != flags)
+		{
+			CCT_ASSERT_FALSE("GetQueue: queue at family '{}' index '{}' has flags '{}' but requested flags '{}'",
+				queueFamilyIndex, queueIndex, queue->Object->GetFlags(), flags);
 			return nullptr;
+		}
 
-		return m_queues[queueFamilyIndex][queueIndex];
+		return queue;
 	}
 
 	VkResult Device::CreateDevice(VkPhysicalDevice pPhysicalDevice, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice)
@@ -140,6 +198,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueBindSparse);
@@ -161,6 +220,26 @@ namespace vkd
 		if (!queue)
 		{
 			CCT_ASSERT_FALSE("Invalid queue family index or queue index");
+			*pQueue = VK_NULL_HANDLE;
+			return;
+		}
+
+		*pQueue = VKD_TO_HANDLE(VkQueue, queue);
+	}
+
+	void Device::GetDeviceQueue2(VkDevice pDevice, const VkDeviceQueueInfo2* pQueueInfo, VkQueue* pQueue)
+	{
+		VKD_FROM_HANDLE(Device, device, pDevice);
+		if (!device || !pQueueInfo || !pQueue)
+		{
+			CCT_ASSERT_FALSE("Invalid parameters to GetDeviceQueue2");
+			return;
+		}
+
+		auto* queue = device->GetQueue(pQueueInfo->queueFamilyIndex, pQueueInfo->queueIndex, pQueueInfo->flags);
+		if (!queue)
+		{
+			CCT_ASSERT_FALSE("Invalid queue family index, queue index, or flags mismatch");
 			*pQueue = VK_NULL_HANDLE;
 			return;
 		}
