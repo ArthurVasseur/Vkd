@@ -9,16 +9,16 @@
 namespace vkd::mem
 {
 	template<typename T>
-	T* Allocate(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope);
+	T* Allocate(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope);
 
-	inline void Free(const VkAllocationCallbacks* pAllocator, void* memory);
+	inline void Free(const VkAllocationCallbacks& pAllocator, void* memory);
 
 	template<typename T>
-	T* New(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope);
+	T* New(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope);
 
 	template<typename T>
 	requires std::is_base_of_v<ObjectBase, T>
-	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks* pAllocator, VkSystemAllocationScope allocationScope);
+	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope);
 
 	template<typename T>
 	requires std::is_base_of_v<ObjectBase, T>

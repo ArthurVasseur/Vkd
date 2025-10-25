@@ -23,6 +23,8 @@ namespace vkd
 
 		Instance();
 
+		VkResult Create(const VkAllocationCallbacks& allocationCallbacks);
+
 		static VkResult EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties);
 		static VkResult EnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties);
 		static VkResult EnumerateInstanceVersion(uint32_t* pApiVersion);

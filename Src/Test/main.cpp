@@ -23,7 +23,7 @@ int main(int argc, const char** argv, const char** env)
 	};
 
 	cct::DynLib driver;
-	if (driver.Load("./vkd" CONCERTO_DYNLIB_EXTENSION) == false)
+	if (driver.Load("./vkd-Software" CONCERTO_DYNLIB_EXTENSION) == false)
 	{
 		return EXIT_FAILURE;
 	}
@@ -64,18 +64,17 @@ int main(int argc, const char** argv, const char** env)
 	{
 		VkPhysicalDeviceProperties properties;
 		vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-		std::cout << "Physical Device: " << properties.deviceName << '\n';
-		std::cout << "API Version: " << VK_VERSION_MAJOR(properties.apiVersion) << "."
-			<< VK_VERSION_MINOR(properties.apiVersion) << "."
-			<< VK_VERSION_PATCH(properties.apiVersion) << '\n';
-		std::cout << "Driver Version: " << VK_VERSION_MAJOR(properties.driverVersion) << "."
-			<< VK_VERSION_MINOR(properties.driverVersion) << "."
-			<< VK_VERSION_PATCH(properties.driverVersion) << "\n\n";
-		std::cout << "Device Name: " << properties.deviceName;
+		cct::Logger::Info("Device name: {}", properties.deviceName);
+		cct::Logger::Info("API Version: {}.{}.{}", VK_VERSION_MAJOR(properties.apiVersion), VK_VERSION_MINOR(properties.apiVersion), VK_VERSION_PATCH(properties.apiVersion));
+		cct::Logger::Info("Driver Version: {}.{}.{}", VK_VERSION_MAJOR(properties.driverVersion), VK_VERSION_MINOR(properties.driverVersion), VK_VERSION_PATCH(properties.driverVersion));
 	}
 
 	uint32_t queueFamilyCount = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevices[0], &queueFamilyCount, nullptr);
+
+	std::vector<VkQueueFamilyProperties> queueFamilyProperties;
+	queueFamilyProperties.resize(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevices[0], &queueFamilyCount, queueFamilyProperties.data());
 
 	VkDeviceCreateInfo deviceCreateInfo = {};
 	VkDevice vkDevice;

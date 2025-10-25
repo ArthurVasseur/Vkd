@@ -19,13 +19,13 @@ namespace vkd
 		return m_objectType;
 	}
 
-	const VkAllocationCallbacks* ObjectBase::GetAllocationCallbacks() const
+	const VkAllocationCallbacks& ObjectBase::GetAllocationCallbacks() const
 	{
-		return m_allocationCallbacks;
+		return *m_allocationCallbacks;
 	}
 
-	inline void ObjectBase::SetAllocationCallbacks(const VkAllocationCallbacks* allocationCallbacks)
+	inline void ObjectBase::SetAllocationCallbacks(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		m_allocationCallbacks = allocationCallbacks;
+		m_allocationCallbacks = &allocationCallbacks;
 	}
 }

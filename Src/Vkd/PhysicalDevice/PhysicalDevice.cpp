@@ -19,14 +19,14 @@ namespace vkd
 	{
 	}
 
-	void PhysicalDevice::SetInstance(Instance& instance)
+	VkResult PhysicalDevice::Create(Instance& owner, VkPhysicalDeviceProperties physicalDeviceProperties, std::array<VkQueueFamilyProperties, 3> queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks)
 	{
-		m_instance = &instance;
-	}
+		m_instance = &owner;
+		m_physicalDeviceProperties = std::move(physicalDeviceProperties);
+		m_queueFamilyProperties = std::move(queueFamilyProperties);
+		SetAllocationCallbacks(allocationCallbacks);
 
-	void PhysicalDevice::SetPhysicalDeviceProperties(const VkPhysicalDeviceProperties& physicalDeviceProperties)
-	{
-		m_physicalDeviceProperties = physicalDeviceProperties;
+		return VK_SUCCESS;
 	}
 
 	const VkPhysicalDeviceProperties& PhysicalDevice::GetPhysicalDeviceProperties() const
@@ -34,20 +34,11 @@ namespace vkd
 		return m_physicalDeviceProperties;
 	}
 
-	void PhysicalDevice::SetQueueFamilyProperties(const VkQueueFamilyProperties& queueFamilyProperties)
-	{
-		m_queueFamilyProperties = queueFamilyProperties;
-	}
-
-	const VkQueueFamilyProperties& PhysicalDevice::GetQueueFamilyProperties() const
+	std::span<VkQueueFamilyProperties> PhysicalDevice::GetQueueFamilyProperties()
 	{
 		return m_queueFamilyProperties;
 	}
 
-	VkResult PhysicalDevice::Create()
-	{
-		return VK_SUCCESS;
-	}
 
 	void PhysicalDevice::GetPhysicalDeviceFeatures(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures* pFeatures)
 	{
@@ -82,13 +73,20 @@ namespace vkd
 
 		if (pQueueFamilyPropertyCount && !pQueueFamilyProperties)
 		{
-			*pQueueFamilyPropertyCount = 0;
+			*pQueueFamilyPropertyCount = static_cast<cct::UInt32>(physicalDevice->GetQueueFamilyProperties().size());
+			return;
 		}
-		CCT_ASSERT_FALSE("Not Implemented");
+
+		// Return the queue family properties
+		if (pQueueFamilyPropertyCount && pQueueFamilyProperties && *pQueueFamilyPropertyCount > 0)
+		{
+			auto properties = physicalDevice->GetQueueFamilyProperties();
+			std::memcpy(pQueueFamilyProperties, properties.data(), properties.size());
+			*pQueueFamilyPropertyCount = static_cast<cct::UInt32>(properties.size());
+		}
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice,
-		VkPhysicalDeviceMemoryProperties* pMemoryProperties)
+	void PhysicalDevice::GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties)
 	{
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		CCT_ASSERT_FALSE("Not Implemented");
@@ -110,8 +108,7 @@ namespace vkd
 		}
 
 		std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
-		for (std::size_t i = 0; i < max; ++i)
-			pProperties[i] = s_supportedExtensions[i];
+		std::memcpy(pProperties, s_supportedExtensions.data(), max);
 
 		if (max < s_supportedExtensions.size())
 			return VK_INCOMPLETE;

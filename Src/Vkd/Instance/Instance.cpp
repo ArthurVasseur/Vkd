@@ -6,7 +6,7 @@
 
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Icd/Icd.hpp"
-#include "Vkd/SoftwarePhysicalDevice/SoftwarePhysicalDevice.hpp"
+#include "VkdSoftware/PhysicalDevice/PhysicalDevice.hpp"
 
 namespace vkd
 {
@@ -30,6 +30,13 @@ namespace vkd
 		ObjectBase(ObjectType),
 		m_physicalDevicesAlreadyEnumerated(false)
 	{
+	}
+
+	VkResult Instance::Create(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		SetAllocationCallbacks(allocationCallbacks);
+
+		return VK_SUCCESS;
 	}
 
 	VkResult Instance::EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties)
@@ -70,11 +77,11 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &s_allocationCallbacks;
 
-		auto* instance = mem::NewDispatchable<Instance>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+		auto* instance = mem::NewDispatchable<Instance>(*pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
 		if (!instance)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
 
-		instance->Object->SetAllocationCallbacks(pAllocator);
+		instance->Object->Create(*pAllocator);
 		
 
 		auto result = instance->Object->EnumeratePlatformPhysicalDevices(); // Force physical device enumeration
@@ -130,12 +137,14 @@ namespace vkd
 		if (m_physicalDevicesAlreadyEnumerated)
 			return VK_SUCCESS; // Enumerate Physical devices only once during the lifetime of this VkInstance
 
-		DispatchableObject<SoftwarePhysicalDevice>* softwarePhysicalDevice = mem::NewDispatchable<SoftwarePhysicalDevice>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+		DispatchableObject<software::PhysicalDevice>* softwarePhysicalDevice = mem::NewDispatchable<software::PhysicalDevice>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
 		if (!softwarePhysicalDevice)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
 		DispatchableObject<PhysicalDevice>* physicalDevice = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(softwarePhysicalDevice);
-		physicalDevice->Object->Create();
-		physicalDevice->Object->SetAllocationCallbacks(GetAllocationCallbacks());
+
+		VkResult result = physicalDevice->Object->Create(*this, GetAllocationCallbacks());
+		if (result != VK_SUCCESS)
+			return result;
 
 		AddPhysicalDevice(physicalDevice);
 		m_physicalDevicesAlreadyEnumerated = true;
