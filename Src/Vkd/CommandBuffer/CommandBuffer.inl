@@ -8,7 +8,8 @@ namespace vkd
 	inline CommandBuffer::CommandBuffer() :
 		ObjectBase(VK_OBJECT_TYPE_COMMAND_BUFFER),
 		m_owner(nullptr),
-		m_level(VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+		m_level(VK_COMMAND_BUFFER_LEVEL_PRIMARY),
+		m_state(State::Initial)
 	{
 	}
 
@@ -30,6 +31,23 @@ namespace vkd
 	inline VkCommandBufferLevel CommandBuffer::GetLevel() const
 	{
 		return m_level;
+	}
+
+	inline void CommandBuffer::PushFill(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, uint32_t data)
+	{
+		VKD_FROM_HANDLE(Buffer, bufferObj, dst);
+		m_ops.emplace_back(Buffer::OpFill{ bufferObj, off, size, data });
+	}
+
+	inline void CommandBuffer::PushCopy(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
+	{
+		VKD_FROM_HANDLE(Buffer, srcBufferObj, srcBuffer);
+		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
+
+		std::vector<VkBufferCopy> regions;
+		regions.resize(regionCount);
+		std::memcpy(regions.data(), pRegions, regions.size());
+		m_ops.emplace_back(Buffer::OpCopy{ srcBufferObj, dstBufferObj, std::move(regions)});
 	}
 
 	inline VkResult CommandBuffer::MarkSubmitted()

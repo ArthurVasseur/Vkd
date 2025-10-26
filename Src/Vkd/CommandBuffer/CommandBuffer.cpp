@@ -15,7 +15,7 @@ namespace vkd
 		if (!cmdBuffer)
 		{
 			CCT_ASSERT_FALSE("Invalid VkCommandBuffer handle");
-			return VK_ERROR_DEVICE_LOST;
+			return VK_ERROR_VALIDATION_FAILED_EXT;
 		}
 
 		if (!pBeginInfo)
@@ -35,7 +35,7 @@ namespace vkd
 		if (!cmdBuffer)
 		{
 			CCT_ASSERT_FALSE("Invalid VkCommandBuffer handle");
-			return VK_ERROR_DEVICE_LOST;
+			return VK_ERROR_VALIDATION_FAILED_EXT;
 		}
 
 		return cmdBuffer->End();
@@ -49,9 +49,25 @@ namespace vkd
 		if (!cmdBuffer)
 		{
 			CCT_ASSERT_FALSE("Invalid VkCommandBuffer handle");
-			return VK_ERROR_DEVICE_LOST;
+			return VK_ERROR_VALIDATION_FAILED_EXT;
 		}
 
 		return cmdBuffer->Reset(flags);
+	}
+
+	void CommandBuffer::CmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size, uint32_t data)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushFill(dstBuffer, dstOffset, size, data);
+	}
+
+	void CommandBuffer::CmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushCopy(srcBuffer, dstBuffer, regionCount, pRegions);
 	}
 }

@@ -15,6 +15,8 @@ namespace vkd
 	class Queue;
 	class CommandPool;
 	class Fence;
+	class Buffer;
+	class DeviceMemory;
 
 	class Device : public ObjectBase
 	{
@@ -53,9 +55,21 @@ namespace vkd
 		static VkResult VKAPI_CALL ResetFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences);
 		static VkResult VKAPI_CALL GetFenceStatus(VkDevice device, VkFence fence);
 
+		static VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer);
+		static void VKAPI_CALL DestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator);
+		static void VKAPI_CALL GetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements* pMemoryRequirements);
+		static VkResult VKAPI_CALL BindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memoryOffset);
+
+		static VkResult VKAPI_CALL AllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo, const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory);
+		static void VKAPI_CALL FreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator);
+		static VkResult VKAPI_CALL MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData);
+		static void VKAPI_CALL UnmapMemory(VkDevice device, VkDeviceMemory memory);
+
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual DispatchableObjectResult<CommandPool> CreateCommandPool() = 0;
 		virtual DispatchableObjectResult<Fence> CreateFence() = 0;
+		virtual DispatchableObjectResult<Buffer> CreateBuffer() = 0;
+		virtual DispatchableObjectResult<DeviceMemory> CreateDeviceMemory() = 0;
 
 	private:
 		PhysicalDevice* m_owner;

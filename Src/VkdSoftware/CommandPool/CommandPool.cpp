@@ -23,7 +23,7 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
-	DispatchableObjectResult<vkd::CommandBuffer> CommandPool::DoCreateCommandBuffer(VkCommandBufferLevel level)
+	DispatchableObjectResult<vkd::CommandBuffer> CommandPool::CreateCommandBuffer(VkCommandBufferLevel level)
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 

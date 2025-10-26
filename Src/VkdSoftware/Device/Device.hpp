@@ -17,5 +17,7 @@ namespace vkd::software
 		DispatchableObjectResult<vkd::Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;
 		DispatchableObjectResult<CommandPool> CreateCommandPool() override;
 		DispatchableObjectResult<vkd::Fence> CreateFence() override;
+		DispatchableObjectResult<vkd::Buffer> CreateBuffer() override;
+		DispatchableObjectResult<vkd::DeviceMemory> CreateDeviceMemory() override;
 	};
 }

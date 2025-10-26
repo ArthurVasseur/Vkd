@@ -1,6 +1,7 @@
 add_rules("mode.debug", "mode.release")
 add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.git main")
-add_requires("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "concerto-graphics")
+add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
+add_requires("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "concerto-graphics", "nazarautils")
 
 function add_files_to_target(p, hpp_as_files)
     for _, dir in ipairs(os.filedirs(p)) do
@@ -27,15 +28,17 @@ local drivers = {
     Software = {
         Files = {
             ".",
+            "Buffer",
             "CommandBuffer",
             "CommandPool",
             "Device",
+            "DeviceMemory",
             "PhysicalDevice",
             "Queue",
             "Synchronization",
             "Synchronization/Fence",
         },
-        Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true} },
+        Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
         Deps = {},
     }
 }
@@ -48,6 +51,7 @@ target("vkd")
     add_includedirs("Src", { public = true })
     add_headerfiles("Src/(Vkd/**.hpp)", "Src/(Vkd/**.inl)")
     add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
+    add_packages("nazarautils", {public = true})
     add_defines("VK_NO_PROTOTYPES")
     if is_plat("windows") then
         add_syslinks("Gdi32", "SetupAPI")
@@ -55,9 +59,11 @@ target("vkd")
 
     local files = {
         ".",
+        "Buffer",
         "CommandBuffer",
         "CommandPool",
         "Device",
+        "DeviceMemory",
         "Icd",
         "Instance",
         "Memory",

@@ -18,7 +18,7 @@ namespace vkd::software
 
 	protected:
 		VkResult Reset(VkCommandPoolResetFlags flags) override;
-		DispatchableObjectResult<vkd::CommandBuffer> DoCreateCommandBuffer(VkCommandBufferLevel level) override;
+		DispatchableObjectResult<vkd::CommandBuffer> CreateCommandBuffer(VkCommandBufferLevel level) override;
 
 	private:
 		// TODO: implement CPU command buffer pool management
