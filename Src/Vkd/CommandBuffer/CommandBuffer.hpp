@@ -4,10 +4,12 @@
 
 #pragma once
 
+#include <span>
 #include <vulkan/vulkan.h>
 
 #include "Vkd/ObjectBase/ObjectBase.hpp"
 #include "Vkd/Buffer/Buffer.hpp"
+#include "Vkd/CommandBuffer/Ops.hpp"
 
 namespace vkd
 {
@@ -24,6 +26,8 @@ namespace vkd
 			Pending,
 			Invalid
 		};
+		using Op = Nz::TypeListInstantiate<Nz::TypeListConcat<Buffer::Op, vkd::Op>,std::variant>;
+
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
 		VKD_DISPATCHABLE_HANDLE(CommandBuffer);
 
@@ -41,18 +45,26 @@ namespace vkd
 		static VkResult VKAPI_CALL ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags);
 		static void VKAPI_CALL CmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size, uint32_t data);
 		static void VKAPI_CALL CmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions);
+		static void VKAPI_CALL CmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline);
+		static void VKAPI_CALL CmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount, const VkBuffer* pBuffers, const VkDeviceSize* pOffsets);
+		static void VKAPI_CALL CmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
 
-		virtual VkResult Begin(const VkCommandBufferBeginInfo& beginInfo) = 0;
-		virtual VkResult End() = 0;
-		virtual VkResult Reset(VkCommandBufferResetFlags flags) = 0;
-		inline void PushFill(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, uint32_t data);
-		inline void PushCopy(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions);
+		VkResult Begin(const VkCommandBufferBeginInfo& beginInfo);
+		VkResult End();
+		VkResult Reset(VkCommandBufferResetFlags flags);
 
+		inline void PushFill(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, cct::UInt32 data);
+		inline void PushCopy(VkBuffer srcBuffer, VkBuffer dstBuffer, cct::UInt32 regionCount, const VkBufferCopy* pRegions);
+		inline void PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline);
+		inline void PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, cct::UInt32 firstBinding);
+		inline void PushDraw(cct::UInt32 vertexCount, cct::UInt32 instanceCount, cct::UInt32 firstVertex, cct::UInt32 firstInstance)
 
 		inline VkResult MarkSubmitted();
 		inline VkResult MarkComplete();
 
-		using Op = Nz::TypeListInstantiate<Buffer::Op, std::variant>;
+		[[nodiscard]] inline std::span<const Op> GetOps() const;
+		[[nodiscard]] inline bool IsSealed() const;
+
 	protected:
 		inline VkResult Transition(State to, std::initializer_list<State> allowed);
 	private:

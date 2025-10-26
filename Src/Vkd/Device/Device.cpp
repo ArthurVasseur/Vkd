@@ -16,6 +16,7 @@
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 #include "Vkd/Buffer/Buffer.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
+#include "Vkd/Pipeline/Pipeline.hpp"
 
 namespace vkd
 {
@@ -231,6 +232,9 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, MapMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, UnmapMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateGraphicsPipelines);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateComputePipelines);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipeline);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
@@ -835,5 +839,141 @@ namespace vkd
 
 		memoryObj->Unmap();
 		memoryObj->m_mapped = false;
+	}
+
+	VkResult Device::CreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		if (!deviceObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkDevice handle");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pCreateInfos || !pPipelines || createInfoCount == 0)
+		{
+			CCT_ASSERT_FALSE("Invalid parameters");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		for (uint32_t i = 0; i < createInfoCount; ++i)
+		{
+			auto pipelineResult = deviceObj->CreatePipeline();
+			if (pipelineResult.IsError())
+			{
+				// Clean up any pipelines created so far
+				for (uint32_t j = 0; j < i; ++j)
+				{
+					VKD_FROM_HANDLE(Pipeline, pipelineObj, pPipelines[j]);
+					if (pipelineObj)
+					{
+						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
+						mem::DeleteDispatchable(dispatchable);
+					}
+				}
+				return pipelineResult.GetError();
+			}
+
+			auto* pipelineObj = std::move(pipelineResult).GetValue();
+			VkResult result = pipelineObj->Object->CreateGraphicsPipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			if (result != VK_SUCCESS)
+			{
+				mem::DeleteDispatchable(pipelineObj);
+				// Clean up any pipelines created so far
+				for (uint32_t j = 0; j < i; ++j)
+				{
+					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
+					if (pipelineObjToDelete)
+					{
+						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
+						mem::DeleteDispatchable(dispatchable);
+					}
+				}
+				return result;
+			}
+
+			pPipelines[i] = VKD_TO_HANDLE(VkPipeline, pipelineObj);
+		}
+
+		return VK_SUCCESS;
+	}
+
+	VkResult Device::CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		if (!deviceObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkDevice handle");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pCreateInfos || !pPipelines || createInfoCount == 0)
+		{
+			CCT_ASSERT_FALSE("Invalid parameters");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		for (uint32_t i = 0; i < createInfoCount; ++i)
+		{
+			auto pipelineResult = deviceObj->CreatePipeline();
+			if (pipelineResult.IsError())
+			{
+				// Clean up any pipelines created so far
+				for (uint32_t j = 0; j < i; ++j)
+				{
+					VKD_FROM_HANDLE(Pipeline, pipelineObj, pPipelines[j]);
+					if (pipelineObj)
+					{
+						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
+						mem::DeleteDispatchable(dispatchable);
+					}
+				}
+				return pipelineResult.GetError();
+			}
+
+			auto* pipelineObj = std::move(pipelineResult).GetValue();
+			VkResult result = pipelineObj->Object->CreateComputePipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			if (result != VK_SUCCESS)
+			{
+				mem::DeleteDispatchable(pipelineObj);
+				// Clean up any pipelines created so far
+				for (uint32_t j = 0; j < i; ++j)
+				{
+					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
+					if (pipelineObjToDelete)
+					{
+						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
+						mem::DeleteDispatchable(dispatchable);
+					}
+				}
+				return result;
+			}
+
+			pPipelines[i] = VKD_TO_HANDLE(VkPipeline, pipelineObj);
+		}
+
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
+		if (!pipelineObj)
+			return;
+
+		auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pipeline);
+		mem::DeleteDispatchable(dispatchable);
 	}
 }

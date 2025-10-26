@@ -11,6 +11,7 @@
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
+#include "VkdSoftware/Pipeline/Pipeline.hpp"
 
 namespace vkd::software
 {
@@ -84,5 +85,17 @@ namespace vkd::software
 		}
 
 		return reinterpret_cast<DispatchableObject<vkd::DeviceMemory>*>(memory);
+	}
+
+	DispatchableObjectResult<vkd::Pipeline> SoftwareDevice::CreatePipeline()
+	{
+		auto* pipeline = mem::NewDispatchable<Pipeline>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!pipeline)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Pipeline");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return reinterpret_cast<DispatchableObject<vkd::Pipeline>*>(pipeline);
 	}
 }

@@ -19,5 +19,6 @@ namespace vkd::software
 		DispatchableObjectResult<vkd::Fence> CreateFence() override;
 		DispatchableObjectResult<vkd::Buffer> CreateBuffer() override;
 		DispatchableObjectResult<vkd::DeviceMemory> CreateDeviceMemory() override;
+		DispatchableObjectResult<vkd::Pipeline> CreatePipeline() override;
 	};
 }
