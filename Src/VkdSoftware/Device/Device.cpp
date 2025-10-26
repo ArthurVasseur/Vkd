@@ -9,6 +9,8 @@
 #include "VkdSoftware/Queue/Queue.hpp"
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
+#include "VkdSoftware/Buffer/Buffer.hpp"
+#include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 
 namespace vkd::software
 {
@@ -58,5 +60,29 @@ namespace vkd::software
 		}
 
 		return reinterpret_cast<DispatchableObject<vkd::Fence>*>(fence);
+	}
+
+	DispatchableObjectResult<vkd::Buffer> SoftwareDevice::CreateBuffer()
+	{
+		auto* buffer = mem::NewDispatchable<Buffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!buffer)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Buffer");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return reinterpret_cast<DispatchableObject<vkd::Buffer>*>(buffer);
+	}
+
+	DispatchableObjectResult<vkd::DeviceMemory> SoftwareDevice::CreateDeviceMemory()
+	{
+		auto* memory = mem::NewDispatchable<DeviceMemory>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!memory)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate DeviceMemory");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return reinterpret_cast<DispatchableObject<vkd::DeviceMemory>*>(memory);
 	}
 }

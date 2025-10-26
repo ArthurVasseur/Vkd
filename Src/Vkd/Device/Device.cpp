@@ -14,7 +14,8 @@
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
-#include "Vkd/Memory/Memory.hpp"
+#include "Vkd/Buffer/Buffer.hpp"
+#include "Vkd/DeviceMemory/DeviceMemory.hpp"
 
 namespace vkd
 {
@@ -222,6 +223,14 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, WaitForFences);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetFences);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetFenceStatus);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetBufferMemoryRequirements);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindBufferMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, AllocateMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, MapMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, UnmapMemory);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
@@ -231,6 +240,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, BeginCommandBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, EndCommandBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, ResetCommandBuffer);
+
+
 
 #undef VKD_ENTRYPOINT_LOOKUP
 
@@ -630,5 +641,200 @@ namespace vkd
 		}
 
 		return fenceObj->GetStatus();
+	}
+
+	VkResult Device::CreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		if (!deviceObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkDevice handle");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pCreateInfo || !pBuffer)
+		{
+			CCT_ASSERT_FALSE("Invalid parameters");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto bufferResult = deviceObj->CreateBuffer();
+		if (bufferResult.IsError())
+			return bufferResult.GetError();
+
+		auto* bufferObj = std::move(bufferResult).GetValue();
+		VkResult result = bufferObj->Object->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::DeleteDispatchable(bufferObj);
+			return result;
+		}
+
+		*pBuffer = VKD_TO_HANDLE(VkBuffer, bufferObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
+		if (!bufferObj)
+			return;
+
+		auto* dispatchable = reinterpret_cast<DispatchableObject<Buffer>*>(buffer);
+		mem::DeleteDispatchable(dispatchable);
+	}
+
+	void Device::GetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements* pMemoryRequirements)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
+		if (!bufferObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkBuffer handle");
+			return;
+		}
+
+		if (!pMemoryRequirements)
+		{
+			CCT_ASSERT_FALSE("Invalid parameters");
+			return;
+		}
+		bufferObj->GetMemoryRequirements(*pMemoryRequirements);
+	}
+
+	VkResult Device::BindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memoryOffset)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
+		if (!bufferObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkBuffer handle");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
+		if (!memoryObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkDeviceMemory handle");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (bufferObj->IsBound())
+		{
+			CCT_ASSERT_FALSE("Buffer already bound to memory");
+			return VK_ERROR_UNKNOWN;
+		}
+
+		bufferObj->BindBufferMemory(*memoryObj, memoryOffset);
+
+		return VK_SUCCESS;
+	}
+
+	VkResult Device::AllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo, const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		if (!deviceObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkDevice handle");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pAllocateInfo || !pMemory)
+		{
+			CCT_ASSERT_FALSE("Invalid parameters");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto memoryResult = deviceObj->CreateDeviceMemory();
+		if (memoryResult.IsError())
+			return memoryResult.GetError();
+
+		auto* memoryObj = std::move(memoryResult).GetValue();
+		VkResult result = memoryObj->Object->Create(*deviceObj, *pAllocateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::DeleteDispatchable(memoryObj);
+			return result;
+		}
+
+		*pMemory = VKD_TO_HANDLE(VkDeviceMemory, memoryObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::FreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
+		if (!memoryObj)
+			return;
+
+		auto* dispatchable = reinterpret_cast<DispatchableObject<DeviceMemory>*>(memory);
+		mem::DeleteDispatchable(dispatchable);
+	}
+
+	VkResult Device::MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
+		if (!memoryObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkDeviceMemory handle");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (!ppData)
+		{
+			CCT_ASSERT_FALSE("Invalid parameters");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (memoryObj->m_mapped)
+		{
+			CCT_ASSERT_FALSE("Memory already mapped");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		VkResult result = memoryObj->Map(offset, size, ppData);
+		if (result == VK_SUCCESS)
+			memoryObj->m_mapped = true;
+
+		return result;
+	}
+
+	void Device::UnmapMemory(VkDevice device, VkDeviceMemory memory)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+
+		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
+		if (!memoryObj)
+		{
+			CCT_ASSERT_FALSE("Invalid VkDeviceMemory handle");
+			return;
+		}
+
+		if (!memoryObj->m_mapped)
+		{
+			CCT_ASSERT_FALSE("Memory not mapped");
+			return;
+		}
+
+		memoryObj->Unmap();
+		memoryObj->m_mapped = false;
 	}
 }

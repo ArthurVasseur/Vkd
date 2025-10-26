@@ -8,6 +8,8 @@
 #include <Concerto/Core/Assert.hpp>
 #include <Concerto/Core/EnumFlags/EnumFlags.hpp>
 
+#include <NazaraUtils/TypeList.hpp>
+
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vk_icd.h>
 #include <vulkan/utility/vk_dispatch_table.h>
