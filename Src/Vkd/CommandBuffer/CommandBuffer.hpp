@@ -27,13 +27,10 @@ namespace vkd
 		[[nodiscard]] inline VkCommandBufferLevel GetLevel() const;
 
 		// Vulkan API entry points
-		static VkResult VKAPI_CALL AllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer* pCommandBuffers);
-		static void VKAPI_CALL FreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount, const VkCommandBuffer* pCommandBuffers);
 		static VkResult VKAPI_CALL BeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo);
 		static VkResult VKAPI_CALL EndCommandBuffer(VkCommandBuffer commandBuffer);
 		static VkResult VKAPI_CALL ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags);
 
-	protected:
 		virtual VkResult Begin(const VkCommandBufferBeginInfo& beginInfo) = 0;
 		virtual VkResult End() = 0;
 		virtual VkResult Reset(VkCommandBufferResetFlags flags) = 0;

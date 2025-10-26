@@ -31,10 +31,8 @@ namespace vkd
 		DispatchableObjectResult<CommandBuffer> AllocateCommandBuffer(VkCommandBufferLevel level);
 
 		// Vulkan API entry points
-		static VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool);
-		static void VKAPI_CALL DestroyCommandPool(VkDevice device, VkCommandPool commandPool, const VkAllocationCallbacks* pAllocator);
-		static VkResult VKAPI_CALL ResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags);
-	protected:
+		
+
 		virtual VkResult Reset(VkCommandPoolResetFlags flags) = 0;
 		virtual DispatchableObjectResult<CommandBuffer> DoCreateCommandBuffer(VkCommandBufferLevel level) = 0;
 
