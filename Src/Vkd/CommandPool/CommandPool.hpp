@@ -34,7 +34,7 @@ namespace vkd
 		
 
 		virtual VkResult Reset(VkCommandPoolResetFlags flags) = 0;
-		virtual DispatchableObjectResult<CommandBuffer> DoCreateCommandBuffer(VkCommandBufferLevel level) = 0;
+		virtual DispatchableObjectResult<CommandBuffer> CreateCommandBuffer(VkCommandBufferLevel level) = 0;
 
 	private:
 		Device* m_owner;

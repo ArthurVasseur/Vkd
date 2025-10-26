@@ -11,6 +11,8 @@ namespace vkd::software
 
 	VkResult Queue::Submit(uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		// TODO: implement CPU command buffer execution
 		// For now, just validate parameters and return success
 		if (submitCount > 0 && !pSubmits)
@@ -31,6 +33,8 @@ namespace vkd::software
 
 	VkResult Queue::WaitIdle()
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		// TODO: implement waiting for all queue operations to complete
 		// For now, since we execute synchronously, this is a no-op
 		return VK_SUCCESS;
@@ -38,6 +42,8 @@ namespace vkd::software
 
 	VkResult Queue::BindSparse(uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		// Sparse binding is an optional feature, not implemented for software queue
 		return VK_ERROR_FEATURE_NOT_PRESENT;
 	}

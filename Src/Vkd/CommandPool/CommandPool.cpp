@@ -8,6 +8,6 @@ namespace vkd
 {
 	DispatchableObjectResult<CommandBuffer> CommandPool::AllocateCommandBuffer(VkCommandBufferLevel level)
 	{
-		return DoCreateCommandBuffer(level);
+		return CreateCommandBuffer(level);
 	}
 }

@@ -45,6 +45,8 @@
 			return dispatchable->Object;														\
 		}
 
+#define VKD_PROFILER_SCOPE
+#define VKD_AUTO_PROFILER_SCOPE
 
 namespace vkd
 {

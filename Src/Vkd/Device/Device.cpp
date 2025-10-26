@@ -160,6 +160,8 @@ namespace vkd
 
 	VkResult Device::CreateDevice(VkPhysicalDevice pPhysicalDevice, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		if (!pAllocator)
 			pAllocator = &physicalDevice->GetAllocationCallbacks();
@@ -182,6 +184,8 @@ namespace vkd
 
 	void Device::DestroyDevice(VkDevice pDevice, const VkAllocationCallbacks* pAllocator)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, device, pDevice);
 		if (!device)
 			return;
@@ -192,6 +196,8 @@ namespace vkd
 
 	PFN_vkVoidFunction Device::GetDeviceProcAddr(VkDevice pDevice, const char* pName)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, device, pDevice);
 
 		if (pName == nullptr)
@@ -233,6 +239,8 @@ namespace vkd
 
 	void Device::GetDeviceQueue(VkDevice pDevice, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, device, pDevice);
 		if (!device || !pQueue)
 		{
@@ -253,6 +261,8 @@ namespace vkd
 
 	void Device::GetDeviceQueue2(VkDevice pDevice, const VkDeviceQueueInfo2* pQueueInfo, VkQueue* pQueue)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, device, pDevice);
 		if (!device || !pQueueInfo || !pQueue)
 		{
@@ -273,6 +283,8 @@ namespace vkd
 
 	VkResult Device::CreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		if (!deviceObj)
 		{
@@ -307,6 +319,8 @@ namespace vkd
 
 	void Device::DestroyCommandPool(VkDevice device, VkCommandPool commandPool, const VkAllocationCallbacks* pAllocator)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
 		if (!poolObj)
 			return;
@@ -317,6 +331,8 @@ namespace vkd
 
 	VkResult Device::ResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
 		if (!poolObj)
 		{
@@ -329,6 +345,8 @@ namespace vkd
 
 	VkResult Device::AllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer* pCommandBuffers)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		if (!deviceObj)
 		{
@@ -394,6 +412,8 @@ namespace vkd
 
 	void Device::FreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount, const VkCommandBuffer* pCommandBuffers)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		if (!pCommandBuffers || commandBufferCount == 0)
 			return;
 
@@ -411,6 +431,8 @@ namespace vkd
 
 	VkResult Device::CreateFence(VkDevice device, const VkFenceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkFence* pFence)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		if (!deviceObj)
 		{
@@ -442,6 +464,8 @@ namespace vkd
 
 	void Device::DestroyFence(VkDevice device, VkFence fence, const VkAllocationCallbacks* pAllocator)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Fence, fenceObj, fence);
 		if (!fenceObj)
 			return;
@@ -462,6 +486,8 @@ namespace vkd
 
 	VkResult Device::WaitForFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences, VkBool32 waitAll, uint64_t timeout)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		if (!deviceObj)
 		{
@@ -559,6 +585,8 @@ namespace vkd
 
 	VkResult Device::ResetFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		if (!deviceObj)
 		{
@@ -592,6 +620,8 @@ namespace vkd
 
 	VkResult Device::GetFenceStatus(VkDevice device, VkFence fence)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(Fence, fenceObj, fence);
 		if (!fenceObj)
 		{

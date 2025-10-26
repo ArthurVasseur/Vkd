@@ -9,6 +9,8 @@ namespace vkd::software
 
 	VkResult Fence::Create(Device& owner, const VkFenceCreateInfo& createInfo)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		cct::EnumFlags<VkFenceCreateFlagBits> flags(createInfo.flags);
 		m_signaled = flags.Contains(VK_FENCE_CREATE_SIGNALED_BIT);
 
@@ -17,12 +19,16 @@ namespace vkd::software
 
 	VkResult Fence::GetStatus()
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		std::lock_guard _(m_mutex);
 		return m_signaled ? VK_SUCCESS : VK_NOT_READY;
 	}
 
 	VkResult Fence::Wait(uint64_t timeout)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		using Clock = std::chrono::steady_clock;
 		std::unique_lock lock(m_mutex);
 
@@ -47,6 +53,8 @@ namespace vkd::software
 
 	VkResult Fence::Reset()
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		std::lock_guard _(m_mutex);
 		m_signaled = false;
 		return VK_SUCCESS;

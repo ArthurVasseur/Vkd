@@ -54,6 +54,8 @@ namespace vkd::software
 
 	DispatchableObjectResult<vkd::Device> PhysicalDevice::CreateDevice()
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		DispatchableObject<SoftwareDevice>* softwareDevice = mem::NewDispatchable<SoftwareDevice>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
 		if (!softwareDevice)
 		{
