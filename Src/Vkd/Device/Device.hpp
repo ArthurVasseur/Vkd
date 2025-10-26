@@ -17,6 +17,7 @@ namespace vkd
 	class Fence;
 	class Buffer;
 	class DeviceMemory;
+	class Pipeline;
 
 	class Device : public ObjectBase
 	{
@@ -65,11 +66,16 @@ namespace vkd
 		static VkResult VKAPI_CALL MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData);
 		static void VKAPI_CALL UnmapMemory(VkDevice device, VkDeviceMemory memory);
 
+		static VkResult VKAPI_CALL CreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines);
+		static VkResult VKAPI_CALL CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines);
+		static void VKAPI_CALL DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator);
+
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual DispatchableObjectResult<CommandPool> CreateCommandPool() = 0;
 		virtual DispatchableObjectResult<Fence> CreateFence() = 0;
 		virtual DispatchableObjectResult<Buffer> CreateBuffer() = 0;
 		virtual DispatchableObjectResult<DeviceMemory> CreateDeviceMemory() = 0;
+		virtual DispatchableObjectResult<Pipeline> CreatePipeline() = 0;
 
 	private:
 		PhysicalDevice* m_owner;

@@ -2,6 +2,7 @@
 
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
+#include "Vkd/Pipeline/Pipeline.hpp"
 
 namespace vkd
 {
@@ -50,6 +51,47 @@ namespace vkd
 		m_ops.emplace_back(Buffer::OpCopy{ srcBufferObj, dstBufferObj, std::move(regions)});
 	}
 
+	inline void CommandBuffer::PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)
+	{
+		VKD_FROM_HANDLE(Pipeline, pipelineObject, pipeline);
+
+		m_ops.emplace_back(OpBindPipeline{
+			.BindPoint = pipelineBindPoint,
+			.Pipeline = pipelineObject,
+		});
+	}
+
+	inline void CommandBuffer::PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, cct::UInt32 firstBinding)
+	{
+		std::vector<Buffer*> buffers;
+		std::vector<VkDeviceSize> offsets;
+		buffers.resize(pBuffers.size());
+		offsets.resize(pBuffers.size());
+
+		for (std::size_t i = 0; i < pBuffers.size(); ++i)
+		{
+			VKD_FROM_HANDLE(Buffer, bufferObject, pBuffers[i]);
+			buffers[i] = bufferObject;
+			offsets[i] = pOffsets[i];
+		}
+
+		m_ops.emplace_back(OpBindVertexBuffer{
+				.Buffers = std::move(buffers),
+				.Offsets = std::move(offsets),
+				.FirstBinding = firstBinding,
+		});
+	}
+
+	inline void CommandBuffer::PushDraw(cct::UInt32 vertexCount, cct::UInt32 instanceCount, cct::UInt32 firstVertex, cct::UInt32 firstInstance)
+	{
+		m_ops.emplace_back(OpDraw{
+			.VertexCount = vertexCount,
+			.InstanceCount = instanceCount,
+			.FirstVertex = firstVertex,
+			.FirstInstance = firstInstance,
+		});
+	}
+
 	inline VkResult CommandBuffer::MarkSubmitted()
 	{
 		return Transition(State::Pending, { State::Executable });
@@ -58,6 +100,16 @@ namespace vkd
 	inline VkResult CommandBuffer::MarkComplete()
 	{
 		return Transition(State::Executable, { State::Pending });
+	}
+
+	inline std::span<const CommandBuffer::Op> CommandBuffer::GetOps() const
+	{
+		return m_ops;
+	}
+
+	inline bool CommandBuffer::IsSealed() const
+	{
+		return m_state == State::Executable;
 	}
 
 	inline VkResult CommandBuffer::Transition(State to, std::initializer_list<State> allowed)
