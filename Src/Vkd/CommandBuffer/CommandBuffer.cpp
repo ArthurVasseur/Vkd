@@ -9,6 +9,8 @@ namespace vkd
 {
 	VkResult CommandBuffer::BeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
 		if (!cmdBuffer)
 		{
@@ -27,6 +29,8 @@ namespace vkd
 
 	VkResult CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
 		if (!cmdBuffer)
 		{
@@ -39,6 +43,8 @@ namespace vkd
 
 	VkResult CommandBuffer::ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags)
 	{
+		VKD_AUTO_PROFILER_SCOPE;
+
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
 		if (!cmdBuffer)
 		{
