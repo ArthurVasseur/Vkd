@@ -236,12 +236,11 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueBindSparse);
 
-
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, BeginCommandBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, EndCommandBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, ResetCommandBuffer);
-
-
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdFillBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer);
 
 #undef VKD_ENTRYPOINT_LOOKUP
 

@@ -46,7 +46,7 @@ namespace vkd
 
 		std::vector<VkBufferCopy> regions;
 		regions.resize(regionCount);
-		std::memcpy(regions.data(), pRegions, regions.size());
+		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy));
 		m_ops.emplace_back(Buffer::OpCopy{ srcBufferObj, dstBufferObj, std::move(regions)});
 	}
 
