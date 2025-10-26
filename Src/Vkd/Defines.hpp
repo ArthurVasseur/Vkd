@@ -6,6 +6,7 @@
 
 #include <Concerto/Core/Types/Types.hpp>
 #include <Concerto/Core/Assert.hpp>
+#include <Concerto/Core/EnumFlags/EnumFlags.hpp>
 
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vk_icd.h>
