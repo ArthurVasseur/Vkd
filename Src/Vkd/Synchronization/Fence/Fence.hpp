@@ -27,13 +27,8 @@ namespace vkd
 		[[nodiscard]] inline VkFenceCreateFlags GetFlags() const;
 
 		// Vulkan API entry points
-		static VkResult VKAPI_CALL CreateFence(VkDevice device, const VkFenceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkFence* pFence);
-		static void VKAPI_CALL DestroyFence(VkDevice device, VkFence fence, const VkAllocationCallbacks* pAllocator);
-		static VkResult VKAPI_CALL WaitForFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences, VkBool32 waitAll, uint64_t timeout);
-		static VkResult VKAPI_CALL ResetFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences);
-		static VkResult VKAPI_CALL GetFenceStatus(VkDevice device, VkFence fence);
 
-	protected:
+
 		virtual VkResult GetStatus() = 0;
 		virtual VkResult Wait(uint64_t timeout) = 0;
 		virtual VkResult Reset() = 0;
