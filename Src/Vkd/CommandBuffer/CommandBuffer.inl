@@ -31,4 +31,29 @@ namespace vkd
 	{
 		return m_level;
 	}
+
+	inline VkResult CommandBuffer::MarkSubmitted()
+	{
+		return Transition(State::Pending, { State::Executable });
+	}
+
+	inline VkResult CommandBuffer::MarkComplete()
+	{
+		return Transition(State::Executable, { State::Pending });
+	}
+
+	inline VkResult CommandBuffer::Transition(State to, std::initializer_list<State> allowed)
+	{
+		for (State s : allowed)
+		{
+			if (m_state == s)
+			{
+				m_state = to;
+				return VK_SUCCESS;
+			}
+		}
+		m_state = State::Invalid;
+		CCT_ASSERT_FALSE("Invalid CB state transition {} -> {}", (int)m_state, (int)to);
+		return VK_ERROR_VALIDATION_FAILED_EXT;
+	}
 }

@@ -11,6 +11,7 @@ namespace vkd::software
 	class CommandBuffer : public vkd::CommandBuffer
 	{
 	public:
+		
 		CommandBuffer() = default;
 		~CommandBuffer() override = default;
 
@@ -20,6 +21,9 @@ namespace vkd::software
 		VkResult Reset(VkCommandBufferResetFlags flags) override;
 
 	private:
+		
 		// TODO: implement CPU command recording and execution
+
+		
 	};
 }
