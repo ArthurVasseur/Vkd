@@ -2,22 +2,53 @@
 
 namespace vkd::software
 {
+	Fence::Fence() :
+		m_signaled(false)
+	{
+	}
+
+	VkResult Fence::Create(Device& owner, const VkFenceCreateInfo& createInfo)
+	{
+		cct::EnumFlags<VkFenceCreateFlagBits> flags(createInfo.flags);
+		m_signaled = flags.Contains(VK_FENCE_CREATE_SIGNALED_BIT);
+
+		return vkd::Fence::Create(owner, createInfo);
+	}
+
 	VkResult Fence::GetStatus()
 	{
-		// TODO: implement CPU execution - return fence status
-		// Return VK_SUCCESS if signaled, VK_NOT_READY if not
-		return VK_SUCCESS;
+		std::lock_guard _(m_mutex);
+		return m_signaled ? VK_SUCCESS : VK_NOT_READY;
 	}
 
 	VkResult Fence::Wait(uint64_t timeout)
 	{
-		// TODO: implement CPU execution - wait for fence with timeout
+		using Clock = std::chrono::steady_clock;
+		std::unique_lock lock(m_mutex);
+
+		if (m_signaled)
+			return VK_SUCCESS;
+
+		if (timeout == 0)
+			return VK_TIMEOUT;
+
+		if (timeout == std::numeric_limits<uint64_t>::max())
+		{
+			m_cv.wait(lock, [this] { return m_signaled; });
+			return VK_SUCCESS;
+		}
+
+		const auto deadline = Clock::now() + std::chrono::nanoseconds(timeout);
+		if (!m_cv.wait_until(lock, deadline, [this] { return m_signaled; }))
+			return VK_TIMEOUT;
+
 		return VK_SUCCESS;
 	}
 
 	VkResult Fence::Reset()
 	{
-		// TODO: implement CPU execution - reset fence to unsignaled state
+		std::lock_guard _(m_mutex);
+		m_signaled = false;
 		return VK_SUCCESS;
 	}
 }
