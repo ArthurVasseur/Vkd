@@ -6,6 +6,10 @@
 
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Device/Device.hpp"
+
+#include <chrono>
+#include <thread>
+
 #include "Vkd/Queue/Queue.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
@@ -442,6 +446,16 @@ namespace vkd
 		if (!fenceObj)
 			return;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		if (!deviceObj)
+			return;
+
+		if (deviceObj != fenceObj->GetOwner())
+		{
+			CCT_ASSERT_FALSE("The VkDevice does not correspond to the fence device");
+			return;
+		}
+
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Fence>*>(fence);
 		mem::DeleteDispatchable(dispatchable);
 	}
@@ -461,24 +475,83 @@ namespace vkd
 			return VK_ERROR_INITIALIZATION_FAILED;
 		}
 
-		// TODO: implement - wait for multiple fences with timeout
-		// For now, iterate and wait on each fence individually
-		for (uint32_t i = 0; i < fenceCount; ++i)
+		const bool infinite = timeout == std::numeric_limits<uint64_t>::max();
+
+		using Clock = std::chrono::steady_clock;
+		const auto start = Clock::now();
+		const auto deadline = infinite ? Clock::time_point::max() : (start + std::chrono::nanoseconds(timeout));
+
+		if (waitAll)
 		{
-			VKD_FROM_HANDLE(Fence, fenceObj, pFences[i]);
-			if (!fenceObj)
+			for (uint32_t i = 0; i < fenceCount; ++i)
 			{
-				CCT_ASSERT_FALSE("Invalid VkFence handle at index {}", i);
-				return VK_ERROR_DEVICE_LOST;
+				VKD_FROM_HANDLE(Fence, fenceObj, pFences[i]);
+				if (!fenceObj)
+				{
+					CCT_ASSERT_FALSE("Invalid VkFence handle at index {}", i);
+					return VK_ERROR_DEVICE_LOST;
+				}
+
+				while (true)
+				{
+					const uint64_t remainingNs = (deadline == Clock::time_point::max())
+						? std::numeric_limits<uint64_t>::max()
+						: static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(deadline - Clock::now()).count());
+
+					if (!infinite && Clock::now() >= deadline)
+						return VK_TIMEOUT;
+
+					VkResult result = fenceObj->Wait(remainingNs);
+					if (result == VK_SUCCESS)
+						break;
+					if (result == VK_TIMEOUT)
+					{
+						if (!infinite && Clock::now() >= deadline)
+							return VK_TIMEOUT;
+						std::this_thread::sleep_for(std::chrono::milliseconds(1));
+						continue;
+					}
+					return result;
+				}
+			}
+		}
+		if (timeout == 0)
+		{
+			for (uint32_t i = 0; i < fenceCount; ++i)
+			{
+				VKD_FROM_HANDLE(Fence, fenceObj, pFences[i]);
+				if (!fenceObj)
+				{
+					CCT_ASSERT_FALSE("Invalid VkFence handle at index {}", i);
+					return VK_ERROR_DEVICE_LOST;
+				}
+				VkResult r = fenceObj->Wait(0);
+				if (r == VK_SUCCESS) return VK_SUCCESS;
+				if (r != VK_TIMEOUT) return r;
+			}
+			return VK_TIMEOUT;
+		}
+
+		while (true)
+		{
+			for (uint32_t i = 0; i < fenceCount; ++i)
+			{
+				VKD_FROM_HANDLE(Fence, fenceObj, pFences[i]);
+				if (!fenceObj)
+				{
+					CCT_ASSERT_FALSE("Invalid VkFence handle at index {}", i);
+					return VK_ERROR_DEVICE_LOST;
+				}
+
+				VkResult r = fenceObj->Wait(0);
+				if (r == VK_SUCCESS) return VK_SUCCESS;
+				if (r != VK_TIMEOUT) return r;
 			}
 
-			VkResult result = fenceObj->Wait(timeout);
-			if (result != VK_SUCCESS)
-				return result;
+			if (!infinite && Clock::now() >= deadline)
+				return VK_TIMEOUT;
 
-			// If waitAll is false, return on first signaled fence
-			if (!waitAll)
-				return VK_SUCCESS;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 
 		return VK_SUCCESS;
