@@ -15,6 +15,14 @@ namespace vkd
 	class CommandBuffer : public ObjectBase
 	{
 	public:
+		enum class State
+		{
+			Initial,
+			Recording,
+			Executable,
+			Pending,
+			Invalid
+		};
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
 		VKD_DISPATCHABLE_HANDLE(CommandBuffer);
 
@@ -35,10 +43,16 @@ namespace vkd
 		virtual VkResult End() = 0;
 		virtual VkResult Reset(VkCommandBufferResetFlags flags) = 0;
 
+		inline VkResult MarkSubmitted();
+		inline VkResult MarkComplete();
+
+	protected:
+		inline VkResult Transition(State to, std::initializer_list<State> allowed);
 	private:
 		CommandPool* m_owner;
 		VkCommandBufferLevel m_level;
+		State m_state;
 	};
 }
 
-#include "CommandBuffer.inl"
+#include "Vkd/CommandBuffer/CommandBuffer.inl"
