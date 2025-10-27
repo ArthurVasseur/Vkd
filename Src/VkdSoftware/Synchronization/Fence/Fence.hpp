@@ -19,10 +19,11 @@ namespace vkd::software
 		~Fence() override = default;
 
 		VkResult Create(Device& owner, const VkFenceCreateInfo& createInfo) override;
-	protected:
+
 		VkResult GetStatus() override;
 		VkResult Wait(uint64_t timeout) override;
 		VkResult Reset() override;
+		VkResult Signal() override;
 
 	private:
 		std::mutex m_mutex;

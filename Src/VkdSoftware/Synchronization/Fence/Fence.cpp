@@ -59,4 +59,14 @@ namespace vkd::software
 		m_signaled = false;
 		return VK_SUCCESS;
 	}
+
+	VkResult Fence::Signal()
+	{
+		{
+			std::lock_guard _(m_mutex);
+			m_signaled = true;
+		}
+		m_cv.notify_all();
+		return VK_SUCCESS;
+	}
 }

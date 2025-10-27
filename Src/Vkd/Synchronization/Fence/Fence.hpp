@@ -28,10 +28,10 @@ namespace vkd
 
 		// Vulkan API entry points
 
-
 		virtual VkResult GetStatus() = 0;
 		virtual VkResult Wait(uint64_t timeout) = 0;
 		virtual VkResult Reset() = 0;
+		virtual VkResult Signal() = 0;
 
 	private:
 		Device* m_owner;

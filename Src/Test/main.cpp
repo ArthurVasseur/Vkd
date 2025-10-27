@@ -125,7 +125,7 @@ int main()
 	VkCommandBuffer cmd = VK_NULL_HANDLE;
 	VK_CHECK(vkAllocateCommandBuffers(device, &cbai, &cmd));
 
-	constexpr VkDeviceSize BufferSize = 256;
+	constexpr VkDeviceSize BufferSize = 64 * sizeof(cct::UInt32);
 
 	auto createBuffer = [&](VkBuffer& buf)
 	{
@@ -134,7 +134,7 @@ int main()
 		bci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		VK_CHECK(vkCreateBuffer(device, &bci, nullptr, &buf));
-		};
+	};
 
 	VkBuffer bufA = VK_NULL_HANDLE, bufB = VK_NULL_HANDLE;
 	createBuffer(bufA);
@@ -186,7 +186,7 @@ int main()
 	VK_CHECK(vkMapMemory(device, memB, 0, BufferSize, 0, &mapped));
 	cct::UInt32* bytes = static_cast<cct::UInt32*>(mapped);
 	size_t bad = 0;
-	for (size_t i = 0; i < static_cast<size_t>(BufferSize); ++i)
+	for (size_t i = 0; i < static_cast<size_t>(BufferSize) / sizeof(cct::UInt32); ++i)
 	{
 		if (bytes[i] != 0x7F)
 		{
