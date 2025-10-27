@@ -19,8 +19,6 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
-		VKD_FROM_HANDLE(vkd::Instance, instance, pInstance);
-
 		if (pName == nullptr)
 			return nullptr;
 
@@ -80,7 +78,7 @@ namespace vkd
 		instance->EnumeratePlatformPhysicalDevices();
 		if (pPhysicalDeviceCount && !pPhysicalDevices)
 		{
-			*pPhysicalDeviceCount = static_cast<cct::UInt32>(instance->GetPhysicalDevices().size());
+			*pPhysicalDeviceCount = static_cast<UInt32>(instance->GetPhysicalDevices().size());
 			return VK_SUCCESS;
 		}
 
@@ -91,7 +89,7 @@ namespace vkd
 		{
 			//auto luid = static_cast<vkd::WddmPhysicalDevice&>(*physicalDevices[i]->Object).GetLuid();
 			//
-			//if (*reinterpret_cast<cct::UInt64*>(&luid) == *reinterpret_cast<cct::UInt64*>(&adapterLUID))
+			//if (*reinterpret_cast<UInt64*>(&luid) == *reinterpret_cast<UInt64*>(&adapterLUID))
 			//{
 			//	swapWith = i;
 			//}

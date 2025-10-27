@@ -49,15 +49,14 @@ namespace vkd
 		static void VKAPI_CALL CmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount, const VkBuffer* pBuffers, const VkDeviceSize* pOffsets);
 		static void VKAPI_CALL CmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
 
-		VkResult Begin(const VkCommandBufferBeginInfo& beginInfo);
-		VkResult End();
-		VkResult Reset(VkCommandBufferResetFlags flags);
-
-		inline void PushFill(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, cct::UInt32 data);
-		inline void PushCopy(VkBuffer srcBuffer, VkBuffer dstBuffer, cct::UInt32 regionCount, const VkBufferCopy* pRegions);
+		inline VkResult Begin(const VkCommandBufferBeginInfo& beginInfo);
+		inline VkResult End();
+		inline VkResult Reset(VkCommandBufferResetFlags flags);
+		inline void PushFill(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, UInt32 data);
+		inline void PushCopy(VkBuffer srcBuffer, VkBuffer dstBuffer, UInt32 regionCount, const VkBufferCopy* pRegions);
 		inline void PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline);
-		inline void PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, cct::UInt32 firstBinding);
-		inline void PushDraw(cct::UInt32 vertexCount, cct::UInt32 instanceCount, cct::UInt32 firstVertex, cct::UInt32 firstInstance)
+		inline void PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, UInt32 firstBinding);
+		inline void PushDraw(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstVertex, UInt32 firstInstance);
 
 		inline VkResult MarkSubmitted();
 		inline VkResult MarkComplete();

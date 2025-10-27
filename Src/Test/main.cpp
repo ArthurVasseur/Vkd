@@ -184,7 +184,7 @@ int main()
 
 	void* mapped = nullptr;
 	VK_CHECK(vkMapMemory(device, memB, 0, BufferSize, 0, &mapped));
-	uint8_t* bytes = static_cast<uint8_t*>(mapped);
+	cct::UInt32* bytes = static_cast<cct::UInt32*>(mapped);
 	size_t bad = 0;
 	for (size_t i = 0; i < static_cast<size_t>(BufferSize); ++i)
 	{

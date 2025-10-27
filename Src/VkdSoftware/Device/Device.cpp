@@ -19,11 +19,7 @@ namespace vkd::software
 	{
 		PhysicalDevice* physicalDevice = GetOwner();
 		auto properties = physicalDevice->GetQueueFamilyProperties();
-		if (queueFamilyIndex > properties.size())
-		{
-			CCT_ASSERT_FALSE("Invalid queue family index '{}'", queueFamilyIndex);
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
+		VKD_CHECK(queueFamilyIndex > properties.size());
 
 		auto* queue = mem::NewDispatchable<Queue>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
 		if (!queue)

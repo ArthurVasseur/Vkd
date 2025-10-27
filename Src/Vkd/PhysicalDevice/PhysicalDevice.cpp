@@ -72,6 +72,8 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+
+
 		*pProperties = physicalDevice->GetPhysicalDeviceProperties();
 	}
 
@@ -83,7 +85,7 @@ namespace vkd
 
 		if (pQueueFamilyPropertyCount && !pQueueFamilyProperties)
 		{
-			*pQueueFamilyPropertyCount = static_cast<cct::UInt32>(physicalDevice->GetQueueFamilyProperties().size());
+			*pQueueFamilyPropertyCount = static_cast<UInt32>(physicalDevice->GetQueueFamilyProperties().size());
 			return;
 		}
 
@@ -92,7 +94,7 @@ namespace vkd
 		{
 			auto properties = physicalDevice->GetQueueFamilyProperties();
 			std::memcpy(pQueueFamilyProperties, properties.data(), properties.size());
-			*pQueueFamilyPropertyCount = static_cast<cct::UInt32>(properties.size());
+			*pQueueFamilyPropertyCount = static_cast<UInt32>(properties.size());
 		}
 	}
 

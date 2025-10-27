@@ -189,8 +189,6 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, device, pDevice);
-		if (!device)
-			return;
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Device>*>(pDevice);
 		mem::DeleteDispatchable(dispatchable);
@@ -199,8 +197,6 @@ namespace vkd
 	PFN_vkVoidFunction Device::GetDeviceProcAddr(VkDevice pDevice, const char* pName)
 	{
 		VKD_AUTO_PROFILER_SCOPE;
-
-		VKD_FROM_HANDLE(Device, device, pDevice);
 
 		if (pName == nullptr)
 			return nullptr;
@@ -256,11 +252,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, device, pDevice);
-		if (!device || !pQueue)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters to GetDeviceQueue");
-			return;
-		}
+		VKD_CHECK(pQueue);
 
 		auto* queue = device->GetQueue(queueFamilyIndex, queueIndex);
 		if (!queue)
@@ -278,11 +270,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, device, pDevice);
-		if (!device || !pQueueInfo || !pQueue)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters to GetDeviceQueue2");
-			return;
-		}
+		VKD_CHECK(pQueueInfo && pQueue);
 
 		auto* queue = device->GetQueue(pQueueInfo->queueFamilyIndex, pQueueInfo->queueIndex, pQueueInfo->flags);
 		if (!queue)
@@ -300,17 +288,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
-
-		if (!pCommandPool)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
+		VKD_CHECK(pCreateInfo && pCommandPool);
 
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
@@ -335,9 +313,8 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
-		if (!poolObj)
-			return;
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<CommandPool>*>(commandPool);
 		mem::DeleteDispatchable(dispatchable);
@@ -347,12 +324,8 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
-		if (!poolObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkCommandPool handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
 
 		return poolObj->Reset(flags);
 	}
@@ -362,24 +335,9 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
-
-		if (!pAllocateInfo || !pCommandBuffers)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
-
+		VKD_CHECK(pAllocateInfo && pCommandBuffers);
 		VKD_FROM_HANDLE(CommandPool, poolObj, pAllocateInfo->commandPool);
-		if (!poolObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkCommandPool handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
+
 
 		// Allocate command buffers from the pool
 		for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; ++i)
@@ -428,8 +386,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
-		if (!pCommandBuffers || commandBufferCount == 0)
-			return;
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(CommandPool, commandPoolObj, commandPool);
+		VKD_CHECK(pCommandBuffers && commandBufferCount != 0);
 
 		// TODO: implement - free command buffers back to pool
 		for (uint32_t i = 0; i < commandBufferCount; ++i)
@@ -448,17 +407,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
-
-		if (!pCreateInfo || !pFence)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
+		VKD_CHECK(pCreateInfo && pFence);
 
 		auto fenceResult = deviceObj->CreateFence();
 		if (fenceResult.IsError())
@@ -481,18 +430,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Fence, fenceObj, fence);
-		if (!fenceObj)
-			return;
-
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-			return;
-
-		if (deviceObj != fenceObj->GetOwner())
-		{
-			CCT_ASSERT_FALSE("The VkDevice does not correspond to the fence device");
-			return;
-		}
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Fence>*>(fence);
 		mem::DeleteDispatchable(dispatchable);
@@ -503,17 +441,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
-
-		if (!pFences || fenceCount == 0)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
+		VKD_CHECK(pFences && fenceCount != 0);
 
 		const bool infinite = timeout == std::numeric_limits<uint64_t>::max();
 
@@ -602,17 +530,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
-
-		if (!pFences || fenceCount == 0)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
+		VKD_CHECK(pFences && fenceCount != 0);
 
 		// TODO: implement - reset multiple fences
 		for (uint32_t i = 0; i < fenceCount; ++i)
@@ -636,12 +554,8 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Fence, fenceObj, fence);
-		if (!fenceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkFence handle");
-			return VK_ERROR_DEVICE_LOST;
-		}
 
 		return fenceObj->GetStatus();
 	}
@@ -651,17 +565,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (!pCreateInfo || !pBuffer)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
+		VKD_CHECK(pCreateInfo && pBuffer);
 
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
@@ -686,9 +590,8 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
-		if (!bufferObj)
-			return;
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Buffer>*>(buffer);
 		mem::DeleteDispatchable(dispatchable);
@@ -698,18 +601,10 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
-		if (!bufferObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkBuffer handle");
-			return;
-		}
+		VKD_CHECK(pMemoryRequirements);
 
-		if (!pMemoryRequirements)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return;
-		}
 		bufferObj->GetMemoryRequirements(*pMemoryRequirements);
 	}
 
@@ -717,25 +612,10 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
-		if (!bufferObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkBuffer handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
-		if (!memoryObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDeviceMemory handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (bufferObj->IsBound())
-		{
-			CCT_ASSERT_FALSE("Buffer already bound to memory");
-			return VK_ERROR_UNKNOWN;
-		}
+		VKD_CHECK(!bufferObj->IsBound());
 
 		bufferObj->BindBufferMemory(*memoryObj, memoryOffset);
 
@@ -747,17 +627,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (!pAllocateInfo || !pMemory)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
+		VKD_CHECK(pAllocateInfo && pMemory);
 
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
@@ -782,9 +652,8 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
-		if (!memoryObj)
-			return;
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<DeviceMemory>*>(memory);
 		mem::DeleteDispatchable(dispatchable);
@@ -795,23 +664,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
-		if (!memoryObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDeviceMemory handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (!ppData)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (memoryObj->m_mapped)
-		{
-			CCT_ASSERT_FALSE("Memory already mapped");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
+		VKD_CHECK(!memoryObj->m_mapped);
 
 		VkResult result = memoryObj->Map(offset, size, ppData);
 		if (result == VK_SUCCESS)
@@ -824,18 +677,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
-		if (!memoryObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDeviceMemory handle");
-			return;
-		}
-
-		if (!memoryObj->m_mapped)
-		{
-			CCT_ASSERT_FALSE("Memory not mapped");
-			return;
-		}
+		VKD_CHECK(memoryObj->m_mapped);
 
 		memoryObj->Unmap();
 		memoryObj->m_mapped = false;
@@ -846,17 +690,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (!pCreateInfos || !pPipelines || createInfoCount == 0)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
+		VKD_CHECK(pCreateInfos || pPipelines || createInfoCount);
 
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
@@ -908,17 +742,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		if (!deviceObj)
-		{
-			CCT_ASSERT_FALSE("Invalid VkDevice handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (!pCreateInfos || !pPipelines || createInfoCount == 0)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
+		VKD_CHECK(pCreateInfos && pPipelines && createInfoCount);
 
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
@@ -969,9 +793,8 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE;
 
+		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
-		if (!pipelineObj)
-			return;
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pipeline);
 		mem::DeleteDispatchable(dispatchable);

@@ -10,9 +10,9 @@ namespace vkd::software
 		const auto& ops = cb.GetOps();
 		for (const auto& op : ops)
 		{
-			VkResult result = std::visit([this](const auto& operation)
+			VkResult result = std::visit([this]<typename T>(T operation)
 			{
-				return (*this)(operation);
+				return (*this)(std::move(operation));
 			}, op);
 
 			if (result != VK_SUCCESS)
@@ -22,33 +22,46 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
-	VkResult CommandDispatcher::operator()(const vkd::Buffer::OpFill& op)
+	VkResult CommandDispatcher::operator()(vkd::Buffer::OpFill op)
 	{
-		return m_context.FillBuffer(op);
+		return m_context->FillBuffer(std::move(op));
 	}
 
-	VkResult CommandDispatcher::operator()(const vkd::Buffer::OpCopy& op)
+	VkResult CommandDispatcher::operator()(vkd::Buffer::OpCopy op)
 	{
-		return m_context.CopyBuffer(op);
+		return m_context->CopyBuffer(std::move(op));
 	}
 
-	//VkResult CommandDispatcher::operator()(const Op_BindPipeline& op)
-	//{
-	//	return m_context.BindPipeline(op.pipeline);
-	//}
+	VkResult CommandDispatcher::operator()(vkd::OpBindVertexBuffer op)
+	{
+		return m_context->BindVertexBuffer(std::move(op));
+	}
 
-	//VkResult CommandDispatcher::operator()(const Op_BindVertexBuffer& op)
-	//{
-	//	return m_context.BindVertexBuffer(op.buffer, op.offset);
-	//}
+	VkResult CommandDispatcher::operator()(vkd::OpDraw op)
+	{
+		return m_context->Draw(std::move(op));
+	}
 
-	//VkResult CommandDispatcher::operator()(const Op_Draw& op)
-	//{
-	//	return m_context.Draw(op.vertexCount, op.firstVertex);
-	//}
+	VkResult CommandDispatcher::operator()(vkd::OpDrawIndexed op)
+	{
+		// TODO: Implement DrawIndexed in CpuContext
+		return VK_SUCCESS;
+	}
 
-	//VkResult CommandDispatcher::operator()(const Op_CopyBuffer& op)
-	//{
-	//	return m_context.CopyBuffer(op.src, op.dst, op.size, op.srcOffset, op.dstOffset);
-	//}
+	VkResult CommandDispatcher::operator()(vkd::OpDrawIndirect op)
+	{
+		// TODO: Implement DrawIndirect in CpuContext
+		return VK_SUCCESS;
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpDrawIndexedIndirect op)
+	{
+		// TODO: Implement DrawIndexedIndirect in CpuContext
+		return VK_SUCCESS;
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpBindPipeline op)
+	{
+		return m_context->BindPipeline(std::move(op));
+	}
 }

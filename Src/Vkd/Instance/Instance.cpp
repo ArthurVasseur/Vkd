@@ -130,7 +130,7 @@ namespace vkd
 		instance->EnumeratePlatformPhysicalDevices();
 		if (pPhysicalDeviceCount && !pPhysicalDevices)
 		{
-			*pPhysicalDeviceCount = static_cast<cct::UInt32>(instance->GetPhysicalDevices().size());
+			*pPhysicalDeviceCount = static_cast<UInt32>(instance->GetPhysicalDevices().size());
 			return VK_SUCCESS;
 		}
 

@@ -81,6 +81,6 @@ namespace vkd
 		PhysicalDevice* m_owner;
 
 		// Queues organized by family index, then queue index
-		std::unordered_map<cct::UInt32 /*family index*/, std::vector<DispatchableObject<Queue>*>> m_queues;
+		std::unordered_map<UInt32 /*family index*/, std::vector<DispatchableObject<Queue>*>> m_queues;
 	};
 }
