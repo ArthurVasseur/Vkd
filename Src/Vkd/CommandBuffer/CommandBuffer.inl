@@ -34,6 +34,30 @@ namespace vkd
 		return m_level;
 	}
 
+	inline VkResult CommandBuffer::Begin(const VkCommandBufferBeginInfo& beginInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+		Transition(State::Recording, { State::Initial });
+
+		return VK_SUCCESS;
+	}
+
+	inline VkResult CommandBuffer::End()
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+		Transition(State::Executable, { State::Recording });
+
+		return VK_SUCCESS;
+	}
+
+	inline VkResult CommandBuffer::Reset(VkCommandBufferResetFlags flags)
+	{
+		VKD_AUTO_PROFILER_SCOPE;
+		Transition(State::Initial, { State::Executable, State::Pending });
+
+		return VK_SUCCESS;
+	}
+
 	inline void CommandBuffer::PushFill(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, uint32_t data)
 	{
 		VKD_FROM_HANDLE(Buffer, bufferObj, dst);
@@ -61,7 +85,7 @@ namespace vkd
 		});
 	}
 
-	inline void CommandBuffer::PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, cct::UInt32 firstBinding)
+	inline void CommandBuffer::PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, UInt32 firstBinding)
 	{
 		std::vector<Buffer*> buffers;
 		std::vector<VkDeviceSize> offsets;
@@ -82,7 +106,7 @@ namespace vkd
 		});
 	}
 
-	inline void CommandBuffer::PushDraw(cct::UInt32 vertexCount, cct::UInt32 instanceCount, cct::UInt32 firstVertex, cct::UInt32 firstInstance)
+	inline void CommandBuffer::PushDraw(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstVertex, UInt32 firstInstance)
 	{
 		m_ops.emplace_back(OpDraw{
 			.VertexCount = vertexCount,

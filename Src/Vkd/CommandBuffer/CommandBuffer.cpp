@@ -78,9 +78,8 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE;
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
-		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
 
-		commandBufferObj->BindPipeline(pipelineObj);
+		commandBufferObj->PushBindPipeline(pipelineBindPoint, pipeline);
 	}
 
 	void CommandBuffer::CmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount, const VkBuffer* pBuffers, const VkDeviceSize* pOffsets)
@@ -89,8 +88,7 @@ namespace vkd
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 
-		if (bindingCount > 0 && pBuffers && pOffsets)
-			commandBufferObj->PushBindVertexBuffer(std::span(pBuffers, bindingCount), std::span(pOffsets, bindingCount), firstBinding);
+		commandBufferObj->PushBindVertexBuffer(std::span(pBuffers, bindingCount), std::span(pOffsets, bindingCount), firstBinding);
 	}
 
 	void CommandBuffer::CmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
@@ -100,29 +98,5 @@ namespace vkd
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 
 		commandBufferObj->PushDraw(vertexCount, instanceCount, firstVertex, firstInstance);
-	}
-
-	VkResult CommandBuffer::Begin(const VkCommandBufferBeginInfo& beginInfo)
-	{
-		VKD_AUTO_PROFILER_SCOPE;
-		Transition(State::Recording, { State::Initial });
-
-		return VK_SUCCESS;
-	}
-
-	VkResult CommandBuffer::End()
-	{
-		VKD_AUTO_PROFILER_SCOPE;
-		Transition(State::Executable, { State::Recording });
-
-		return VK_SUCCESS;
-	}
-
-	VkResult CommandBuffer::Reset(VkCommandBufferResetFlags flags)
-	{
-		VKD_AUTO_PROFILER_SCOPE;
-		Transition(State::Initial, { State::Executable, State::Pending });
-
-		return VK_SUCCESS;
 	}
 }

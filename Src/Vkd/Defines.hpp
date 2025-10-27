@@ -27,8 +27,17 @@
 #define VKD_VK_API_VERSION VK_MAKE_VERSION(1, 4, VK_HEADER_VERSION)
 #define VKD_DRIVER_VERSION VK_MAKE_VERSION(0, 1, 0)
 
+#ifdef VKD_DEBUG_CHECKS
+#define VKD_CHECK(cond) CCT_ASSERT(cond, #cond " is false / null.")
+#else
+#define VKD_CHECK(cond) do {} while(false)
+#endif
+
 #define VKD_FROM_HANDLE(type, name, handle)	\
-	type* name = type::FromHandle(handle)
+	VKD_CHECK(handle != nullptr);			\
+	type* name = type::FromHandle(handle);	\
+	VKD_CHECK((name) != nullptr);			\
+	VKD_CHECK(dynamic_cast<type*>(name) != nullptr)
 
 #define VKD_TO_HANDLE(type, handle)	\
 	(type)(handle)
@@ -52,7 +61,8 @@
 
 namespace vkd
 {
-	enum class VendorId : cct::UInt32
+	using namespace cct;
+	enum class VendorId : UInt32
 	{
 		Microsoft = 0x1414,
 		Amd = 0x1002,//0x1022,

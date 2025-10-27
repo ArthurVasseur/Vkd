@@ -8,40 +8,40 @@ namespace vkd
 	{
 		std::vector<Buffer*> Buffers;
 		std::vector<VkDeviceSize> Offsets;
-		cct::UInt32 FirstBinding;
+		UInt32 FirstBinding;
 	};
 
 	struct OpDraw
 	{
-		cct::UInt32 VertexCount;
-		cct::UInt32 InstanceCount;
-		cct::UInt32 FirstVertex;
-		cct::UInt32 FirstInstance;
+		UInt32 VertexCount;
+		UInt32 InstanceCount;
+		UInt32 FirstVertex;
+		UInt32 FirstInstance;
 	};
 
 	struct OpDrawIndexed
 	{
-		cct::UInt32 IndexCount;
-		cct::UInt32 InstanceCount;
-		cct::UInt32 FirstIndex;
+		UInt32 IndexCount;
+		UInt32 InstanceCount;
+		UInt32 FirstIndex;
 		cct::Int32 VertexOffset;
-		cct::UInt32 FirstInstance;
+		UInt32 FirstInstance;
 	};
 
 	struct OpDrawIndirect
 	{
 		Buffer* BufferHandle;
 		VkDeviceSize Offset;
-		cct::UInt32 DrawCount;
-		cct::UInt32 Stride;
+		UInt32 DrawCount;
+		UInt32 Stride;
 	};
 
 	struct OpDrawIndexedIndirect
 	{
 		Buffer* BufferHandle;
 		VkDeviceSize Offset;
-		cct::UInt32 DrawCount;
-		cct::UInt32 Stride;
+		UInt32 DrawCount;
+		UInt32 Stride;
 	};
 
 	struct OpBindPipeline

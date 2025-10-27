@@ -5,7 +5,7 @@
 namespace vkd::software
 {
 	inline CommandDispatcher::CommandDispatcher(CpuContext& ctx) :
-		m_context(ctx)
+		m_context(&ctx)
 	{
 	}
 }

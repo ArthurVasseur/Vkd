@@ -17,10 +17,16 @@ namespace vkd::software
 		VkResult Execute(const CommandBuffer& cb);
 
 	private:
-		VkResult operator()(const vkd::Buffer::OpFill& op);
-		VkResult operator()(const vkd::Buffer::OpCopy& op);
+		VkResult operator()(vkd::Buffer::OpFill op);
+		VkResult operator()(vkd::Buffer::OpCopy op);
+		VkResult operator()(vkd::OpBindVertexBuffer op);
+		VkResult operator()(vkd::OpDraw op);
+		VkResult operator()(vkd::OpDrawIndexed op);
+		VkResult operator()(vkd::OpDrawIndirect op);
+		VkResult operator()(vkd::OpDrawIndexedIndirect op);
+		VkResult operator()(vkd::OpBindPipeline op);
 
-		CpuContext& m_context;
+		CpuContext* m_context;
 	};
 }
 

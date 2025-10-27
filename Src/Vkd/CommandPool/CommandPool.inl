@@ -34,7 +34,7 @@ namespace vkd
 		return m_flags;
 	}
 
-	inline cct::UInt32 CommandPool::GetQueueFamilyIndex() const
+	inline UInt32 CommandPool::GetQueueFamilyIndex() const
 	{
 		return m_queueFamilyIndex;
 	}

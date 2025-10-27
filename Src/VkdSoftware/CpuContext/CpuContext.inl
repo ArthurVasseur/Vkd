@@ -7,7 +7,7 @@ namespace vkd::software
 	inline void CpuContext::Reset()
 	{
 		m_boundPipeline = nullptr;
-		m_boundVertexBuffer = nullptr;
-		m_vertexBufferOffset = 0;
+		m_boundVertexBuffers.clear();
+		m_vertexBufferOffsets.clear();
 	}
 }

@@ -26,7 +26,7 @@ namespace vkd
 
 		[[nodiscard]] inline Device* GetOwner() const;
 		[[nodiscard]] inline VkCommandPoolCreateFlags GetFlags() const;
-		[[nodiscard]] inline cct::UInt32 GetQueueFamilyIndex() const;
+		[[nodiscard]] inline UInt32 GetQueueFamilyIndex() const;
 
 		DispatchableObjectResult<CommandBuffer> AllocateCommandBuffer(VkCommandBufferLevel level);
 
@@ -39,7 +39,7 @@ namespace vkd
 	private:
 		Device* m_owner;
 		VkCommandPoolCreateFlags m_flags;
-		cct::UInt32 m_queueFamilyIndex;
+		UInt32 m_queueFamilyIndex;
 	};
 }
 
