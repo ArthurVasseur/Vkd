@@ -14,7 +14,7 @@ namespace vkd::software
 		explicit CommandDispatcher(CpuContext& ctx);
 		~CommandDispatcher() = default;
 
-		VkResult Execute(const CommandBuffer& cb);
+		VkResult Execute(const vkd::CommandBuffer& cb);
 
 	private:
 		VkResult operator()(vkd::Buffer::OpFill op);

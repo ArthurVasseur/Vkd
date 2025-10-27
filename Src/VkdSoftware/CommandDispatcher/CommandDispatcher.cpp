@@ -2,7 +2,7 @@
 
 namespace vkd::software
 {
-	VkResult CommandDispatcher::Execute(const CommandBuffer& cb)
+	VkResult CommandDispatcher::Execute(const vkd::CommandBuffer& cb)
 	{
 		if (!cb.IsSealed())
 			return VK_ERROR_VALIDATION_FAILED_EXT;

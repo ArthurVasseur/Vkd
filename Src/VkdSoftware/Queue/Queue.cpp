@@ -1,6 +1,9 @@
 #include "VkdSoftware/Queue/Queue.hpp"
-
+#include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/Defines.hpp"
+#include "VkdSoftware/CommandDispatcher/CommandDispatcher.hpp"
+#include "VkdSoftware/CpuContext/CpuContext.hpp"
+#include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 
 namespace vkd::software
 {
@@ -12,21 +15,26 @@ namespace vkd::software
 	VkResult Queue::Submit(uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence)
 	{
 		VKD_AUTO_PROFILER_SCOPE;
+		VKD_CHECK(submitCount && pSubmits);
 
-		// TODO: implement CPU command buffer execution
-		// For now, just validate parameters and return success
-		if (submitCount > 0 && !pSubmits)
+		std::thread thread([&]() //TODO: ThreadPool
 		{
-			CCT_ASSERT_FALSE("pSubmits is null but submitCount > 0");
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
+			for (std::size_t i = 0; i < pSubmits->commandBufferCount; ++i)
+			{
+				VKD_FROM_HANDLE(vkd::CommandBuffer, cmdBufferObj, pSubmits->pCommandBuffers[i]);
+				CpuContext cpuContext;
+				CommandDispatcher commandDispatcher(cpuContext);
+				commandDispatcher.Execute(*cmdBufferObj);
+			}
 
-		// Future implementation:
-		// 1. Process each VkSubmitInfo
-		// 2. Wait on semaphores (pWaitSemaphores)
-		// 3. Execute command buffers (pCommandBuffers) on CPU
-		// 4. Signal semaphores (pSignalSemaphores)
-		// 5. Signal fence if provided
+			if (fence)
+			{
+				VKD_FROM_HANDLE(vkd::Fence, fenceObj, fence);
+				fenceObj->Signal();
+			}
+		});
+
+		thread.detach();
 
 		return VK_SUCCESS;
 	}

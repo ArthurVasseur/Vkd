@@ -19,7 +19,7 @@ namespace vkd::software
 	{
 		PhysicalDevice* physicalDevice = GetOwner();
 		auto properties = physicalDevice->GetQueueFamilyProperties();
-		VKD_CHECK(queueFamilyIndex > properties.size());
+		VKD_CHECK(queueFamilyIndex < properties.size());
 
 		auto* queue = mem::NewDispatchable<Queue>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
 		if (!queue)
