@@ -15,10 +15,10 @@ namespace vkd::software
 
 	protected:
 		DispatchableObjectResult<vkd::Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;
-		DispatchableObjectResult<CommandPool> CreateCommandPool() override;
-		DispatchableObjectResult<vkd::Fence> CreateFence() override;
-		DispatchableObjectResult<vkd::Buffer> CreateBuffer() override;
-		DispatchableObjectResult<vkd::DeviceMemory> CreateDeviceMemory() override;
-		DispatchableObjectResult<vkd::Pipeline> CreatePipeline() override;
+		Result<vkd::CommandPool*, VkResult> CreateCommandPool() override;
+		Result<vkd::Fence*, VkResult> CreateFence() override;
+		Result<vkd::Buffer*, VkResult> CreateBuffer() override;
+		Result<vkd::DeviceMemory*, VkResult> CreateDeviceMemory() override;
+		Result<vkd::Pipeline*, VkResult> CreatePipeline() override;
 	};
 }

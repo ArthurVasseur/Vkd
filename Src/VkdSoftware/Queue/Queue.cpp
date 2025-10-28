@@ -27,7 +27,6 @@ namespace vkd::software
 
 		std::thread thread([cmdBuffers, fence]() //TODO: ThreadPool
 		{
-			tracy::SetThreadName("software::Queue Execution");
 			for (auto* cmdBufferObj : cmdBuffers)
 			{
 				CpuContext cpuContext;

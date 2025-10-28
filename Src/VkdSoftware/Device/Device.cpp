@@ -35,63 +35,63 @@ namespace vkd::software
 		return reinterpret_cast<DispatchableObject<vkd::Queue>*>(queue);
 	}
 
-	DispatchableObjectResult<vkd::CommandPool> SoftwareDevice::CreateCommandPool()
+	Result<vkd::CommandPool*, VkResult> SoftwareDevice::CreateCommandPool()
 	{
-		auto* pool = mem::NewDispatchable<CommandPool>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+		auto* pool = mem::New<CommandPool>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
 		if (!pool)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate CommandPool");
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 
-		return reinterpret_cast<DispatchableObject<vkd::CommandPool>*>(pool);
+		return pool;
 	}
 
-	DispatchableObjectResult<vkd::Fence> SoftwareDevice::CreateFence()
+	Result<vkd::Fence*, VkResult> SoftwareDevice::CreateFence()
 	{
-		auto* fence = mem::NewDispatchable<Fence>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* fence = mem::New<Fence>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!fence)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Fence");
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 
-		return reinterpret_cast<DispatchableObject<vkd::Fence>*>(fence);
+		return fence;
 	}
 
-	DispatchableObjectResult<vkd::Buffer> SoftwareDevice::CreateBuffer()
+	Result<vkd::Buffer*, VkResult> SoftwareDevice::CreateBuffer()
 	{
-		auto* buffer = mem::NewDispatchable<Buffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* buffer = mem::New<Buffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!buffer)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Buffer");
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 
-		return reinterpret_cast<DispatchableObject<vkd::Buffer>*>(buffer);
+		return buffer;
 	}
 
-	DispatchableObjectResult<vkd::DeviceMemory> SoftwareDevice::CreateDeviceMemory()
+	Result<vkd::DeviceMemory*, VkResult> SoftwareDevice::CreateDeviceMemory()
 	{
-		auto* memory = mem::NewDispatchable<DeviceMemory>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* memory = mem::New<DeviceMemory>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!memory)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate DeviceMemory");
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 
-		return reinterpret_cast<DispatchableObject<vkd::DeviceMemory>*>(memory);
+		return memory;
 	}
 
-	DispatchableObjectResult<vkd::Pipeline> SoftwareDevice::CreatePipeline()
+	Result<vkd::Pipeline*, VkResult> SoftwareDevice::CreatePipeline()
 	{
-		auto* pipeline = mem::NewDispatchable<Pipeline>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* pipeline = mem::New<Pipeline>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!pipeline)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Pipeline");
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 
-		return reinterpret_cast<DispatchableObject<vkd::Pipeline>*>(pipeline);
+		return pipeline;
 	}
 }

@@ -67,6 +67,12 @@
 			return dispatchable->Object;														\
 		}
 
+#define VKD_NON_DISPATCHABLE_HANDLE(type)														\
+		static inline type* FromHandle(Vk##type instance)										\
+		{																						\
+			return reinterpret_cast<type*>(instance);											\
+		}
+
 namespace vkd
 {
 	using namespace cct;

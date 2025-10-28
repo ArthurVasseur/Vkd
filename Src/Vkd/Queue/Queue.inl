@@ -6,7 +6,7 @@
 namespace vkd
 {
 	inline Queue::Queue() :
-		ObjectBase(VK_OBJECT_TYPE_QUEUE),
+		ObjectBase(ObjectType),
 		m_owner(nullptr),
 		m_queueFamilyIndex(0),
 		m_queueIndex(0),

@@ -6,7 +6,7 @@
 namespace vkd
 {
 	inline Buffer::Buffer() :
-		ObjectBase(VK_OBJECT_TYPE_BUFFER),
+		ObjectBase(ObjectType),
 		m_owner(nullptr),
 		m_size(0),
 		m_usage(0),

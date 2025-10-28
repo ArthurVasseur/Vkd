@@ -35,6 +35,14 @@ namespace vkd::mem
 		return new (allocation) T(std::forward<Args>(args)...);
 	}
 
+	template<typename T>
+	void Delete(const VkAllocationCallbacks& pAllocator, T* object)
+	{
+		VKD_CHECK(object);
+		object->~T();
+		Free(pAllocator, object);
+	}
+
 	template <typename T>
 	requires std::is_base_of_v<ObjectBase, T>
 	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope)
