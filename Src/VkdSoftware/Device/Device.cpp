@@ -15,6 +15,16 @@
 
 namespace vkd::software
 {
+	SoftwareDevice::~SoftwareDevice()
+	{
+		m_threadPool.RequestStop();
+	}
+
+	ThreadPool& SoftwareDevice::GetThreadPool()
+	{
+		return m_threadPool;
+	}
+
 	DispatchableObjectResult<vkd::Queue> SoftwareDevice::CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags)
 	{
 		PhysicalDevice* physicalDevice = GetOwner();

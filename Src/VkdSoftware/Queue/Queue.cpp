@@ -2,9 +2,9 @@
 // Created by arthur on 27/10/2025.
 //
 
+#include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Queue/Queue.hpp"
 #include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
-#include "Vkd/Defines.hpp"
 #include "VkdSoftware/CommandDispatcher/CommandDispatcher.hpp"
 #include "VkdSoftware/CpuContext/CpuContext.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
@@ -29,8 +29,20 @@ namespace vkd::software
 			cmdBuffers[i] = cmdBufferObj;
 		}
 
-		std::thread thread([cmdBuffers, fence]() //TODO: ThreadPool
+		auto* softwareDevice = static_cast<SoftwareDevice*>(GetOwner());
+		auto& threadPool = softwareDevice->GetThreadPool();
+
+		std::lock_guard<std::mutex> lock(m_submitMutex);
+		auto previousSubmit = std::move(m_previousSubmit);
+
+		m_previousSubmit = threadPool.Submit([cmdBuffers, fence, previousSubmit = std::move(previousSubmit)]() mutable -> bool
 		{
+			// Wait for the previous submit to complete before starting the new one
+			if (previousSubmit.valid())
+			{
+				previousSubmit.wait();
+			}
+
 			for (auto* cmdBufferObj : cmdBuffers)
 			{
 				CpuContext cpuContext;
@@ -43,9 +55,8 @@ namespace vkd::software
 				VKD_FROM_HANDLE(vkd::Fence, fenceObj, fence);
 				fenceObj->Signal();
 			}
+			return true;
 		});
-
-		thread.detach(); // TODO: Big problem
 
 		return VK_SUCCESS;
 	}
@@ -54,8 +65,14 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		// TODO: implement waiting for all queue operations to complete
-		// For now, since we execute synchronously, this is a no-op
+		std::lock_guard<std::mutex> lock(m_submitMutex);
+
+		// Wait for the previous submit to complete
+		if (m_previousSubmit.valid())
+		{
+			m_previousSubmit.wait();
+		}
+
 		return VK_SUCCESS;
 	}
 

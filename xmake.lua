@@ -54,6 +54,18 @@ local drivers = {
     }
 }
 
+target("vkd-Utils")
+    set_languages("cxx20")
+    set_kind("static")
+    add_includedirs("Src", { public = true })
+
+    local files = {
+        ".",
+        "ThreadPool",
+    }
+    for _, dir in ipairs(files) do
+        add_files_to_target("Src/VkdUtils/" .. dir, false)
+    end
 
 target("vkd")
     set_languages("cxx20")
@@ -64,6 +76,7 @@ target("vkd")
     add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
     add_packages("nazarautils", {public = true})
     add_defines("VK_NO_PROTOTYPES")
+    add_deps("vkd-Utils", { public = true })
     if is_plat("windows") then
         add_syslinks("Gdi32", "SetupAPI")
     end

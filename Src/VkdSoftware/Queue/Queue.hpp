@@ -5,6 +5,8 @@
 #pragma once
 
 #include "Vkd/Queue/Queue.hpp"
+#include <future>
+#include <mutex>
 
 namespace vkd::software
 {
@@ -23,5 +25,7 @@ namespace vkd::software
 
 	private:
 		// Future: Add CPU rasterization pipeline, command buffer execution, etc.
+		std::future<bool> m_previousSubmit;
+		std::mutex m_submitMutex;
 	};
 }
