@@ -10,8 +10,8 @@ namespace vkd::software
 	VkResult PhysicalDevice::Create(Instance& owner, const VkAllocationCallbacks& allocationCallbacks)
 	{
 		VkPhysicalDeviceProperties physicalDeviceProperties = {
-			.apiVersion = VK_API_VERSION_1_4,
-			.driverVersion = VK_MAKE_VERSION(0, 1, 0),
+			.apiVersion = VKD_VK_API_VERSION,
+			.driverVersion = VKD_DRIVER_VERSION,
 			.vendorID = 0x0601,
 			.deviceID = 0x060103,
 			.deviceType = VK_PHYSICAL_DEVICE_TYPE_CPU,

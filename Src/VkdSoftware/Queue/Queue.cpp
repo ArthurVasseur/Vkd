@@ -1,3 +1,7 @@
+//
+// Created by arthur on 27/10/2025.
+//
+
 #include "VkdSoftware/Queue/Queue.hpp"
 #include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/Defines.hpp"
@@ -41,7 +45,7 @@ namespace vkd::software
 			}
 		});
 
-		thread.detach();
+		thread.detach(); // TODO: Big problem
 
 		return VK_SUCCESS;
 	}

@@ -1,10 +1,11 @@
-#include "Buffer.hpp"
+//
+// Created by arthur on 27/10/2025.
+//
 
-#include "VkdSoftware/Defines.hpp"
+#include "VkdSoftware/Buffer/Buffer.hpp"
+
 
 namespace vkd::software
 {
-	Buffer::Buffer()
-	{
-	}
+
 }

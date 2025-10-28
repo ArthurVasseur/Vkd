@@ -25,7 +25,7 @@ namespace vkd
 
 		[[nodiscard]] inline Device* GetOwner() const;
 		[[nodiscard]] inline VkDeviceSize GetSize() const;
-		[[nodiscard]] inline uint32_t GetTypeIndex() const;
+		[[nodiscard]] inline UInt32 GetTypeIndex() const;
 		[[nodiscard]] inline bool IsMapped() const;
 
 		virtual VkResult Map(VkDeviceSize offset, VkDeviceSize size, void** ppData) = 0;
@@ -33,7 +33,7 @@ namespace vkd
 
 		Device* m_owner;
 		VkDeviceSize m_size;
-		uint32_t m_typeIndex;
+		UInt32 m_typeIndex;
 		bool m_mapped;
 	};
 }

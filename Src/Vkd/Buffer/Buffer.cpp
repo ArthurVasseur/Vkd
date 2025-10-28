@@ -1,9 +1,7 @@
-#include "Buffer.hpp"
-
-#include "Vkd/Defines.hpp"
-#include "Vkd/Device/Device.hpp"
-#include "Vkd/DeviceMemory/DeviceMemory.hpp"
-#include "Vkd/Memory/Memory.hpp"
+//
+// Created by arthur on 27/10/2025.
+//
+#include "Vkd/Buffer/Buffer.hpp"
 
 namespace vkd
 {

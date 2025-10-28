@@ -3,13 +3,10 @@
 //
 
 #include <algorithm>
-
-#include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
-#include "Vkd/Device/Device.hpp"
-
 #include <chrono>
 #include <thread>
 
+#include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Queue/Queue.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"

@@ -11,7 +11,7 @@ namespace vkd::software
 	class Buffer : public vkd::Buffer
 	{
 	public:
-		Buffer();
+		Buffer() = default;
 		~Buffer() override = default;
 	};
 }

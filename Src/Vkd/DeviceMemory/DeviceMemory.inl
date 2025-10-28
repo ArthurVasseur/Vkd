@@ -1,3 +1,7 @@
+//
+// Created by arthur on 27/10/2025.
+//
+
 #pragma once
 
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
@@ -35,7 +39,7 @@ namespace vkd
 		return m_size;
 	}
 
-	inline uint32_t DeviceMemory::GetTypeIndex() const
+	inline UInt32 DeviceMemory::GetTypeIndex() const
 	{
 		return m_typeIndex;
 	}
