@@ -6,7 +6,7 @@
 namespace vkd
 {
 	inline Fence::Fence() :
-		ObjectBase(VK_OBJECT_TYPE_FENCE),
+		ObjectBase(ObjectType),
 		m_owner(nullptr),
 		m_flags(0)
 	{

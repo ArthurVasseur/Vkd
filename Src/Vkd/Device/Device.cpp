@@ -298,10 +298,10 @@ namespace vkd
 			return poolResult.GetError();
 
 		auto* pool = std::move(poolResult).GetValue();
-		VkResult result = pool->Object->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = pool->Create(*deviceObj, *pCreateInfo, *pAllocator);
 		if (result != VK_SUCCESS)
 		{
-			mem::DeleteDispatchable(pool);
+			mem::Free(*pAllocator, pool);
 			return result;
 		}
 
@@ -316,8 +316,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
 
-		auto* dispatchable = reinterpret_cast<DispatchableObject<CommandPool>*>(commandPool);
-		mem::DeleteDispatchable(dispatchable);
+		mem::Delete(poolObj->GetAllocationCallbacks(), poolObj);
 	}
 
 	VkResult Device::ResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags)
@@ -409,15 +408,18 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pCreateInfo && pFence);
 
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
 		auto fenceResult = deviceObj->CreateFence();
 		if (fenceResult.IsError())
 			return fenceResult.GetError();
 
 		auto* fenceObj = std::move(fenceResult).GetValue();
-		VkResult result = fenceObj->Object->Create(*deviceObj, *pCreateInfo);
+		VkResult result = fenceObj->Create(*deviceObj, *pCreateInfo);
 		if (result != VK_SUCCESS)
 		{
-			mem::DeleteDispatchable(fenceObj);
+			mem::Free(*pAllocator, fenceObj);
 			return result;
 		}
 
@@ -433,7 +435,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Fence>*>(fence);
-		mem::DeleteDispatchable(dispatchable);
+		mem::Delete(fenceObj->GetAllocationCallbacks(), dispatchable);
 	}
 
 	VkResult Device::WaitForFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences, VkBool32 waitAll, uint64_t timeout)
@@ -575,10 +577,10 @@ namespace vkd
 			return bufferResult.GetError();
 
 		auto* bufferObj = std::move(bufferResult).GetValue();
-		VkResult result = bufferObj->Object->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = bufferObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
 		if (result != VK_SUCCESS)
 		{
-			mem::DeleteDispatchable(bufferObj);
+			mem::Delete(*pAllocator, bufferObj);
 			return result;
 		}
 
@@ -593,8 +595,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
 
-		auto* dispatchable = reinterpret_cast<DispatchableObject<Buffer>*>(buffer);
-		mem::DeleteDispatchable(dispatchable);
+		mem::Delete(bufferObj->GetAllocationCallbacks(), bufferObj);
 	}
 
 	void Device::GetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements* pMemoryRequirements)
@@ -637,10 +638,10 @@ namespace vkd
 			return memoryResult.GetError();
 
 		auto* memoryObj = std::move(memoryResult).GetValue();
-		VkResult result = memoryObj->Object->Create(*deviceObj, *pAllocateInfo, *pAllocator);
+		VkResult result = memoryObj->Create(*deviceObj, *pAllocateInfo, *pAllocator);
 		if (result != VK_SUCCESS)
 		{
-			mem::DeleteDispatchable(memoryObj);
+			mem::Delete(*pAllocator, memoryObj);
 			return result;
 		}
 
@@ -655,8 +656,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
 
-		auto* dispatchable = reinterpret_cast<DispatchableObject<DeviceMemory>*>(memory);
-		mem::DeleteDispatchable(dispatchable);
+		mem::Delete(memoryObj->GetAllocationCallbacks(), memoryObj);
 	}
 
 	VkResult Device::MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData)
@@ -714,10 +714,10 @@ namespace vkd
 			}
 
 			auto* pipelineObj = std::move(pipelineResult).GetValue();
-			VkResult result = pipelineObj->Object->CreateGraphicsPipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			VkResult result = pipelineObj->CreateGraphicsPipeline(*deviceObj, pCreateInfos[i], *pAllocator);
 			if (result != VK_SUCCESS)
 			{
-				mem::DeleteDispatchable(pipelineObj);
+				mem::Delete(*pAllocator, pipelineObj);
 				// Clean up any pipelines created so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
@@ -766,10 +766,10 @@ namespace vkd
 			}
 
 			auto* pipelineObj = std::move(pipelineResult).GetValue();
-			VkResult result = pipelineObj->Object->CreateComputePipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			VkResult result = pipelineObj->CreateComputePipeline(*deviceObj, pCreateInfos[i], *pAllocator);
 			if (result != VK_SUCCESS)
 			{
-				mem::DeleteDispatchable(pipelineObj);
+				mem::Delete(*pAllocator, pipelineObj);
 				// Clean up any pipelines created so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
@@ -796,7 +796,6 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
 
-		auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pipeline);
-		mem::DeleteDispatchable(dispatchable);
+		mem::Delete(pipelineObj->GetAllocationCallbacks(), pipelineObj);
 	}
 }

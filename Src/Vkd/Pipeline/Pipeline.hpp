@@ -15,7 +15,7 @@ namespace vkd
 	{
 	public:
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_PIPELINE;
-		VKD_DISPATCHABLE_HANDLE(Pipeline);
+		VKD_NON_DISPATCHABLE_HANDLE(Pipeline);
 
 		Pipeline();
 		~Pipeline() override = default;

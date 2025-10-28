@@ -6,7 +6,7 @@
 namespace vkd
 {
 	inline Pipeline::Pipeline() :
-		ObjectBase(VK_OBJECT_TYPE_PIPELINE),
+		ObjectBase(ObjectType),
 		m_owner(nullptr),
 		m_bindPoint(VK_PIPELINE_BIND_POINT_MAX_ENUM),
 		m_layout(VK_NULL_HANDLE)

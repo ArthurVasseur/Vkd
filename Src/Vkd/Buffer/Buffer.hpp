@@ -34,7 +34,7 @@ namespace vkd
 		using Op = Nz::TypeList<OpFill, OpCopy>;
 
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_BUFFER;
-		VKD_DISPATCHABLE_HANDLE(Buffer);
+		VKD_NON_DISPATCHABLE_HANDLE(Buffer);
 
 		Buffer();
 		~Buffer() override = default;

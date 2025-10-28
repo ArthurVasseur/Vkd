@@ -6,7 +6,7 @@
 namespace vkd
 {
 	inline DeviceMemory::DeviceMemory() :
-		ObjectBase(VK_OBJECT_TYPE_DEVICE_MEMORY),
+		ObjectBase(ObjectType),
 		m_owner(nullptr),
 		m_size(0),
 		m_typeIndex(0),

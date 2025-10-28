@@ -16,7 +16,7 @@ namespace vkd
 	{
 	public:
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
-		VKD_DISPATCHABLE_HANDLE(DeviceMemory);
+		VKD_NON_DISPATCHABLE_HANDLE(DeviceMemory);
 
 		DeviceMemory();
 		~DeviceMemory() override = default;

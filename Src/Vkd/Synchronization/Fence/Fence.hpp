@@ -16,7 +16,7 @@ namespace vkd
 	{
 	public:
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_FENCE;
-		VKD_DISPATCHABLE_HANDLE(Fence);
+		VKD_NON_DISPATCHABLE_HANDLE(Fence);
 
 		Fence();
 		~Fence() override = default;

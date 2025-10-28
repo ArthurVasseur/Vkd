@@ -7,7 +7,7 @@
 namespace vkd
 {
 	inline CommandBuffer::CommandBuffer() :
-		ObjectBase(VK_OBJECT_TYPE_COMMAND_BUFFER),
+		ObjectBase(ObjectType),
 		m_owner(nullptr),
 		m_level(VK_COMMAND_BUFFER_LEVEL_PRIMARY),
 		m_state(State::Initial)

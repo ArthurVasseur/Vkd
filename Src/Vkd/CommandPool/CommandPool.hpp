@@ -17,7 +17,7 @@ namespace vkd
 	{
 	public:
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_COMMAND_POOL;
-		VKD_DISPATCHABLE_HANDLE(CommandPool);
+		VKD_NON_DISPATCHABLE_HANDLE(CommandPool);
 
 		CommandPool();
 		~CommandPool() override = default;

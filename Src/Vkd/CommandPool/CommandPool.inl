@@ -6,7 +6,7 @@
 namespace vkd
 {
 	inline CommandPool::CommandPool() :
-		ObjectBase(VK_OBJECT_TYPE_COMMAND_POOL),
+		ObjectBase(ObjectType),
 		m_owner(nullptr),
 		m_flags(0),
 		m_queueFamilyIndex(0)

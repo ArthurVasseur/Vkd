@@ -71,11 +71,11 @@ namespace vkd
 		static void VKAPI_CALL DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator);
 
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
-		virtual DispatchableObjectResult<CommandPool> CreateCommandPool() = 0;
-		virtual DispatchableObjectResult<Fence> CreateFence() = 0;
-		virtual DispatchableObjectResult<Buffer> CreateBuffer() = 0;
-		virtual DispatchableObjectResult<DeviceMemory> CreateDeviceMemory() = 0;
-		virtual DispatchableObjectResult<Pipeline> CreatePipeline() = 0;
+		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
+		virtual Result<Fence*, VkResult> CreateFence() = 0;
+		virtual Result<Buffer*, VkResult> CreateBuffer() = 0;
+		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory() = 0;
+		virtual Result<Pipeline*, VkResult> CreatePipeline() = 0;
 
 	private:
 		PhysicalDevice* m_owner;
