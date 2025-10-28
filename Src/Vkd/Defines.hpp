@@ -33,6 +33,17 @@
 #define VKD_CHECK(cond) do {} while(false)
 #endif
 
+#ifdef VKD_PROFILING
+#define TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#include <source_location>
+#define VKD_PROFILER_SCOPE(name) ZoneScopedN(name)
+#define VKD_AUTO_PROFILER_SCOPE() ZoneScoped
+#else
+#define VKD_PROFILER_SCOPE(name)
+#define VKD_AUTO_PROFILER_SCOPE()
+#endif
+
 #define VKD_FROM_HANDLE(type, name, handle)	\
 	VKD_CHECK(handle != nullptr);			\
 	type* name = type::FromHandle(handle);	\
@@ -55,9 +66,6 @@
 			}																					\
 			return dispatchable->Object;														\
 		}
-
-#define VKD_PROFILER_SCOPE
-#define VKD_AUTO_PROFILER_SCOPE
 
 namespace vkd
 {

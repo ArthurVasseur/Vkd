@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iostream>
 #include <volk.h>
+#include <thread>
 
 #define VK_CHECK(x) do { VkResult err = (x); if (err != VK_SUCCESS) { \
     std::cerr << "VK_CHECK failed at " << __FILE__ << ":" << __LINE__ << " -> " << err << std::endl; std::abort(); } } while(0)
@@ -53,15 +54,16 @@ int main()
 	app.pApplicationName = "Vkd MVP Test";
 	app.apiVersion = VK_API_VERSION_1_1;
 
-	cct::DynLib driver;
-	if (driver.Load("./vkd-Software" CONCERTO_DYNLIB_EXTENSION) == false)
-	{
-		return EXIT_FAILURE;
-	}
+	//cct::DynLib driver;
+	auto lib = LoadLibraryA("./vkd-Software.dll");
+	//if (driver.Load("./vkd-Software" CONCERTO_DYNLIB_EXTENSION) == false)
+	//{
+	//	return EXIT_FAILURE;
+	//}
 
 	VkDirectDriverLoadingInfoLUNARG directLoadingInfo = {};
 	directLoadingInfo.sType = VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_INFO_LUNARG;
-	directLoadingInfo.pfnGetInstanceProcAddr = static_cast<PFN_vkGetInstanceProcAddrLUNARG>(driver.GetSymbol("vk_icdGetInstanceProcAddr"));
+	directLoadingInfo.pfnGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddrLUNARG>(GetProcAddress(lib, "vk_icdGetInstanceProcAddr"));
 
 	VkDirectDriverLoadingListLUNARG directDriverList = {};
 	directDriverList.sType = VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_LIST_LUNARG;
@@ -215,5 +217,6 @@ int main()
 	vkDestroyDevice(device, nullptr);
 	vkDestroyInstance(instance, nullptr);
 
+	std::this_thread::sleep_for(std::chrono::seconds(1));
 	return (bad == 0) ? 0 : 2;
 }

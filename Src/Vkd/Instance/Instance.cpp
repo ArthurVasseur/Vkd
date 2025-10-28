@@ -41,7 +41,7 @@ namespace vkd
 
 	VkResult Instance::EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		if (pLayerName)
 			return VK_ERROR_LAYER_NOT_PRESENT;
@@ -64,7 +64,7 @@ namespace vkd
 
 	VkResult Instance::EnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		CCT_ASSERT_FALSE("Not Implemented");
 		return VK_ERROR_INCOMPATIBLE_DRIVER;
@@ -78,7 +78,7 @@ namespace vkd
 
 	VkResult Instance::CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		if (!pAllocator)
 			pAllocator = &s_allocationCallbacks;
@@ -103,7 +103,7 @@ namespace vkd
 
 	void Instance::DestroyInstance(VkInstance pInstance, const VkAllocationCallbacks* pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Instance, instance, pInstance);
 		if (!instance)
@@ -115,7 +115,7 @@ namespace vkd
 
 	PFN_vkVoidFunction Instance::GetInstanceProcAddr(VkInstance instance, const char* pName)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		CCT_ASSERT_FALSE("Not Implemented");
 		return nullptr;
@@ -123,7 +123,7 @@ namespace vkd
 
 	VkResult Instance::EnumeratePhysicalDevices(VkInstance pInstance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(vkd::Instance, instance, pInstance);
 
@@ -146,7 +146,7 @@ namespace vkd
 
 	VkResult Instance::EnumeratePlatformPhysicalDevices()
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		if (m_physicalDevicesAlreadyEnumerated)
 			return VK_SUCCESS; // Enumerate Physical devices only once during the lifetime of this VkInstance
@@ -167,7 +167,7 @@ namespace vkd
 
 	void Instance::AddPhysicalDevice(DispatchableObject<PhysicalDevice>* physicalDevice)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		m_physicalDevices.emplace_back(physicalDevice);
 	}
@@ -179,7 +179,7 @@ namespace vkd
 
 	void* Instance::AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		void* alloc = mi_malloc_aligned(size, alignment);
 		if (!alloc)
@@ -193,7 +193,7 @@ namespace vkd
 
 	void* Instance::ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		void* alloc = mi_realloc_aligned(pOriginal, size, alignment);
 		if (!alloc)
@@ -207,7 +207,7 @@ namespace vkd
 
 	void Instance::FreeFunction(void* pUserData, void* pMemory)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		mi_free(pMemory);
 	}

@@ -162,7 +162,7 @@ namespace vkd
 
 	VkResult Device::CreateDevice(VkPhysicalDevice pPhysicalDevice, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		if (!pAllocator)
@@ -186,7 +186,7 @@ namespace vkd
 
 	void Device::DestroyDevice(VkDevice pDevice, const VkAllocationCallbacks* pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, device, pDevice);
 
@@ -196,7 +196,7 @@ namespace vkd
 
 	PFN_vkVoidFunction Device::GetDeviceProcAddr(VkDevice pDevice, const char* pName)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		if (pName == nullptr)
 			return nullptr;
@@ -249,7 +249,7 @@ namespace vkd
 
 	void Device::GetDeviceQueue(VkDevice pDevice, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, device, pDevice);
 		VKD_CHECK(pQueue);
@@ -267,7 +267,7 @@ namespace vkd
 
 	void Device::GetDeviceQueue2(VkDevice pDevice, const VkDeviceQueueInfo2* pQueueInfo, VkQueue* pQueue)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, device, pDevice);
 		VKD_CHECK(pQueueInfo && pQueue);
@@ -285,7 +285,7 @@ namespace vkd
 
 	VkResult Device::CreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pCreateInfo && pCommandPool);
@@ -311,7 +311,7 @@ namespace vkd
 
 	void Device::DestroyCommandPool(VkDevice device, VkCommandPool commandPool, const VkAllocationCallbacks* pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
@@ -322,7 +322,7 @@ namespace vkd
 
 	VkResult Device::ResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
@@ -332,7 +332,7 @@ namespace vkd
 
 	VkResult Device::AllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer* pCommandBuffers)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pAllocateInfo && pCommandBuffers);
@@ -384,7 +384,7 @@ namespace vkd
 
 	void Device::FreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount, const VkCommandBuffer* pCommandBuffers)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, commandPoolObj, commandPool);
@@ -404,7 +404,7 @@ namespace vkd
 
 	VkResult Device::CreateFence(VkDevice device, const VkFenceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkFence* pFence)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pCreateInfo && pFence);
@@ -427,7 +427,7 @@ namespace vkd
 
 	void Device::DestroyFence(VkDevice device, VkFence fence, const VkAllocationCallbacks* pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Fence, fenceObj, fence);
 		VKD_FROM_HANDLE(Device, deviceObj, device);
@@ -438,7 +438,7 @@ namespace vkd
 
 	VkResult Device::WaitForFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences, VkBool32 waitAll, uint64_t timeout)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pFences && fenceCount != 0);
@@ -527,7 +527,7 @@ namespace vkd
 
 	VkResult Device::ResetFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pFences && fenceCount != 0);
@@ -552,7 +552,7 @@ namespace vkd
 
 	VkResult Device::GetFenceStatus(VkDevice device, VkFence fence)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Fence, fenceObj, fence);
@@ -562,7 +562,7 @@ namespace vkd
 
 	VkResult Device::CreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pCreateInfo && pBuffer);
@@ -588,7 +588,7 @@ namespace vkd
 
 	void Device::DestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
@@ -599,7 +599,7 @@ namespace vkd
 
 	void Device::GetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements* pMemoryRequirements)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
@@ -610,7 +610,7 @@ namespace vkd
 
 	VkResult Device::BindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memoryOffset)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
@@ -624,7 +624,7 @@ namespace vkd
 
 	VkResult Device::AllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo, const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pAllocateInfo && pMemory);
@@ -650,7 +650,7 @@ namespace vkd
 
 	void Device::FreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
@@ -661,7 +661,7 @@ namespace vkd
 
 	VkResult Device::MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
 		VKD_CHECK(!memoryObj->m_mapped);
@@ -675,7 +675,7 @@ namespace vkd
 
 	void Device::UnmapMemory(VkDevice device, VkDeviceMemory memory)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
@@ -687,7 +687,7 @@ namespace vkd
 
 	VkResult Device::CreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pCreateInfos || pPipelines || createInfoCount);
@@ -739,7 +739,7 @@ namespace vkd
 
 	VkResult Device::CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_CHECK(pCreateInfos && pPipelines && createInfoCount);
@@ -791,7 +791,7 @@ namespace vkd
 
 	void Device::DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
