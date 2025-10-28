@@ -42,7 +42,7 @@ namespace vkd
 
 	void PhysicalDevice::GetPhysicalDeviceFeatures(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures* pFeatures)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		CCT_ASSERT_FALSE("Not Implemented");
@@ -50,7 +50,7 @@ namespace vkd
 
 	void PhysicalDevice::GetPhysicalDeviceFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkFormatProperties* pFormatProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		CCT_ASSERT_FALSE("Not Implemented");
@@ -60,7 +60,7 @@ namespace vkd
 		VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
 		VkImageFormatProperties* pImageFormatProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		CCT_ASSERT_FALSE("Not Implemented");
@@ -69,7 +69,7 @@ namespace vkd
 
 	void PhysicalDevice::GetPhysicalDeviceProperties(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceProperties* pProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 
@@ -79,7 +79,7 @@ namespace vkd
 
 	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 
@@ -100,7 +100,7 @@ namespace vkd
 
 	void PhysicalDevice::GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		CCT_ASSERT_FALSE("Not Implemented");
@@ -109,7 +109,7 @@ namespace vkd
 	VkResult PhysicalDevice::EnumerateDeviceExtensionProperties(VkPhysicalDevice pPhysicalDevice, const char* pLayerName,
 		uint32_t* pPropertyCount, VkExtensionProperties* pProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
@@ -136,7 +136,7 @@ namespace vkd
 		VkFormat format, VkImageType type, VkSampleCountFlagBits samples, VkImageUsageFlags usage, VkImageTiling tiling,
 		uint32_t* pPropertyCount, VkSparseImageFormatProperties* pProperties)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		CCT_ASSERT_FALSE("Not Implemented");
@@ -144,7 +144,7 @@ namespace vkd
 
 	void PhysicalDevice::DestroyPhysicalDevice(VkPhysicalDevice pPhysicalDevice)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		if (!physicalDevice)

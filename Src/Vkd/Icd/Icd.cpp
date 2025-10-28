@@ -17,7 +17,7 @@ namespace vkd
 
 	PFN_vkVoidFunction Icd::GetInstanceProcAddr(VkInstance pInstance, const char* pName)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		if (pName == nullptr)
 			return nullptr;
@@ -71,7 +71,7 @@ namespace vkd
 
 	VkResult Icd::EnumerateAdapterPhysicalDevices(VkInstance pInstance, LUID adapterLUID, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(vkd::Instance, instance, pInstance);
 

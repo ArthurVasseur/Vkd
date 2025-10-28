@@ -10,14 +10,14 @@ namespace vkd::software
 {
 	VkResult CommandPool::Create(Device& owner, const VkCommandPoolCreateInfo& createInfo, const VkAllocationCallbacks& pAllocator)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		return vkd::CommandPool::Create(owner, createInfo, pAllocator);
 	}
 
 	VkResult CommandPool::Reset(VkCommandPoolResetFlags flags)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		// TODO: implement CPU execution - reset all command buffers in pool
 		return VK_SUCCESS;
@@ -25,7 +25,7 @@ namespace vkd::software
 
 	DispatchableObjectResult<vkd::CommandBuffer> CommandPool::CreateCommandBuffer(VkCommandBufferLevel level)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		auto* buffer = mem::NewDispatchable<CommandBuffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!buffer)

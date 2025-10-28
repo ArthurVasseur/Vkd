@@ -2,9 +2,14 @@ add_rules("mode.debug", "mode.release")
 add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.git main")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
 add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "concerto-graphics", "nazarautils")
-add_requires("concerto-core", {configs = {asserts = get_config("debug_checks")}})
+add_requires("concerto-core", {configs = {asserts = get_config("debug_checks"), debug = is_mode("debug")}})
 
 option("debug_checks", {default = is_mode("debug"), description = "Enable additional debug checks"})
+option("profiling", { description = "Build with tracy profiler", default = false })
+
+if has_config("profiling") then
+    add_requires("tracy")
+end
 
 function add_files_to_target(p, hpp_as_files)
     for _, dir in ipairs(os.filedirs(p)) do
@@ -64,6 +69,10 @@ target("vkd")
     end
     if has_config("debug_checks") then
         add_defines("VKD_DEBUG_CHECKS", { public = true })
+    end
+    if has_config("profiling") then
+        add_packages("tracy", {public = true})
+        add_defines("VKD_PROFILING", { public = true })
     end
 
     local files = {

@@ -10,7 +10,7 @@ namespace vkd::software
 
 	VkResult CpuContext::BindPipeline(OpBindPipeline op)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		CCT_ASSERT(op.Pipeline != nullptr, "Pipeline cannot be null");
 
@@ -21,7 +21,7 @@ namespace vkd::software
 
 	VkResult CpuContext::BindVertexBuffer(OpBindVertexBuffer op)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		CCT_ASSERT(!op.Buffers.empty(), "No vertex buffers provided");
 		CCT_ASSERT(!op.Offsets.empty(), "No offsets provided");
@@ -47,14 +47,14 @@ namespace vkd::software
 
 	VkResult CpuContext::Draw(vkd::OpDraw op)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		return VK_SUCCESS;
 	}
 
 	VkResult CpuContext::CopyBuffer(vkd::Buffer::OpCopy op)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		for (auto& region : op.regions)
 		{
@@ -78,7 +78,7 @@ namespace vkd::software
 
 	VkResult CpuContext::FillBuffer(vkd::Buffer::OpFill op)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		cct::UByte* data = nullptr;
 		op.dst->GetMemory()->Map(op.offset, op.size, reinterpret_cast<void**>(&data));

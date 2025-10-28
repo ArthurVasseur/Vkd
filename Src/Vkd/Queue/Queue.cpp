@@ -7,7 +7,7 @@ namespace vkd
 {
 	VkResult Queue::QueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Queue, queueObj, queue);
 		if (!queueObj)
@@ -21,7 +21,7 @@ namespace vkd
 
 	VkResult Queue::QueueWaitIdle(VkQueue queue)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Queue, queueObj, queue);
 		if (!queueObj)
@@ -35,7 +35,7 @@ namespace vkd
 
 	VkResult Queue::QueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Queue, queueObj, queue);
 		if (!queueObj)

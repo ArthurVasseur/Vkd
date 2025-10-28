@@ -11,7 +11,7 @@ namespace vkd
 {
 	VkResult CommandBuffer::BeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
 		if (!cmdBuffer)
@@ -31,7 +31,7 @@ namespace vkd
 
 	VkResult CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
 		if (!cmdBuffer)
@@ -45,7 +45,7 @@ namespace vkd
 
 	VkResult CommandBuffer::ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
 		if (!cmdBuffer)
@@ -59,7 +59,7 @@ namespace vkd
 
 	void CommandBuffer::CmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size, uint32_t data)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 		commandBufferObj->PushFill(dstBuffer, dstOffset, size, data);
@@ -67,7 +67,7 @@ namespace vkd
 
 	void CommandBuffer::CmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 		commandBufferObj->PushCopy(srcBuffer, dstBuffer, regionCount, pRegions);
@@ -75,7 +75,7 @@ namespace vkd
 
 	void CommandBuffer::CmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 
@@ -84,7 +84,7 @@ namespace vkd
 
 	void CommandBuffer::CmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount, const VkBuffer* pBuffers, const VkDeviceSize* pOffsets)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 
@@ -93,7 +93,7 @@ namespace vkd
 
 	void CommandBuffer::CmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 

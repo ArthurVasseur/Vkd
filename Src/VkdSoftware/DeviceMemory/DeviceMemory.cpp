@@ -6,7 +6,7 @@ namespace vkd::software
 {
 	VkResult DeviceMemory::Create(vkd::Device& owner, const VkMemoryAllocateInfo& info, const VkAllocationCallbacks& allocationCallbacks)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		VkResult result = vkd::DeviceMemory::Create(owner, info, allocationCallbacks);
 		if (result != VK_SUCCESS)
@@ -26,7 +26,7 @@ namespace vkd::software
 
 	VkResult DeviceMemory::Map(VkDeviceSize offset, VkDeviceSize size, void** ppData)
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		if (offset >= m_size)
 		{
@@ -42,7 +42,7 @@ namespace vkd::software
 
 	void DeviceMemory::Unmap()
 	{
-		VKD_AUTO_PROFILER_SCOPE;
+		VKD_AUTO_PROFILER_SCOPE();
 
 		m_mapOffset = 0;
 	}
