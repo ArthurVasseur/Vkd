@@ -8,6 +8,8 @@ namespace vkd::software
 {
 	VkResult CommandDispatcher::Execute(const vkd::CommandBuffer& cb)
 	{
+		VKD_AUTO_PROFILER_SCOPE();
+
 		if (!cb.IsSealed())
 			return VK_ERROR_VALIDATION_FAILED_EXT;
 
