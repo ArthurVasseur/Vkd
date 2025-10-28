@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 
 namespace vkd::software

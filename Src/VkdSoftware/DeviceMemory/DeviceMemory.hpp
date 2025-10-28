@@ -5,7 +5,6 @@
 #pragma once
 
 #include <vector>
-#include <cstdint>
 
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 

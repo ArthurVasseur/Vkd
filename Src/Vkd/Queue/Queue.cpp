@@ -1,6 +1,8 @@
-#include "Queue.hpp"
+//
+// Created by arthur on 27/10/2025.
+//
 
-#include "Vkd/Defines.hpp"
+#include "Vkd/Queue/Queue.hpp"
 #include "Vkd/Device/Device.hpp"
 
 namespace vkd

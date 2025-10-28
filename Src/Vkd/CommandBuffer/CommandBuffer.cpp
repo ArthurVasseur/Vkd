@@ -1,11 +1,8 @@
-#include "CommandBuffer.hpp"
+//
+// Created by arthur on 27/10/2025.
+//
 
-#include "Vkd/Defines.hpp"
-#include "Vkd/Device/Device.hpp"
-#include "Vkd/CommandPool/CommandPool.hpp"
-#include "Vkd/Memory/Memory.hpp"
-#include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
-#include "VkdSoftware/Pipeline/Pipeline.hpp"
+#include "Vkd/CommandBuffer/CommandBuffer.hpp"
 
 namespace vkd
 {
@@ -14,17 +11,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
-		if (!cmdBuffer)
-		{
-			CCT_ASSERT_FALSE("Invalid VkCommandBuffer handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
-		if (!pBeginInfo)
-		{
-			CCT_ASSERT_FALSE("Invalid parameters");
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
+		VKD_CHECK(pBeginInfo);
 
 		return cmdBuffer->Begin(*pBeginInfo);
 	}
@@ -34,11 +21,6 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
-		if (!cmdBuffer)
-		{
-			CCT_ASSERT_FALSE("Invalid VkCommandBuffer handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
 
 		return cmdBuffer->End();
 	}
@@ -48,11 +30,6 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, commandBuffer);
-		if (!cmdBuffer)
-		{
-			CCT_ASSERT_FALSE("Invalid VkCommandBuffer handle");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
 
 		return cmdBuffer->Reset(flags);
 	}
