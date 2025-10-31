@@ -1,6 +1,11 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Defines.hpp
+ * @brief Common definitions and macros for the Vkd driver
+ * @date 2025-04-23
+ *
+ * Provides Vulkan includes, platform detection, handle macros, and common type definitions
+ * used throughout the driver implementation.
+ */
 
 #pragma once
 

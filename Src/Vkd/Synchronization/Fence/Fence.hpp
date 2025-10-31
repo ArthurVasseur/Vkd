@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file Fence.hpp
+ * @brief Vulkan fence synchronization primitive
+ * @date 2025-10-25
+ *
+ * Represents a fence for GPU-CPU synchronization.
+ */
 
 #pragma once
 

@@ -1,6 +1,10 @@
-//
-// Created by arthur on 26/10/2025.
-//
+/**
+ * @file Pipeline.hpp
+ * @brief Vulkan graphics pipeline abstraction
+ * @date 2025-10-26
+ *
+ * Represents a graphics pipeline object.
+ */
 
 #pragma once
 

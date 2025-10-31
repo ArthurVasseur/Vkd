@@ -1,6 +1,8 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Device.cpp
+ * @brief Implementation of Vulkan logical device
+ * @date 2025-04-23
+ */
 
 #include <algorithm>
 #include <chrono>

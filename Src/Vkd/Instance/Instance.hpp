@@ -1,6 +1,11 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Instance.hpp
+ * @brief Vulkan instance implementation
+ * @date 2025-04-23
+ *
+ * Represents a Vulkan instance and manages physical device enumeration
+ * and instance-level extensions.
+ */
 
 #pragma once
 

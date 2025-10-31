@@ -1,3 +1,11 @@
+/**
+ * @file Queue.hpp
+ * @brief Vulkan queue abstraction
+ * @date 2025-04-23
+ *
+ * Represents a device queue and handles command buffer submission and synchronization.
+ */
+
 #pragma once
 
 #include <vulkan/vulkan.h>

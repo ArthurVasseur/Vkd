@@ -1,11 +1,11 @@
-#include "Fence.hpp"
-
-#include "Vkd/Defines.hpp"
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file Fence.cpp
+ * @brief Implementation of Vulkan fence
+ * @date 2025-10-27
+ */
 
 #include "Vkd/Synchronization/Fence/Fence.hpp"
+#include "Vkd/Defines.hpp"
 
 namespace vkd
 {

@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file CommandBuffer.hpp
+ * @brief Vulkan command buffer abstraction
+ * @date 2025-10-25
+ *
+ * Represents a command buffer for recording and executing Vulkan commands.
+ */
 
 #pragma once
 

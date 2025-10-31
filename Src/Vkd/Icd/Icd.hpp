@@ -1,6 +1,11 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Icd.hpp
+ * @brief ICD (Installable Client Driver) interface for Vulkan loader
+ * @date 2025-04-23
+ *
+ * Implements the Vulkan ICD interface functions required for loader communication
+ * and driver initialization.
+ */
 
 #pragma once
 

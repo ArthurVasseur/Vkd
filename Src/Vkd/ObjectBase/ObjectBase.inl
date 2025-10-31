@@ -1,6 +1,8 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file ObjectBase.inl
+ * @brief Inline implementations for ObjectBase
+ * @date 2025-04-23
+ */
 
 #pragma once
 

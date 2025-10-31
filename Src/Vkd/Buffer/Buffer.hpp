@@ -1,6 +1,10 @@
-//
-// Created by arthur on 26/10/2025.
-//
+/**
+ * @file Buffer.hpp
+ * @brief Vulkan buffer object abstraction
+ * @date 2025-10-26
+ *
+ * Represents a Vulkan buffer resource and handles memory binding.
+ */
 
 #pragma once
 

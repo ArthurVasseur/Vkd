@@ -1,6 +1,10 @@
-//
-// Created by arthur on 26/10/2025.
-//
+/**
+ * @file DeviceMemory.hpp
+ * @brief Vulkan device memory abstraction
+ * @date 2025-10-26
+ *
+ * Represents a device memory allocation.
+ */
 
 #pragma once
 

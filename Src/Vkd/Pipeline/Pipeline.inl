@@ -1,3 +1,9 @@
+/**
+ * @file Pipeline.inl
+ * @brief Inline implementations for Pipeline
+ * @date 2025-10-26
+ */
+
 #pragma once
 
 #include "Vkd/Pipeline/Pipeline.hpp"
