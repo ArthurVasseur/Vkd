@@ -1,6 +1,8 @@
-//
-// Created by arthur on 26/10/2025.
-//
+/**
+ * @file Pipeline.cpp
+ * @brief Implementation of software renderer pipeline
+ * @date 2025-10-26
+ */
 
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
 #include "Vkd/Device/Device.hpp"

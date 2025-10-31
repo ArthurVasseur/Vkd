@@ -1,6 +1,10 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file CommandDispatcher.hpp
+ * @brief Command dispatcher for CPU-based rendering
+ * @date 2025-10-27
+ *
+ * Executes recorded command buffer operations on the CPU.
+ */
 
 #pragma once
 

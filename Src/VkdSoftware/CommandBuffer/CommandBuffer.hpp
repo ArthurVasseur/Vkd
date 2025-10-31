@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file CommandBuffer.hpp
+ * @brief Software renderer command buffer implementation
+ * @date 2025-10-25
+ *
+ * Command buffer implementation that records draw calls for CPU execution.
+ */
 
 #pragma once
 

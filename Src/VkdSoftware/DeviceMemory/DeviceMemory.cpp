@@ -1,11 +1,23 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file DeviceMemory.cpp
+ * @brief Implementation of software renderer device memory
+ * @date 2025-10-27
+ */
 
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
+#include "VkdSoftware/Device/Device.hpp"
 
 namespace vkd::software
 {
+	DeviceMemory::~DeviceMemory()
+	{
+		if (m_allocation.size > 0 && m_owner)
+		{
+			auto* softwareDevice = static_cast<SoftwareDevice*>(m_owner);
+			softwareDevice->GetAllocator().Free(m_allocation);
+		}
+	}
+
 	VkResult DeviceMemory::Create(vkd::Device& owner, const VkMemoryAllocateInfo& info, const VkAllocationCallbacks& allocationCallbacks)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
@@ -14,14 +26,9 @@ namespace vkd::software
 		if (result != VK_SUCCESS)
 			return result;
 
-		try
-		{
-			m_data.resize(info.allocationSize);
-		}
-		catch (const std::bad_alloc&)
-		{
-			return VK_ERROR_OUT_OF_HOST_MEMORY;
-		}
+		auto* softwareDevice = static_cast<SoftwareDevice*>(&owner);
+		if (!softwareDevice->GetAllocator().Allocate(info.allocationSize, 16, m_allocation))
+			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
 		return VK_SUCCESS;
 	}
@@ -37,7 +44,7 @@ namespace vkd::software
 		}
 
 		m_mapOffset = offset;
-		*ppData = m_data.data() + m_mapOffset;
+		*ppData = Data() + m_mapOffset;
 
 		return VK_SUCCESS;
 	}

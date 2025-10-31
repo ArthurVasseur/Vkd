@@ -1,3 +1,9 @@
+/**
+ * @file Buffer.inl
+ * @brief Inline implementations for software renderer buffer
+ * @date 2025-10-26
+ */
+
 #pragma once
 
 #include "VkdSoftware/Buffer/Buffer.hpp"

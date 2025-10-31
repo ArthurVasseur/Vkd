@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file CommandDispatcher.cpp
+ * @brief Implementation of command dispatcher
+ * @date 2025-10-27
+ */
 
 #include "VkdSoftware/CommandDispatcher/CommandDispatcher.hpp"
 

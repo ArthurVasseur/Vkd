@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file CpuContext.inl
+ * @brief Inline implementations for CPU rendering context
+ * @date 2025-10-27
+ */
 
 #pragma once
 

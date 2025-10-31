@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/11/2025.
-//
+/**
+ * @file EntryPoint.cpp
+ * @brief ICD entry points for the Vulkan driver
+ * @date 2025-11-25
+ *
+ * Exports the required ICD interface functions for loader communication.
+ */
 
 #include <Vkd/Icd/Icd.hpp>
 

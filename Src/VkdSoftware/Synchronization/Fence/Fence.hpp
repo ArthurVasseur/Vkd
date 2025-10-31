@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file Fence.hpp
+ * @brief Software renderer fence implementation
+ * @date 2025-10-25
+ *
+ * CPU-based fence synchronization using atomic operations.
+ */
 
 #pragma once
 
