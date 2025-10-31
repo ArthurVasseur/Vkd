@@ -168,7 +168,7 @@ target("vkd-test")
     add_deps("vkd-Utils")
 target_end()
 
-target("vkd-test")
+target("vkd-test-app")
     set_languages("cxx20")
     set_kind("binary")
     add_files("Tests/**.cpp")
