@@ -1,6 +1,10 @@
-//
-// Created by arthur on 26/10/2025.
-//
+/**
+ * @file Pipeline.hpp
+ * @brief Software renderer pipeline implementation
+ * @date 2025-10-26
+ *
+ * Graphics pipeline implementation for CPU rendering.
+ */
 
 #pragma once
 

@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file Buffer.cpp
+ * @brief Implementation of software renderer buffer
+ * @date 2025-10-27
+ */
 
 #include "VkdSoftware/Buffer/Buffer.hpp"
 

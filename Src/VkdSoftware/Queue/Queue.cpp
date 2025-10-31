@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file Queue.cpp
+ * @brief Implementation of software renderer queue
+ * @date 2025-10-27
+ */
 
 #include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Queue/Queue.hpp"

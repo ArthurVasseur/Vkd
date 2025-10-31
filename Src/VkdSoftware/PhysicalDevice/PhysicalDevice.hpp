@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file PhysicalDevice.hpp
+ * @brief Software renderer physical device implementation
+ * @date 2025-10-25
+ *
+ * CPU-based software rendering physical device implementation.
+ */
 
 #pragma once
 

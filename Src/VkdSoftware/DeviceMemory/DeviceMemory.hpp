@@ -1,12 +1,15 @@
-//
-// Created by arthur on 26/10/2025.
-//
+/**
+ * @file DeviceMemory.hpp
+ * @brief Software renderer device memory implementation
+ * @date 2025-10-26
+ *
+ * Device memory allocation using the TLSF allocator for CPU-accessible memory.
+ */
 
 #pragma once
 
-#include <vector>
-
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
+#include "VkdUtils/Allocator/Allocator.hpp"
 
 namespace vkd::software
 {
@@ -14,20 +17,20 @@ namespace vkd::software
 	{
 	public:
 		DeviceMemory();
-		~DeviceMemory() override = default;
+		~DeviceMemory() override;
 
 		VkResult Create(vkd::Device& owner, const VkMemoryAllocateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;
 
-		[[nodiscard]] inline uint8_t* Data();
-		[[nodiscard]] inline const uint8_t* Data() const;
+		[[nodiscard]] inline UByte* Data();
+		[[nodiscard]] inline const UByte* Data() const;
 
 	protected:
 		VkResult Map(VkDeviceSize offset, VkDeviceSize size, void** ppData) override;
 		void Unmap() override;
 
 	private:
-		std::vector<uint8_t> m_data;
-		size_t m_mapOffset;
+		vkd::Allocation m_allocation;
+		std::size_t m_mapOffset;
 	};
 }
 

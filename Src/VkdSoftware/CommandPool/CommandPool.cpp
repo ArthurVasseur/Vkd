@@ -1,12 +1,11 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file CommandPool.cpp
+ * @brief Implementation of software renderer command pool
+ * @date 2025-10-27
+ */
 
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
 #include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
-//
-// Created by arthur on 27/10/2025.
-//
 
 #include "Vkd/Memory/Memory.hpp"
 

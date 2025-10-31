@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file Queue.hpp
+ * @brief Software renderer queue implementation
+ * @date 2025-10-25
+ *
+ * Queue implementation for CPU-based command execution with thread pool scheduling.
+ */
 
 #pragma once
 

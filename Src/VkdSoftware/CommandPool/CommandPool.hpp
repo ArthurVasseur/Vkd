@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file CommandPool.hpp
+ * @brief Software renderer command pool implementation
+ * @date 2025-10-25
+ *
+ * Command pool implementation for CPU-based command buffer allocation.
+ */
 
 #pragma once
 

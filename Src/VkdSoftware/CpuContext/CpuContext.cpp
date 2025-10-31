@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file CpuContext.cpp
+ * @brief Implementation of CPU rendering context
+ * @date 2025-10-27
+ */
 
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "VkdSoftware/CpuContext/CpuContext.hpp"

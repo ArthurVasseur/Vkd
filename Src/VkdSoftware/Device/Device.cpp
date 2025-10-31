@@ -1,6 +1,8 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Device.cpp
+ * @brief Implementation of software renderer logical device
+ * @date 2025-04-23
+ */
 
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
@@ -12,9 +14,19 @@
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
+#include "VkdUtils/System/System.hpp"
 
 namespace vkd::software
 {
+	SoftwareDevice::SoftwareDevice() : m_allocator([]() -> std::size_t
+	{
+		utils::System system;
+		const UInt64 totalRam = system.GetTotalRamBytes();
+		return static_cast<std::size_t>(utils::System::ComputeDeviceMemoryHeapSize(totalRam));
+	}())
+	{
+	}
+
 	SoftwareDevice::~SoftwareDevice()
 	{
 		m_threadPool.RequestStop();
@@ -23,6 +35,11 @@ namespace vkd::software
 	ThreadPool& SoftwareDevice::GetThreadPool()
 	{
 		return m_threadPool;
+	}
+
+	Allocator& SoftwareDevice::GetAllocator()
+	{
+		return m_allocator;
 	}
 
 	DispatchableObjectResult<vkd::Queue> SoftwareDevice::CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags)

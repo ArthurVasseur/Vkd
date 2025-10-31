@@ -1,6 +1,11 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file CpuContext.hpp
+ * @brief CPU rendering context for software rasterization
+ * @date 2025-10-27
+ *
+ * Maintains the state for CPU-based rendering operations including vertex buffers,
+ * pipeline state, and viewport configuration.
+ */
 
 #pragma once
 

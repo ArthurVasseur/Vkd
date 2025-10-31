@@ -1,6 +1,10 @@
-//
-// Created by arthur on 26/10/2025.
-//
+/**
+ * @file BufferCPU.hpp
+ * @brief CPU-accessible buffer utilities for software rendering
+ * @date 2025-10-26
+ *
+ * Utility functions for managing CPU-accessible buffer data.
+ */
 
 #pragma once
 

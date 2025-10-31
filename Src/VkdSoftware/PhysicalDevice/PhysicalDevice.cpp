@@ -1,6 +1,8 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file PhysicalDevice.cpp
+ * @brief Implementation of software renderer physical device
+ * @date 2025-10-25
+ */
 
 #include "VkdSoftware/PhysicalDevice/PhysicalDevice.hpp"
 #include "VkdSoftware/Device/Device.hpp"

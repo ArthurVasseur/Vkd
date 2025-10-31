@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file CommandBuffer.inl
+ * @brief Inline implementations for software renderer command buffer
+ * @date 2025-10-27
+ */
 
 #pragma once
 
