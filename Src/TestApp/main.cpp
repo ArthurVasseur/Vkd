@@ -1,3 +1,11 @@
+/**
+ * @file main.cpp
+ * @brief Vulkan driver integration test
+ * @date 2025-04-23
+ *
+ * Integration test for the Vkd software Vulkan driver implementation.
+ */
+
 #define VOLK_IMPLEMENTATION
 
 #include <vulkan/vulkan.h>
