@@ -1,6 +1,11 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file ObjectBase.hpp
+ * @brief Base class for all Vulkan dispatchable objects
+ * @date 2025-04-23
+ *
+ * Provides common functionality for Vulkan objects including object type tracking,
+ * allocation callbacks, and handle management utilities.
+ */
 
 #pragma once
 #include <Concerto/Core/Result/Result.hpp>

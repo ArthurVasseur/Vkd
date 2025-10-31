@@ -1,6 +1,8 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Memory.inl
+ * @brief Inline implementations for memory allocation utilities
+ * @date 2025-04-23
+ */
 
 #pragma once
 #include "Vkd/Memory/Memory.hpp"

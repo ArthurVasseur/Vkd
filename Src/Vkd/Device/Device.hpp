@@ -1,6 +1,11 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Device.hpp
+ * @brief Vulkan logical device abstraction
+ * @date 2025-04-23
+ *
+ * Represents a logical device and manages queues, command pools, buffers, pipelines,
+ * and device memory allocations.
+ */
 
 #pragma once
 

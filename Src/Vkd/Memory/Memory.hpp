@@ -1,6 +1,10 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Memory.hpp
+ * @brief Memory allocation utilities for Vulkan objects
+ * @date 2025-04-23
+ *
+ * Provides allocation and deallocation functions using Vulkan allocation callbacks.
+ */
 
 #pragma once
 #include "Vkd/Defines.hpp"

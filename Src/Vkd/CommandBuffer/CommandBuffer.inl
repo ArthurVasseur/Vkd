@@ -1,3 +1,9 @@
+/**
+ * @file CommandBuffer.inl
+ * @brief Inline implementations for CommandBuffer
+ * @date 2025-10-25
+ */
+
 #pragma once
 
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"

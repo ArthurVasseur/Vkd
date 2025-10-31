@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file CommandBuffer.cpp
+ * @brief Implementation of Vulkan command buffer
+ * @date 2025-10-27
+ */
 
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 

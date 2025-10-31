@@ -1,6 +1,10 @@
-//
-// Created by arthur on 25/10/2025.
-//
+/**
+ * @file CommandPool.hpp
+ * @brief Vulkan command pool abstraction
+ * @date 2025-10-25
+ *
+ * Represents a command pool for allocating command buffers.
+ */
 
 #pragma once
 

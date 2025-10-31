@@ -1,6 +1,8 @@
-//
-// Created by arthur on 27/10/2025.
-//
+/**
+ * @file Queue.cpp
+ * @brief Implementation of Vulkan queue
+ * @date 2025-10-27
+ */
 
 #include "Vkd/Queue/Queue.hpp"
 #include "Vkd/Device/Device.hpp"

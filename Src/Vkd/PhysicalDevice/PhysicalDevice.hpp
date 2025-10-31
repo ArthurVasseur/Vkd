@@ -1,6 +1,11 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file PhysicalDevice.hpp
+ * @brief Vulkan physical device abstraction
+ * @date 2025-04-23
+ *
+ * Represents a physical device and provides device properties, queue family information,
+ * and device creation capabilities.
+ */
 
 #pragma once
 
@@ -43,7 +48,7 @@ namespace vkd
 	protected:
 		VkResult Create(Instance& owner, VkPhysicalDeviceProperties physicalDeviceProperties, std::array<VkQueueFamilyProperties, 3> queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks);
 	private:
-		static std::array<VkExtensionProperties, 2> s_supportedExtensions;
+		static std::array<VkExtensionProperties, 0> s_supportedExtensions;
 
 		Instance* m_instance;
 		VkPhysicalDeviceProperties m_physicalDeviceProperties;

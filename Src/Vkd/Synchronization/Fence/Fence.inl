@@ -1,3 +1,9 @@
+/**
+ * @file Fence.inl
+ * @brief Inline implementations for Fence
+ * @date 2025-10-25
+ */
+
 #pragma once
 
 #include "Vkd/Synchronization/Fence/Fence.hpp"

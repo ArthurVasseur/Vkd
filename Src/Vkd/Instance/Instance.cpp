@@ -1,6 +1,8 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Instance.cpp
+ * @brief Implementation of Vulkan instance
+ * @date 2025-04-23
+ */
 
 #include <mimalloc.h>
 

@@ -1,3 +1,11 @@
+/**
+ * @file Ops.hpp
+ * @brief Command buffer operation structures
+ * @date 2025-10-25
+ *
+ * Defines structures for command buffer operations used in command recording.
+ */
+
 #pragma once
 
 #include <NazaraUtils/TypeList.hpp>

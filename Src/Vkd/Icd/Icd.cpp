@@ -1,6 +1,8 @@
-//
-// Created by arthur on 23/04/2025.
-//
+/**
+ * @file Icd.cpp
+ * @brief Implementation of ICD interface functions
+ * @date 2025-04-23
+ */
 
 #include "Vkd/Icd/Icd.hpp"
 #include "Vkd/Instance/Instance.hpp"

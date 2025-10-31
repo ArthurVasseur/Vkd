@@ -1,3 +1,9 @@
+/**
+ * @file Queue.inl
+ * @brief Inline implementations for Queue
+ * @date 2025-04-23
+ */
+
 #pragma once
 
 #include "Vkd/Queue/Queue.hpp"
