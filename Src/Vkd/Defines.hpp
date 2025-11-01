@@ -12,6 +12,7 @@
 #include <Concerto/Core/Types/Types.hpp>
 #include <Concerto/Core/Assert.hpp>
 #include <Concerto/Core/EnumFlags/EnumFlags.hpp>
+#include <Concerto/Core/Logger/Logger.hpp>
 
 #include <NazaraUtils/TypeList.hpp>
 

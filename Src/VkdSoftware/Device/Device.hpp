@@ -20,6 +20,8 @@ namespace vkd::software
 		SoftwareDevice();
 		~SoftwareDevice() override;
 
+		VkResult Create(vkd::PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks) override;
+
 		[[nodiscard]] ThreadPool& GetThreadPool();
 		[[nodiscard]] Allocator& GetAllocator();
 

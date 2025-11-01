@@ -33,7 +33,7 @@ namespace vkd
 		Device();
 		~Device() override;
 
-		VkResult Create(PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks);
+		virtual VkResult Create(PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks);
 		[[nodiscard]] PhysicalDevice* GetOwner() const;
 
 		VkResult CreateQueues(const VkDeviceCreateInfo& pCreateInfo);
