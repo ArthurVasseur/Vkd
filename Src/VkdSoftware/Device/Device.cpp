@@ -20,9 +20,12 @@ namespace vkd::software
 {
 	SoftwareDevice::SoftwareDevice() : m_allocator([]() -> std::size_t
 	{
-		utils::System system;
-		const UInt64 totalRam = system.GetTotalRamBytes();
-		return static_cast<std::size_t>(utils::System::ComputeDeviceMemoryHeapSize(totalRam));
+		System system;
+		const std::optional<UInt64> availableRam = system.GetAvailableRamBytes();
+		if (availableRam)
+			return static_cast<std::size_t>(System::ComputeDeviceMemoryHeapSize(*availableRam));
+		CCT_ASSERT_FALSE("Could not query system ram, using 256 Mb");
+		return 256ULL * 1024ULL * 1024ULL;
 	}())
 	{
 	}
@@ -30,6 +33,15 @@ namespace vkd::software
 	SoftwareDevice::~SoftwareDevice()
 	{
 		m_threadPool.RequestStop();
+	}
+
+	VkResult SoftwareDevice::Create(vkd::PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks)
+	{
+		if (!m_allocator.Init())
+			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+
+		cct::Logger::Info("Allocated {} Mb for SoftwareDevice allocator", m_allocator.GetTotal() / (1024ULL * 1024ULL));
+		return Device::Create(owner, pDeviceCreateInfo, allocationCallbacks);
 	}
 
 	ThreadPool& SoftwareDevice::GetThreadPool()
