@@ -1,12 +1,13 @@
 add_rules("mode.debug", "mode.release")
 add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.git main")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
-add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "concerto-graphics", "nazarautils", "catch2")
+add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "nazarautils", "catch2", "volk")
 add_requires("concerto-core", {configs = {asserts = get_config("debug_checks"), debug = is_mode("debug")}})
 add_requires("catch2")
 
 option("debug_checks", {default = is_mode("debug"), description = "Enable additional debug checks"})
 option("profiling", { description = "Build with tracy profiler", default = false })
+option("tests", { description = "Build test applications", default = true })
 
 if has_config("profiling") then
     add_requires("tracy")
@@ -159,24 +160,27 @@ for driver_name, driver in pairs(drivers) do
     target_end()
 end
 
-target("vkd-test")
-    set_languages("cxx20")
-    set_kind("binary")
-    add_includedirs("Src", { public = true })
-    add_packages("catch2")
-    add_files("Src/Tests/**.cpp")
-    add_deps("vkd-Utils")
-target_end()
+if has_config("tests") then
+    target("vkd-tests")
+        set_languages("cxx20")
+        set_kind("binary")
+        add_includedirs("Src", { public = true })
+        add_packages("catch2")
+        add_files("Src/Tests/**.cpp")
+        add_deps("vkd-Utils")
+    target_end()
 
-target("vkd-test-app")
-    set_languages("cxx20")
-    set_kind("binary")
-    add_files("Tests/**.cpp")
-    add_includedirs("Src", { public = true })
-    add_packages("concerto-core", "concerto-graphics", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
-    add_defines("VK_NO_PROTOTYPES")
-    add_files("Src/TestApp/main.cpp")
+    target("vkd-test-app")
+        set_languages("cxx20")
+        set_kind("binary")
+        add_files("Tests/**.cpp")
+        add_includedirs("Src", { public = true })
+        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
+        add_defines("VK_NO_PROTOTYPES")
+        add_files("Src/TestApp/main.cpp")
 
-    for driver_name, driver in pairs(drivers) do
-        add_deps("vkd-" .. driver_name)
-    end
+        for driver_name, driver in pairs(drivers) do
+            add_deps("vkd-" .. driver_name)
+        end
+end
+
