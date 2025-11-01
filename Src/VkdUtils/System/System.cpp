@@ -7,22 +7,24 @@
 #include "VkdUtils/System/System.hpp"
 
 #if defined(CCT_PLATFORM_WINDOWS)
-	#define NOMINMAX
-	#include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #elif defined(CCT_PLATFORM_LINUX)
-	#include <sys/sysinfo.h>
+#include <sys/sysinfo.h>
+#include <pthread.h>
 #elif defined(CCT_PLATFORM_FREEBSD) || defined(CCT_PLATFORM_MACOS)
-	#include <sys/types.h>
-	#include <sys/sysctl.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <pthread.h>
 #endif
 
-namespace vkd::utils
+namespace vkd
 {
-	System::System() = default;
-
-	static UInt64 VkdUtils_Internal_QueryTotalRamBytes()
+	namespace
 	{
-		#if defined(CCT_PLATFORM_WINDOWS)
+		UInt64 QueryTotalRamBytes()
+		{
+#if defined(CCT_PLATFORM_WINDOWS)
 			MEMORYSTATUSEX statex;
 			statex.dwLength = sizeof(statex);
 			if (!GlobalMemoryStatusEx(&statex))
@@ -30,35 +32,35 @@ namespace vkd::utils
 				return 0ull;
 			}
 			return static_cast<UInt64>(statex.ullTotalPhys);
-		#elif defined(CCT_PLATFORM_LINUX)
+#elif defined(CCT_PLATFORM_LINUX)
 			struct sysinfo info;
 			if (sysinfo(&info) != 0)
 			{
 				return 0ull;
 			}
 			return static_cast<UInt64>(info.totalram) * static_cast<UInt64>(info.mem_unit);
-		#elif defined(CCT_PLATFORM_FREEBSD) || defined(CCT_PLATFORM_MACOS)
+#elif defined(CCT_PLATFORM_FREEBSD) || defined(CCT_PLATFORM_MACOS)
 			UInt64 memBytes = 0;
 			size_t size = sizeof(memBytes);
 			const char* key =
-			#if defined(CCT_PLATFORM_MACOS)
+#if defined(CCT_PLATFORM_MACOS)
 				"hw.memsize";
-			#else
+#else
 				"hw.physmem";
-			#endif
+#endif
 			if (sysctlbyname(key, &memBytes, &size, nullptr, 0) != 0)
 			{
 				return 0ull;
 			}
 			return memBytes;
-		#else
+#else
 			return 0ull;
-		#endif
-	}
+#endif
+		}
 
-	static std::optional<UInt64> VkdUtils_Internal_QueryAvailableRamBytes()
-	{
-		#if defined(CCT_PLATFORM_WINDOWS)
+		std::optional<UInt64> QueryAvailableRamBytes()
+		{
+#if defined(CCT_PLATFORM_WINDOWS)
 			MEMORYSTATUSEX statex;
 			statex.dwLength = sizeof(statex);
 			if (!GlobalMemoryStatusEx(&statex))
@@ -66,23 +68,24 @@ namespace vkd::utils
 				return std::nullopt;
 			}
 			return static_cast<UInt64>(statex.ullAvailPhys);
-		#elif defined(CCT_PLATFORM_LINUX)
+#elif defined(CCT_PLATFORM_LINUX)
 			struct sysinfo info;
 			if (sysinfo(&info) != 0)
 			{
 				return std::nullopt;
 			}
 			return static_cast<UInt64>(info.freeram) * static_cast<UInt64>(info.mem_unit);
-		#else
+#else
 			return std::nullopt;
-		#endif
-	}
+#endif
+		}
 
+	}
 	UInt64 System::GetTotalRamBytes()
 	{
 		if (!m_totalRamBytes.has_value())
 		{
-			m_totalRamBytes = VkdUtils_Internal_QueryTotalRamBytes();
+			m_totalRamBytes = QueryTotalRamBytes();
 		}
 		return m_totalRamBytes.value_or(0ull);
 	}
@@ -91,7 +94,7 @@ namespace vkd::utils
 	{
 		if (!m_availableRamBytes.has_value())
 		{
-			m_availableRamBytes = VkdUtils_Internal_QueryAvailableRamBytes();
+			m_availableRamBytes = QueryAvailableRamBytes();
 		}
 		return m_availableRamBytes;
 	}
@@ -117,5 +120,19 @@ namespace vkd::utils
 			msb++;
 		}
 		return 1ULL << msb;
+	}
+
+	void System::SetThreadName(const std::string& name) noexcept
+	{
+#if defined(CCT_PLATFORM_WINDOWS)
+		std::wstring wideName(name.begin(), name.end());
+		SetThreadDescription(GetCurrentThread(), wideName.c_str());
+#elif defined(CCT_PLATFORM_LINUX)
+		pthread_setname_np(pthread_self(), name.c_str());
+#elif defined(CCT_PLATFORM_MACOS)
+		pthread_setname_np(name.c_str());
+#elif defined(CCT_PLATFORM_FREEBSD)
+		pthread_set_name_np(pthread_self(), name.c_str());
+#endif
 	}
 }

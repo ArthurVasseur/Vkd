@@ -188,9 +188,9 @@ namespace vkd
 		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
 		CCT_ASSERT(pMemoryProperties, "pMemoryProperties cannot be null");
 
-		utils::System system;
+		System system;
 		const UInt64 totalRam = system.GetTotalRamBytes();
-		const UInt64 heapSize = utils::System::ComputeDeviceMemoryHeapSize(totalRam);
+		const UInt64 heapSize = System::ComputeDeviceMemoryHeapSize(totalRam);
 
 		// Initialize memory properties
 		pMemoryProperties->memoryHeapCount = 1;
