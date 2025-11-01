@@ -17,7 +17,7 @@
 
 #include <cstddef>
 #include <iosfwd>
-#include <memory>
+#include <vector>
 #include <Concerto/Core/Types/Types.hpp>
 
 // Alignment macro
@@ -279,14 +279,14 @@ private:
 private:
 	std::size_t m_TotalSize;
 	std::size_t m_UsedSize;
-	std::unique_ptr<UInt8[]> m_Pool;
+	std::vector<UInt8> m_Pool;
 	UInt32 m_FirstLevelIndexBits;
 	UInt32 m_SecondLevelIndexBits;
 	UInt32 m_FirstLevelCount;
 	UInt32 m_SecondLevelCount;
 	UInt64 m_FirstLevelBitmap;
-	std::unique_ptr<UInt64[]> m_SecondLevelBitmaps;
-	std::unique_ptr<Block*[]> m_FreeLists;
+	std::vector<UInt64> m_SecondLevelBitmaps;
+	std::vector<Block*> m_FreeLists;
 	bool m_Initialized;
 };
 

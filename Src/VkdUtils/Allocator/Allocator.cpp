@@ -87,14 +87,14 @@ struct VKD_ALIGN(Allocator::BlockAlignment) Allocator::Block
 
 Allocator::Allocator(std::size_t poolSizeBytes) noexcept : m_TotalSize(poolSizeBytes),
 	m_UsedSize(0),
-	m_Pool(nullptr),
+	m_Pool(),
 	m_FirstLevelIndexBits(DefaultFirstLevelIndexBits),
 	m_SecondLevelIndexBits(DefaultSecondLevelIndexBits),
 	m_FirstLevelCount(1u << DefaultFirstLevelIndexBits),
 	m_SecondLevelCount(1u << DefaultSecondLevelIndexBits),
 	m_FirstLevelBitmap(0),
-	m_SecondLevelBitmaps(nullptr),
-	m_FreeLists(nullptr),
+	m_SecondLevelBitmaps(),
+	m_FreeLists(),
 	m_Initialized(false)
 {
 }
@@ -102,42 +102,47 @@ Allocator::Allocator(std::size_t poolSizeBytes) noexcept : m_TotalSize(poolSizeB
 bool Allocator::Init() noexcept
 {
 	if (m_Initialized)
-	{
 		return false;
-	}
 
 	if (m_TotalSize < MinBlockSize + sizeof(Block))
+		return false;
+
+	try
+	{
+		m_Pool.resize(m_TotalSize);
+	}
+	catch (...)
 	{
 		return false;
 	}
 
-	m_Pool = std::unique_ptr<UInt8[]>(new (std::nothrow) UInt8[m_TotalSize]);
-	if (!m_Pool)
+	try
 	{
-		return false;
+		m_SecondLevelBitmaps.resize(m_FirstLevelCount);
 	}
-
-	m_SecondLevelBitmaps = std::unique_ptr<UInt64[]>(new (std::nothrow) UInt64[m_FirstLevelCount]);
-	if (!m_SecondLevelBitmaps)
+	catch (...)
 	{
-		m_Pool.reset();
+		m_Pool.clear();
 		return false;
 	}
 
 	const std::size_t totalLists = m_FirstLevelCount * m_SecondLevelCount;
-	m_FreeLists = std::unique_ptr<Block*[]>(new (std::nothrow) Block*[totalLists]);
-	if (!m_FreeLists)
+	try
 	{
-		m_Pool.reset();
-		m_SecondLevelBitmaps.reset();
+		m_FreeLists.resize(totalLists);
+	}
+	catch (...)
+	{
+		m_Pool.clear();
+		m_SecondLevelBitmaps.clear();
 		return false;
 	}
 
 	m_FirstLevelBitmap = 0;
-	std::memset(m_SecondLevelBitmaps.get(), 0, sizeof(UInt64) * m_FirstLevelCount);
-	std::memset(m_FreeLists.get(), 0, sizeof(Block*) * totalLists);
+	std::memset(m_SecondLevelBitmaps.data(), 0, sizeof(UInt64) * m_FirstLevelCount);
+	std::memset(m_FreeLists.data(), 0, sizeof(Block*) * totalLists);
 
-	Block* initialBlock = reinterpret_cast<Block*>(m_Pool.get());
+	Block* initialBlock = reinterpret_cast<Block*>(m_Pool.data());
 	initialBlock->size = m_TotalSize - sizeof(Block);
 	initialBlock->prevPhysicalSize = 0;
 	initialBlock->flags.Clear();
@@ -206,17 +211,17 @@ UInt32 Allocator::CountLeadingZeros64(UInt64 x) noexcept
 
 std::size_t Allocator::GetBlockOffset(const Block* b) const noexcept
 {
-	return reinterpret_cast<const UInt8*>(b) - m_Pool.get();
+	return reinterpret_cast<const UInt8*>(b) - m_Pool.data();
 }
 
 Allocator::Block* Allocator::GetBlockFromOffset(std::size_t offset) noexcept
 {
-	return reinterpret_cast<Block*>(m_Pool.get() + offset);
+	return reinterpret_cast<Block*>(m_Pool.data() + offset);
 }
 
 const Allocator::Block* Allocator::GetBlockFromOffset(std::size_t offset) const noexcept
 {
-	return reinterpret_cast<const Block*>(m_Pool.get() + offset);
+	return reinterpret_cast<const Block*>(m_Pool.data() + offset);
 }
 
 std::size_t Allocator::GetPayloadOffset(const Block* b) const noexcept
