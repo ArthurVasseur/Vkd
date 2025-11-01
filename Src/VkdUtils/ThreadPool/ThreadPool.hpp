@@ -83,7 +83,7 @@ namespace vkd
 		size_t GetWorkerCount() const noexcept;
 
 	private:
-		void WorkerLoop(std::stop_token stopToken);
+		void WorkerLoop(std::stop_token stopToken, unsigned int workerIndex);
 
 		void TaskCompleted() noexcept;
 

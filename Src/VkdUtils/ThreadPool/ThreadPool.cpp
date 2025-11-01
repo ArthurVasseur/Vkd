@@ -3,6 +3,7 @@
 //
 
 #include "VkdUtils/ThreadPool/ThreadPool.hpp"
+#include "VkdUtils/System/System.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -24,9 +25,9 @@ namespace vkd
 
 		for (unsigned int i = 0; i < numThreads; ++i)
 		{
-			m_workers.emplace_back([this](std::stop_token st)
+			m_workers.emplace_back([this, i](std::stop_token st)
 				{
-					WorkerLoop(st);
+					WorkerLoop(st, i + 1);
 				});
 		}
 	}
@@ -36,8 +37,10 @@ namespace vkd
 		RequestStop();
 	}
 
-	void ThreadPool::WorkerLoop(std::stop_token stopToken)
+	void ThreadPool::WorkerLoop(std::stop_token stopToken, unsigned int workerIndex)
 	{
+		System::SetThreadName("ThreadPool Worker#" + std::to_string(workerIndex));
+
 		while (true)
 		{
 			std::function<void()> task;
