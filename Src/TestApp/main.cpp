@@ -190,7 +190,7 @@ int main()
 	si.pCommandBuffers = &cmd;
 
 	VK_CHECK(vkQueueSubmit(queue, 1, &si, fence));
-	vkWaitForFences(device, 1, &fence, VK_TRUE, 5'000'000'000ull);
+	vkWaitForFences(device, 1, &fence, VK_TRUE, std::numeric_limits<cct::UInt64>::max());
 
 	void* mapped = nullptr;
 	VK_CHECK(vkMapMemory(device, memB, 0, BufferSize, 0, &mapped));
