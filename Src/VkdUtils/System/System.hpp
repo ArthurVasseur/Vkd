@@ -10,15 +10,16 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <Concerto/Core/Types/Types.hpp>
 
-namespace vkd::utils
+namespace vkd
 {
 	using namespace cct;
 	class System
 	{
 	public:
-		System();
+		System() = default;
 		~System() = default;
 
 		UInt64 GetTotalRamBytes();
@@ -27,6 +28,7 @@ namespace vkd::utils
 		void InvalidateCache();
 
 		static UInt64 ComputeDeviceMemoryHeapSize(UInt64 totalRam) noexcept;
+		static void SetThreadName(const std::string& name) noexcept;
 
 	private:
 		std::optional<UInt64> m_totalRamBytes;
