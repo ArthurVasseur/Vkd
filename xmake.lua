@@ -57,7 +57,7 @@ local drivers = {
 }
 
 target("vkd-Utils")
-    set_languages("cxx20")
+    set_languages("c++20")
     set_kind("static")
     add_includedirs("Src", { public = true })
     add_packages("concerto-core", "mimalloc", {public = true})
@@ -73,8 +73,16 @@ target("vkd-Utils")
         add_files_to_target("Src/VkdUtils/" .. dir, false)
     end
 
+    if is_plat("mingw", "linux", "macosx", "bsd") then
+        add_syslinks("pthread")
+    end
+
+    if is_plat("macos") then 
+        add_cxxflags("-fexperimental-library", {public = true})
+    end
+
 target("vkd")
-    set_languages("cxx20")
+    set_languages("c++20")
     set_kind("static")
     add_files("Src/Vkd/**.cpp")
     add_includedirs("Src", { public = true })
@@ -119,7 +127,7 @@ target_end()
 for driver_name, driver in pairs(drivers) do
     target("vkd-" .. driver_name)
         set_kind("shared")
-        set_languages("cxx20")
+        set_languages("c++20")
         add_defines("VKD_" .. driver_name:upper() .. "_BUILD", { public = false })
         add_includedirs("Src/", { public = true })
         add_defines("VK_NO_PROTOTYPES")
@@ -140,6 +148,10 @@ for driver_name, driver in pairs(drivers) do
             add_files_to_target("Src/Vkd" .. driver_name .. "/" .. dir, false)
         end
         add_deps("vkd")
+        
+        if is_plat("mingw", "linux", "macosx", "bsd") then
+            add_syslinks("pthread")
+        end
 
         after_build(function(target)
             local lib_path = path.absolute(target:targetfile())
@@ -162,7 +174,7 @@ end
 
 if has_config("tests") then
     target("vkd-tests")
-        set_languages("cxx20")
+        set_languages("c++20")
         set_kind("binary")
         add_includedirs("Src", { public = true })
         add_packages("catch2")
@@ -171,11 +183,11 @@ if has_config("tests") then
     target_end()
 
     target("vkd-test-app")
-        set_languages("cxx20")
+        set_languages("c++20")
         set_kind("binary")
         add_files("Tests/**.cpp")
         add_includedirs("Src", { public = true })
-        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
+        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk")
         add_defines("VK_NO_PROTOTYPES")
         add_files("Src/TestApp/main.cpp")
 
