@@ -148,7 +148,7 @@ jobs:
       run: xmake run vkd-tests
 
     - name: Install
-      run: xmake install -vo vkd-Software
+      run: xmake install -vo vkd vkd-Software
 
     # For some reason macOS-14 doesn't seem to have Python
     - uses: actions/setup-python@v6
