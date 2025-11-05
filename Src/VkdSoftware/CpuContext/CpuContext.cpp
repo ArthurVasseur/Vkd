@@ -81,6 +81,46 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
+	VkResult CpuContext::CopyBuffer2(vkd::Buffer::OpCopy2 op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		for (auto& region : op.regions)
+		{
+			CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
+			CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
+
+			cct::UByte* srcData = nullptr;
+			op.src->GetMemory()->Map(region.srcOffset, region.size, reinterpret_cast<void**>(&srcData));
+
+			cct::UByte* dstData = nullptr;
+			op.dst->GetMemory()->Map(region.dstOffset, region.size, reinterpret_cast<void**>(&dstData));
+
+			std::memcpy(dstData, srcData, region.size);
+
+			op.dst->GetMemory()->Unmap();
+			op.src->GetMemory()->Unmap();
+		}
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::UpdateBuffer(vkd::Buffer::OpUpdate op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
+
+		cct::UByte* dstData = nullptr;
+		op.dst->GetMemory()->Map(op.offset, op.data.size(), reinterpret_cast<void**>(&dstData));
+
+		std::memcpy(dstData, op.data.data(), op.data.size());
+
+		op.dst->GetMemory()->Unmap();
+
+		return VK_SUCCESS;
+	}
+
 	VkResult CpuContext::FillBuffer(vkd::Buffer::OpFill op)
 	{
 		VKD_AUTO_PROFILER_SCOPE();

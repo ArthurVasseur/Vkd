@@ -41,7 +41,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
-		commandBufferObj->PushFill(dstBuffer, dstOffset, size, data);
+		commandBufferObj->PushFillBuffer(dstBuffer, dstOffset, size, data);
 	}
 
 	void CommandBuffer::CmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
@@ -49,7 +49,25 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
-		commandBufferObj->PushCopy(srcBuffer, dstBuffer, regionCount, pRegions);
+		commandBufferObj->PushCopyBuffer(srcBuffer, dstBuffer, regionCount, pRegions);
+	}
+
+	void CommandBuffer::CmdCopyBuffer2(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		VKD_CHECK(pCopyBufferInfo);
+
+		commandBufferObj->PushCopyBuffer2(pCopyBufferInfo->srcBuffer, pCopyBufferInfo->dstBuffer, pCopyBufferInfo->regionCount, pCopyBufferInfo->pRegions);
+	}
+
+	void CommandBuffer::CmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize dataSize, const void* pData)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushUpdateBuffer(dstBuffer, dstOffset, dataSize, pData);
 	}
 
 	void CommandBuffer::CmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)

@@ -35,7 +35,22 @@ namespace vkd
 			Buffer* dst;
 			std::vector<VkBufferCopy> regions;
 		};
-		using Op = Nz::TypeList<OpFill, OpCopy>;
+
+		struct OpCopy2
+		{
+			Buffer* src;
+			Buffer* dst;
+			std::vector<VkBufferCopy2> regions;
+		};
+
+		struct OpUpdate
+		{
+			Buffer* dst;
+			VkDeviceSize offset;
+			std::vector<UInt8> data;
+		};
+
+		using Op = Nz::TypeList<OpFill, OpCopy, OpCopy2, OpUpdate>;
 
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_BUFFER;
 		VKD_NON_DISPATCHABLE_HANDLE(Buffer);
