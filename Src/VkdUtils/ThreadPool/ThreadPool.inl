@@ -14,6 +14,22 @@ namespace vkd
 
 		m_tasksInFlight.fetch_add(1, std::memory_order_acq_rel);
 
+		auto wrapped = [func = std::forward<F>(f), this]() mutable
+			{
+				try
+				{
+					func();
+				}
+				catch (const std::exception& e)
+				{
+					std::cerr << "[ThreadPool] Task threw exception: " << e.what() << '\n';
+				}
+				catch (...)
+				{
+					std::cerr << "[ThreadPool] Task threw unknown exception" << '\n';
+				}
+			};
+
 		{
 			std::lock_guard lock(m_queueMutex);
 
@@ -23,7 +39,7 @@ namespace vkd
 				return;
 			}
 
-			m_taskQueue.emplace_back(std::forward<F>(f));
+			m_taskQueue.emplace_back(std::move(wrapped));
 		}
 
 		m_queueCv.notify_one();
@@ -35,28 +51,39 @@ namespace vkd
 	{
 		using ReturnType = std::invoke_result_t<std::decay_t<F>>;
 
-		auto task = std::make_shared<std::packaged_task<ReturnType()>>(std::forward<F>(f));
-		std::future<ReturnType> result = task->get_future();
+		auto promise = std::make_shared<std::promise<ReturnType>>();
+		auto func = std::make_shared<std::decay_t<F>>(std::forward<F>(f));
+		std::future<ReturnType> result = promise->get_future();
 
 		if (m_stopRequested.load(std::memory_order_acquire))
 		{
-			std::promise<ReturnType> promise;
-			promise.set_exception(std::make_exception_ptr(std::runtime_error("ThreadPool is shutting down")));
-			return promise.get_future();
+			promise->set_exception(std::make_exception_ptr(std::runtime_error("ThreadPool is shutting down")));
+			return result;
 		}
 
 		m_tasksInFlight.fetch_add(1, std::memory_order_acq_rel);
 
-		auto wrapped_task = [task]()
+		auto wrapped_task = [promise, func]()
 			{
 				try
 				{
-					(*task)();
+					if constexpr (std::is_void_v<ReturnType>)
+					{
+						(*func)();
+						promise->set_value();
+					}
+					else
+					{
+						promise->set_value((*func)());
+					}
 				}
 				catch (...)
 				{
-					// Exception will be stored in the future by packaged_task
-					// No need to catch here, just ensure proper cleanup
+					try
+					{
+						promise->set_exception(std::current_exception());
+					}
+					catch (...) {}
 				}
 			};
 
@@ -69,14 +96,9 @@ namespace vkd
 
 				try
 				{
-					throw std::runtime_error("ThreadPool is shutting down");
+					promise->set_exception(std::make_exception_ptr(std::runtime_error("ThreadPool is shutting down")));
 				}
-				catch (...)
-				{
-					// This is a workaround since we can't easily set exception on packaged_task
-					// Return the original future which will be in a broken state
-					// In practice, we could return an exceptional future here
-				}
+				catch (...) {}
 
 				return result;
 			}

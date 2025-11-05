@@ -62,16 +62,18 @@ int main()
 	app.pApplicationName = "Vkd MVP Test";
 	app.apiVersion = VK_API_VERSION_1_1;
 
-	//cct::DynLib driver;
-	auto lib = LoadLibraryA("./vkd-Software.dll");
-	//if (driver.Load("./vkd-Software" CONCERTO_DYNLIB_EXTENSION) == false)
-	//{
-	//	return EXIT_FAILURE;
-	//}
+	cct::DynLib driver;
+	if (driver.Load(
+		"./"
+		#ifdef CCT_PLATFORM_POSIX
+		"lib"
+		#endif
+		"vkd-Software" CONCERTO_DYNLIB_EXTENSION) == false)
+			return EXIT_FAILURE;
 
 	VkDirectDriverLoadingInfoLUNARG directLoadingInfo = {};
 	directLoadingInfo.sType = VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_INFO_LUNARG;
-	directLoadingInfo.pfnGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddrLUNARG>(GetProcAddress(lib, "vk_icdGetInstanceProcAddr"));
+	directLoadingInfo.pfnGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddrLUNARG>(driver.GetSymbol("vk_icdGetInstanceProcAddr"));
 
 	VkDirectDriverLoadingListLUNARG directDriverList = {};
 	directDriverList.sType = VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_LIST_LUNARG;
