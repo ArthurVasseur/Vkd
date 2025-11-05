@@ -165,9 +165,15 @@ UInt32 Allocator::FindLastSet64(UInt64 x) noexcept
 		return 0;
 
 #if defined(CCT_PLATFORM_WINDOWS)
+	#if defined(CCT_ARCH_X86)
+	unsigned long index;
+	_BitScanReverse(&index, static_cast<unsigned long>(x));
+	return static_cast<UInt32>(index);
+	#else
 	unsigned long index;
 	_BitScanReverse64(&index, x);
 	return static_cast<UInt32>(index);
+	#endif
 #elif defined(CCT_PLATFORM_POSIX)
 	return 63 - __builtin_clzll(x);
 #else
@@ -187,9 +193,24 @@ UInt32 Allocator::CountLeadingZeros64(UInt64 x) noexcept
 		return 64;
 
 #if defined(CCT_PLATFORM_WINDOWS)
+	#if defined(CCT_ARCH_X86)
+	if (x >> 32)
+	{
+		unsigned long index;
+		_BitScanReverse(&index, static_cast<unsigned long>(x >> 32));
+		return static_cast<UInt32>(31 - index);
+	}
+	else
+	{
+		unsigned long index;
+		_BitScanReverse(&index, static_cast<unsigned long>(x));
+		return static_cast<UInt32>(63 - index);
+	}
+	#else
 	unsigned long index;
 	_BitScanReverse64(&index, x);
 	return static_cast<UInt32>(63 - index);
+	#endif
 #elif defined(CCT_PLATFORM_POSIX)
 	return __builtin_clzll(x);
 #else

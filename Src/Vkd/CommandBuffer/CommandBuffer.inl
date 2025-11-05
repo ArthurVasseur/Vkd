@@ -87,7 +87,7 @@ namespace vkd
 
 		m_ops.emplace_back(OpBindPipeline{
 			.BindPoint = pipelineBindPoint,
-			.Pipeline = pipelineObject,
+			.PipelineObject = pipelineObject,
 		});
 	}
 
