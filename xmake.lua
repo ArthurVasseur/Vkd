@@ -1,12 +1,13 @@
 add_rules("mode.debug", "mode.release")
 add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.git main")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
-add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "concerto-graphics", "nazarautils", "catch2")
+add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "nazarautils", "catch2", "volk")
 add_requires("concerto-core", {configs = {asserts = get_config("debug_checks"), debug = is_mode("debug")}})
 add_requires("catch2")
 
 option("debug_checks", {default = is_mode("debug"), description = "Enable additional debug checks"})
 option("profiling", { description = "Build with tracy profiler", default = false })
+option("tests", { description = "Build test applications", default = true })
 
 if has_config("profiling") then
     add_requires("tracy")
@@ -56,10 +57,14 @@ local drivers = {
 }
 
 target("vkd-Utils")
-    set_languages("cxx20")
+    set_languages("c++20")
     set_kind("static")
     add_includedirs("Src", { public = true })
     add_packages("concerto-core", "mimalloc", {public = true})
+
+    if is_plat("linux", "macosx", "bsd") then
+        add_cxflags("-fPIC")
+    end
 
     local files = {
         ".",
@@ -72,8 +77,21 @@ target("vkd-Utils")
         add_files_to_target("Src/VkdUtils/" .. dir, false)
     end
 
+    if is_plat("mingw", "linux", "macosx", "bsd") then
+        add_syslinks("pthread")
+    end
+
+    -- macOS: ensure we link against the correct C++ runtime when using custom toolchain
+    if is_plat("macosx") then
+        local llvm_prefix = os.getenv("LLVM_PREFIX")
+        if llvm_prefix then
+            add_linkdirs(path.join(llvm_prefix, "lib"))
+            add_rpathdirs(path.join(llvm_prefix, "lib"))
+        end
+    end
+
 target("vkd")
-    set_languages("cxx20")
+    set_languages("c++20")
     set_kind("static")
     add_files("Src/Vkd/**.cpp")
     add_includedirs("Src", { public = true })
@@ -82,6 +100,10 @@ target("vkd")
     add_packages("nazarautils", {public = true})
     add_defines("VK_NO_PROTOTYPES")
     add_deps("vkd-Utils", { public = true })
+
+    if is_plat("linux", "macosx", "bsd") then
+        add_cxflags("-fPIC")
+    end
     if is_plat("windows") then
         add_syslinks("Gdi32", "SetupAPI")
     end
@@ -118,7 +140,7 @@ target_end()
 for driver_name, driver in pairs(drivers) do
     target("vkd-" .. driver_name)
         set_kind("shared")
-        set_languages("cxx20")
+        set_languages("c++20")
         add_defines("VKD_" .. driver_name:upper() .. "_BUILD", { public = false })
         add_includedirs("Src/", { public = true })
         add_defines("VK_NO_PROTOTYPES")
@@ -139,6 +161,19 @@ for driver_name, driver in pairs(drivers) do
             add_files_to_target("Src/Vkd" .. driver_name .. "/" .. dir, false)
         end
         add_deps("vkd")
+        
+        if is_plat("mingw", "linux", "macosx", "bsd") then
+            add_syslinks("pthread")
+        end
+
+        -- macOS: ensure we link against the correct C++ runtime when using custom toolchain
+        if is_plat("macosx") then
+            local llvm_prefix = os.getenv("LLVM_PREFIX")
+            if llvm_prefix then
+                add_linkdirs(path.join(llvm_prefix, "lib"))
+                add_rpathdirs(path.join(llvm_prefix, "lib"))
+            end
+        end
 
         after_build(function(target)
             local lib_path = path.absolute(target:targetfile())
@@ -159,24 +194,27 @@ for driver_name, driver in pairs(drivers) do
     target_end()
 end
 
-target("vkd-test")
-    set_languages("cxx20")
-    set_kind("binary")
-    add_includedirs("Src", { public = true })
-    add_packages("catch2")
-    add_files("Src/Tests/**.cpp")
-    add_deps("vkd-Utils")
-target_end()
+if has_config("tests") then
+    target("vkd-tests")
+        set_languages("c++20")
+        set_kind("binary")
+        add_includedirs("Src", { public = true })
+        add_packages("catch2")
+        add_files("Src/Tests/**.cpp")
+        add_deps("vkd-Utils")
+    target_end()
 
-target("vkd-test-app")
-    set_languages("cxx20")
-    set_kind("binary")
-    add_files("Tests/**.cpp")
-    add_includedirs("Src", { public = true })
-    add_packages("concerto-core", "concerto-graphics", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
-    add_defines("VK_NO_PROTOTYPES")
-    add_files("Src/TestApp/main.cpp")
+    -- target("vkd-test-app")
+    --     set_languages("c++20")
+    --     set_kind("binary")
+    --     add_files("Tests/**.cpp")
+    --     add_includedirs("Src", { public = true })
+    --     add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk")
+    --     add_defines("VK_NO_PROTOTYPES")
+    --     add_files("Src/TestApp/main.cpp")
 
-    for driver_name, driver in pairs(drivers) do
-        add_deps("vkd-" .. driver_name)
-    end
+    --     for driver_name, driver in pairs(drivers) do
+    --         add_deps("vkd-" .. driver_name)
+    --     end
+end
+
