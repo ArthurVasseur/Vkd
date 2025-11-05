@@ -64,13 +64,13 @@ namespace vkd
 		return VK_SUCCESS;
 	}
 
-	inline void CommandBuffer::PushFill(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, uint32_t data)
+	inline void CommandBuffer::PushFillBuffer(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, uint32_t data)
 	{
 		VKD_FROM_HANDLE(Buffer, bufferObj, dst);
 		m_ops.emplace_back(Buffer::OpFill{ bufferObj, off, size, data });
 	}
 
-	inline void CommandBuffer::PushCopy(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
+	inline void CommandBuffer::PushCopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
 	{
 		VKD_FROM_HANDLE(Buffer, srcBufferObj, srcBuffer);
 		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
@@ -79,6 +79,27 @@ namespace vkd
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy));
 		m_ops.emplace_back(Buffer::OpCopy{ srcBufferObj, dstBufferObj, std::move(regions)});
+	}
+
+	inline void CommandBuffer::PushCopyBuffer2(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy2* pRegions)
+	{
+		VKD_FROM_HANDLE(Buffer, srcBufferObj, srcBuffer);
+		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
+
+		std::vector<VkBufferCopy2> regions;
+		regions.resize(regionCount);
+		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy2));
+		m_ops.emplace_back(Buffer::OpCopy2{ srcBufferObj, dstBufferObj, std::move(regions)});
+	}
+
+	inline void CommandBuffer::PushUpdateBuffer(VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize dataSize, const void* pData)
+	{
+		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
+
+		std::vector<UInt8> data;
+		data.resize(dataSize);
+		std::memcpy(data.data(), pData, dataSize);
+		m_ops.emplace_back(Buffer::OpUpdate{ dstBufferObj, dstOffset, std::move(data)});
 	}
 
 	inline void CommandBuffer::PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)

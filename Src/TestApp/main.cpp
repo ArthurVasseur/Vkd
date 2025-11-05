@@ -10,6 +10,7 @@
 
 #include <vulkan/vulkan.h>
 #include <Concerto/Core/DynLib/DynLib.hpp>
+#include <Concerto/Core/Logger/Logger.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <array>
@@ -20,7 +21,7 @@
 #include <thread>
 
 #define VK_CHECK(x) do { VkResult err = (x); if (err != VK_SUCCESS) { \
-    std::cerr << "VK_CHECK failed at " << __FILE__ << ":" << __LINE__ << " -> " << err << std::endl; std::abort(); } } while(0)
+    cct::Logger::Error("VK_CHECK failed at {}:{} -> {}", __FILE__, __LINE__, static_cast<int>(err)); std::abort(); } } while(0)
 
 static uint32_t findQueueFamily(VkPhysicalDevice pd)
 {
@@ -97,7 +98,7 @@ int main()
 	VK_CHECK(vkEnumeratePhysicalDevices(instance, &pdCount, nullptr));
 	if (pdCount == 0)
 	{
-		std::cerr << "No physical devices found." << std::endl;
+		cct::Logger::Error("No physical devices found.");
 		return 1;
 	}
 	std::vector<VkPhysicalDevice> pds(pdCount);
@@ -179,6 +180,21 @@ int main()
 		region.dstOffset = 0;
 		region.size = BufferSize;
 		vkCmdCopyBuffer(cmd, bufA, bufB, 1, &region);
+
+		std::vector<cct::UInt32> updateData(16, 0xDEADBEEF);
+		vkCmdUpdateBuffer(cmd, bufB, 0, updateData.size() * sizeof(cct::UInt32), updateData.data());
+
+		VkBufferCopy2 region2{ VK_STRUCTURE_TYPE_BUFFER_COPY_2 };
+		region2.srcOffset = 0;
+		region2.dstOffset = BufferSize / 2;
+		region2.size = BufferSize / 2;
+
+		VkCopyBufferInfo2 copyInfo2{ VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2 };
+		copyInfo2.srcBuffer = bufB;
+		copyInfo2.dstBuffer = bufA;
+		copyInfo2.regionCount = 1;
+		copyInfo2.pRegions = &region2;
+		vkCmdCopyBuffer2(cmd, &copyInfo2);
 	}
 	VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -194,28 +210,75 @@ int main()
 	VK_CHECK(vkQueueSubmit(queue, 1, &si, fence));
 	vkWaitForFences(device, 1, &fence, VK_TRUE, std::numeric_limits<cct::UInt64>::max());
 
-	void* mapped = nullptr;
-	VK_CHECK(vkMapMemory(device, memB, 0, BufferSize, 0, &mapped));
-	cct::UInt32* bytes = static_cast<cct::UInt32*>(mapped);
-	size_t bad = 0;
-	for (size_t i = 0; i < static_cast<size_t>(BufferSize) / sizeof(cct::UInt32); ++i)
+	size_t totalErrors = 0;
+
+	void* mappedB = nullptr;
+	VK_CHECK(vkMapMemory(device, memB, 0, BufferSize, 0, &mappedB));
+	cct::UInt32* bytesB = static_cast<cct::UInt32*>(mappedB);
+
+	for (size_t i = 0; i < 16; ++i)
 	{
-		if (bytes[i] != 0x7F)
+		if (bytesB[i] != 0xDEADBEEF)
 		{
-			bad++;
+			cct::Logger::Error("UpdateBuffer: bufB[{}] = 0x{:x}, expected 0xDEADBEEF", i, bytesB[i]);
+			totalErrors++;
+			break;
+		}
+	}
+
+	for (size_t i = 16; i < static_cast<size_t>(BufferSize) / sizeof(cct::UInt32); ++i)
+	{
+		if (bytesB[i] != 0x7F)
+		{
+			cct::Logger::Error("CopyBuffer: bufB[{}] = 0x{:x}, expected 0x7F", i, bytesB[i]);
+			totalErrors++;
 			break;
 		}
 	}
 	vkUnmapMemory(device, memB);
 
-	if (bad == 0)
+	if (totalErrors == 0)
+		cct::Logger::Info("UpdateBuffer succeeded: bufB[0..16] = 0xDEADBEEF, bufB[16..64] = 0x7F");
+
+	void* mappedA = nullptr;
+	VK_CHECK(vkMapMemory(device, memA, 0, BufferSize, 0, &mappedA));
+	cct::UInt32* bytesA = static_cast<cct::UInt32*>(mappedA);
+
+	for (size_t i = 0; i < static_cast<size_t>(BufferSize) / sizeof(cct::UInt32) / 2; ++i)
 	{
-		std::cout << "[OK] Fill+Copy succeeded: all " << BufferSize << " bytes are 0x7F" << std::endl;
+		if (bytesA[i] != 0x7F)
+		{
+			cct::Logger::Error("FillBuffer: bufA[{}] = 0x{:x}, expected 0x7F", i, bytesA[i]);
+			totalErrors++;
+			break;
+		}
 	}
+
+	for (size_t i = static_cast<size_t>(BufferSize) / sizeof(cct::UInt32) / 2; i < static_cast<size_t>(BufferSize) / sizeof(cct::UInt32) / 2 + 16; ++i)
+	{
+		if (bytesA[i] != 0xDEADBEEF)
+		{
+			cct::Logger::Error("CopyBuffer2: bufA[{}] = 0x{:x}, expected 0xDEADBEEF", i, bytesA[i]);
+			totalErrors++;
+			break;
+		}
+	}
+
+	for (size_t i = static_cast<size_t>(BufferSize) / sizeof(cct::UInt32) / 2 + 16; i < static_cast<size_t>(BufferSize) / sizeof(cct::UInt32); ++i)
+	{
+		if (bytesA[i] != 0x7F)
+		{
+			cct::Logger::Error("CopyBuffer2: bufA[{}] = 0x{:x}, expected 0x7F", i, bytesA[i]);
+			totalErrors++;
+			break;
+		}
+	}
+	vkUnmapMemory(device, memA);
+
+	if (totalErrors == 0)
+		cct::Logger::Info("CopyBuffer2 succeeded: bufA[0..32] = 0x7F, bufA[32..48] = 0xDEADBEEF, bufA[48..64] = 0x7F");
 	else
-	{
-		std::cout << "[FAIL] Verification failed" << std::endl;
-	}
+		cct::Logger::Error("Total verification errors: {}", totalErrors);
 
 	vkDestroyFence(device, fence, nullptr);
 	vkFreeCommandBuffers(device, pool, 1, &cmd);
@@ -228,5 +291,5 @@ int main()
 	vkDestroyInstance(instance, nullptr);
 
 	std::this_thread::sleep_for(std::chrono::seconds(1));
-	return (bad == 0) ? 0 : 2;
+	return (totalErrors == 0) ? 0 : 2;
 }

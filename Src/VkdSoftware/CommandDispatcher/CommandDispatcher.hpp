@@ -25,6 +25,8 @@ namespace vkd::software
 	private:
 		VkResult operator()(vkd::Buffer::OpFill op);
 		VkResult operator()(vkd::Buffer::OpCopy op);
+		VkResult operator()(vkd::Buffer::OpCopy2 op);
+		VkResult operator()(vkd::Buffer::OpUpdate op);
 		VkResult operator()(vkd::OpBindVertexBuffer op);
 		VkResult operator()(vkd::OpDraw op);
 		VkResult operator()(vkd::OpDrawIndexed op);

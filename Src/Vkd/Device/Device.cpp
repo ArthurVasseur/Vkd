@@ -240,6 +240,11 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, ResetCommandBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdFillBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer2);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdUpdateBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindPipeline);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindVertexBuffers);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDraw);
 
 #undef VKD_ENTRYPOINT_LOOKUP
 

@@ -27,6 +27,8 @@ namespace vkd::software
 		VkResult BindVertexBuffer(OpBindVertexBuffer buffer);
 		VkResult Draw(vkd::OpDraw op);
 		VkResult CopyBuffer(vkd::Buffer::OpCopy op);
+		VkResult CopyBuffer2(vkd::Buffer::OpCopy2 op);
+		VkResult UpdateBuffer(vkd::Buffer::OpUpdate op);
 		VkResult FillBuffer(vkd::Buffer::OpFill op);
 
 		inline void Reset();
