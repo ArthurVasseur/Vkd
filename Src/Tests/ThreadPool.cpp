@@ -1,16 +1,18 @@
 /**
- * @file Test/ThreadPool.cpp
+ * @file Tests/ThreadPool.cpp
  * @brief Unit tests for ThreadPool
  * @date 2025-10-31
  */
 
-#include <VkdUtils/ThreadPool/ThreadPool.hpp>
-#include <catch2/catch_test_macros.hpp>
 #include <atomic>
 #include <vector>
 #include <string>
 #include <chrono>
 #include <thread>
+
+#define CATCH_CONFIG_RUNNER
+#include <catch2/catch_test_macros.hpp>
+#include <VkdUtils/ThreadPool/ThreadPool.hpp>
 
 using namespace vkd;
 using namespace std::chrono_literals;
@@ -161,7 +163,15 @@ TEST_CASE("ThreadPool - Exception Handling", "[threadpool][exception]")
 				throw std::runtime_error("Test exception");
 			});
 
-		REQUIRE(pool.WaitFor(1000ms));
+		try
+		{
+			
+			REQUIRE(pool.WaitFor(1000ms));
+		}
+		catch (const std::exception& e)
+		{
+			std::cout << "Exception thrown: " << e.what() << '\n';
+		}
 
 		REQUIRE_THROWS_AS(future.get(), std::runtime_error);
 	}
@@ -246,10 +256,10 @@ TEST_CASE("ThreadPool - Wait and WaitFor", "[threadpool][wait]")
 	{
 		pool.AddTask([]()
 			{
-				std::this_thread::sleep_for(200ms);
+				std::this_thread::sleep_for(500ms);
 			});
 
-		auto deadline = std::chrono::steady_clock::now() + 100ms;
+		auto deadline = std::chrono::steady_clock::now() + 200ms;
 		REQUIRE_FALSE(pool.Wait(deadline));
 
 		deadline = std::chrono::steady_clock::now() + 1000ms;

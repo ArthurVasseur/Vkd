@@ -12,13 +12,6 @@
 
 namespace vkd
 {
-	std::array<VkExtensionProperties, 4> Instance::s_supportedExtensions = {
-		VkExtensionProperties{.extensionName = VK_KHR_SURFACE_EXTENSION_NAME, .specVersion = 1},
-		VkExtensionProperties{.extensionName = VK_EXT_DEBUG_UTILS_EXTENSION_NAME , .specVersion = 1},
-		VkExtensionProperties{.extensionName = VK_EXT_DEBUG_REPORT_EXTENSION_NAME, .specVersion = 1},
-		VkExtensionProperties{.extensionName = VK_KHR_WIN32_SURFACE_EXTENSION_NAME, .specVersion = 1},
-	};
-
 	VkAllocationCallbacks Instance::s_allocationCallbacks = {
 		.pUserData = nullptr,
 		.pfnAllocation = AllocationFunction,
@@ -50,16 +43,17 @@ namespace vkd
 
 		if (pPropertyCount && !pProperties)
 		{
-			*pPropertyCount = s_supportedExtensions.size();
+			//*pPropertyCount = s_supportedExtensions.size();
+			*pPropertyCount = 0;
 			return VK_SUCCESS;
 		}
 
-		std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
-		for (std::size_t i = 0; i < max; ++i)
-			pProperties[i] = s_supportedExtensions[i];
+		//std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
+		//for (std::size_t i = 0; i < max; ++i)
+		//	pProperties[i] = s_supportedExtensions[i];
 
-		if (max < s_supportedExtensions.size())
-			return VK_INCOMPLETE;
+		//if (max < s_supportedExtensions.size())
+		//	return VK_INCOMPLETE;
 
 		return VK_SUCCESS;
 	}
@@ -179,7 +173,7 @@ namespace vkd
 		return m_physicalDevices;
 	}
 
-	void* Instance::AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
+	void* VKAPI_PTR Instance::AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -193,7 +187,7 @@ namespace vkd
 		return alloc;
 	}
 
-	void* Instance::ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
+	void* VKAPI_PTR Instance::ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -207,7 +201,7 @@ namespace vkd
 		return alloc;
 	}
 
-	void Instance::FreeFunction(void* pUserData, void* pMemory)
+	void VKAPI_PTR Instance::FreeFunction(void* pUserData, void* pMemory)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 

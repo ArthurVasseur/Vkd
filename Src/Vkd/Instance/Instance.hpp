@@ -43,11 +43,10 @@ namespace vkd
 		void AddPhysicalDevice(DispatchableObject<PhysicalDevice>* physicalDevice);
 		std::span<DispatchableObject<PhysicalDevice>*> GetPhysicalDevices();
 	private:
-		static void* AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
-		static void* ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
-		static void FreeFunction(void* pUserData, void* pMemory);
+		static void* VKAPI_PTR AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
+		static void* VKAPI_PTR ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
+		static void VKAPI_PTR FreeFunction(void* pUserData, void* pMemory);
 
-		static std::array<VkExtensionProperties, 4> s_supportedExtensions;
 		static VkAllocationCallbacks s_allocationCallbacks;
 
 		std::vector<DispatchableObject<PhysicalDevice>*> m_physicalDevices;

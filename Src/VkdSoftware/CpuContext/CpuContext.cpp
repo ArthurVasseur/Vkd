@@ -17,9 +17,9 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		CCT_ASSERT(op.Pipeline != nullptr, "Pipeline cannot be null");
+		CCT_ASSERT(op.PipelineObject != nullptr, "Pipeline cannot be null");
 
-		m_boundPipeline = op.Pipeline;
+		m_boundPipeline = op.PipelineObject;
 
 		return VK_SUCCESS;
 	}

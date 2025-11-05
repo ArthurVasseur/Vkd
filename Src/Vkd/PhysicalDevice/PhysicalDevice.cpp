@@ -227,11 +227,12 @@ namespace vkd
 			return VK_SUCCESS;
 		}
 
-		std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
-		std::memcpy(pProperties, s_supportedExtensions.data(), max);
+		// std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
+		// if (max > 0)
+		// 	std::memcpy(pProperties, s_supportedExtensions.data(), max * sizeof(VkExtensionProperties));
 
-		if (max < s_supportedExtensions.size())
-			return VK_INCOMPLETE;
+		// if (max < s_supportedExtensions.size())
+		// 	return VK_INCOMPLETE;
 
 		return VK_SUCCESS;
 	}

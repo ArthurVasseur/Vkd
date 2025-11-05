@@ -55,7 +55,7 @@ namespace vkd
 	struct OpBindPipeline
 	{
 		VkPipelineBindPoint BindPoint;
-		Pipeline* Pipeline;
+		Pipeline* PipelineObject;
 	};
 
 	using Op = Nz::TypeList<

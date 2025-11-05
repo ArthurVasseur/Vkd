@@ -4,12 +4,14 @@
  * @date 2025-10-30
  */
 
-#include <VkdUtils/Allocator/Allocator.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_approx.hpp>
 #include <random>
 #include <vector>
 #include <algorithm>
+
+#define CATCH_CONFIG_RUNNER
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
+#include <VkdUtils/Allocator/Allocator.hpp>
 
 using namespace vkd;
 

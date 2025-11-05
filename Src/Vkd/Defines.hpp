@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <cstring>
+
 #include <Concerto/Core/Types/Types.hpp>
 #include <Concerto/Core/Assert.hpp>
 #include <Concerto/Core/EnumFlags/EnumFlags.hpp>
