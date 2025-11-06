@@ -17,6 +17,7 @@ namespace vkd
 {
 	class Device;
 	class DeviceMemory;
+	class Image;
 
 	class Buffer : public ObjectBase
 	{
@@ -50,7 +51,23 @@ namespace vkd
 			std::vector<UInt8> data;
 		};
 
-		using Op = Nz::TypeList<OpFill, OpCopy, OpCopy2, OpUpdate>;
+		struct OpCopyBufferToImage
+		{
+			Buffer* src;
+			Image* dst;
+			VkImageLayout dstLayout;
+			std::vector<VkBufferImageCopy> regions;
+		};
+
+		struct OpCopyImageToBuffer
+		{
+			Image* src;
+			VkImageLayout srcLayout;
+			Buffer* dst;
+			std::vector<VkBufferImageCopy> regions;
+		};
+
+		using Op = Nz::TypeList<OpFill, OpCopy, OpCopy2, OpUpdate, OpCopyBufferToImage, OpCopyImageToBuffer>;
 
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_BUFFER;
 		VKD_NON_DISPATCHABLE_HANDLE(Buffer);

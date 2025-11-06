@@ -13,6 +13,7 @@
 
 #include "Vkd/ObjectBase/ObjectBase.hpp"
 #include "Vkd/Buffer/Buffer.hpp"
+#include "Vkd/Image/Image.hpp"
 #include "Vkd/CommandBuffer/Ops.hpp"
 
 namespace vkd
@@ -30,7 +31,9 @@ namespace vkd
 			Pending,
 			Invalid
 		};
-		using Op = Nz::TypeListInstantiate<Nz::TypeListConcat<Buffer::Op, vkd::Op>,std::variant>;
+		using BufferImageOps = Nz::TypeListConcat<Buffer::Op, Image::Op>;
+		using AllOps = Nz::TypeListConcat<BufferImageOps, vkd::Op>;
+		using Op = Nz::TypeListInstantiate<AllOps, std::variant>;
 
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
 		VKD_DISPATCHABLE_HANDLE(CommandBuffer);
@@ -51,6 +54,10 @@ namespace vkd
 		static void VKAPI_CALL CmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions);
 		static void VKAPI_CALL CmdCopyBuffer2(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo);
 		static void VKAPI_CALL CmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize dataSize, const void* pData);
+		static void VKAPI_CALL CmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageCopy* pRegions);
+		static void VKAPI_CALL CmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount, const VkBufferImageCopy* pRegions);
+		static void VKAPI_CALL CmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy* pRegions);
+		static void VKAPI_CALL CmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, uint32_t rangeCount, const VkImageSubresourceRange* pRanges);
 		static void VKAPI_CALL CmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline);
 		static void VKAPI_CALL CmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount, const VkBuffer* pBuffers, const VkDeviceSize* pOffsets);
 		static void VKAPI_CALL CmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
@@ -62,6 +69,10 @@ namespace vkd
 		inline void PushCopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, UInt32 regionCount, const VkBufferCopy* pRegions);
 		inline void PushCopyBuffer2(VkBuffer srcBuffer, VkBuffer dstBuffer, UInt32 regionCount, const VkBufferCopy2* pRegions);
 		inline void PushUpdateBuffer(VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize dataSize, const void* pData);
+		inline void PushCopyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkImageCopy* pRegions);
+		inline void PushCopyBufferToImage(VkBuffer srcBuffer, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkBufferImageCopy* pRegions);
+		inline void PushCopyImageToBuffer(VkImage srcImage, VkImageLayout srcImageLayout, VkBuffer dstBuffer, UInt32 regionCount, const VkBufferImageCopy* pRegions);
+		inline void PushClearColorImage(VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, UInt32 rangeCount, const VkImageSubresourceRange* pRanges);
 		inline void PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline);
 		inline void PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, UInt32 firstBinding);
 		inline void PushDraw(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstVertex, UInt32 firstInstance);

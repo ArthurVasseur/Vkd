@@ -29,6 +29,7 @@ namespace vkd::software
 		Result<vkd::CommandPool*, VkResult> CreateCommandPool() override;
 		Result<vkd::Fence*, VkResult> CreateFence() override;
 		Result<vkd::Buffer*, VkResult> CreateBuffer() override;
+		Result<vkd::Image*, VkResult> CreateImage() override;
 		Result<vkd::DeviceMemory*, VkResult> CreateDeviceMemory() override;
 		Result<vkd::Pipeline*, VkResult> CreatePipeline() override;
 	private:

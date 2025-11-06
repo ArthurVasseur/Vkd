@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Vkd/Buffer/Buffer.hpp"
+#include "Vkd/Image/Image.hpp"
 #include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
 #include "VkdSoftware/CpuContext/CpuContext.hpp"
 
@@ -27,6 +28,10 @@ namespace vkd::software
 		VkResult operator()(vkd::Buffer::OpCopy op);
 		VkResult operator()(vkd::Buffer::OpCopy2 op);
 		VkResult operator()(vkd::Buffer::OpUpdate op);
+		VkResult operator()(vkd::Buffer::OpCopyBufferToImage op);
+		VkResult operator()(vkd::Buffer::OpCopyImageToBuffer op);
+		VkResult operator()(vkd::Image::OpCopy op);
+		VkResult operator()(vkd::Image::OpClearColorImage op);
 		VkResult operator()(vkd::OpBindVertexBuffer op);
 		VkResult operator()(vkd::OpDraw op);
 		VkResult operator()(vkd::OpDrawIndexed op);

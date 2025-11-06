@@ -21,6 +21,7 @@ namespace vkd
 	class CommandPool;
 	class Fence;
 	class Buffer;
+	class Image;
 	class DeviceMemory;
 	class Pipeline;
 
@@ -66,6 +67,11 @@ namespace vkd
 		static void VKAPI_CALL GetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements* pMemoryRequirements);
 		static VkResult VKAPI_CALL BindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memoryOffset);
 
+		static VkResult VKAPI_CALL CreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImage* pImage);
+		static void VKAPI_CALL DestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator);
+		static void VKAPI_CALL GetImageMemoryRequirements(VkDevice device, VkImage image, VkMemoryRequirements* pMemoryRequirements);
+		static VkResult VKAPI_CALL BindImageMemory(VkDevice device, VkImage image, VkDeviceMemory memory, VkDeviceSize memoryOffset);
+
 		static VkResult VKAPI_CALL AllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo, const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory);
 		static void VKAPI_CALL FreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator);
 		static VkResult VKAPI_CALL MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData);
@@ -79,6 +85,7 @@ namespace vkd
 		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
 		virtual Result<Fence*, VkResult> CreateFence() = 0;
 		virtual Result<Buffer*, VkResult> CreateBuffer() = 0;
+		virtual Result<Image*, VkResult> CreateImage() = 0;
 		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory() = 0;
 		virtual Result<Pipeline*, VkResult> CreatePipeline() = 0;
 
