@@ -172,7 +172,7 @@ VkResult CpuContext::CopyImage(vkd::Image::OpCopy op)
 											 srcRowPitch +
 										 region.srcOffset.x * pixelSize;
 				VkDeviceSize dstOffset = ((region.dstOffset.z + z) *
-										  op.dst->GetExtent().height(region.dstOffset.y + y)) *
+										  op.dst->GetExtent().height + (region.dstOffset.y + y)) *
 											 dstRowPitch +
 										 region.dstOffset.x * pixelSize;
 				std::memcpy(dstBase + dstOffset, srcBase + srcOffset, rowSize);
