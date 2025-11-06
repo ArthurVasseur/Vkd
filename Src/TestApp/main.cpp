@@ -280,6 +280,200 @@ int main()
 	else
 		cct::Logger::Error("Total verification errors: {}", totalErrors);
 
+	cct::Logger::Info("All buffer tests completed successfully!");
+
+	cct::Logger::Info("Starting image tests...");
+	VkImageCreateInfo ici{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	ici.imageType = VK_IMAGE_TYPE_2D;
+	ici.format = VK_FORMAT_R8G8B8A8_UNORM;
+	ici.extent = { 16, 16, 1 };
+	ici.mipLevels = 1;
+	ici.arrayLayers = 1;
+	ici.samples = VK_SAMPLE_COUNT_1_BIT;
+	ici.tiling = VK_IMAGE_TILING_LINEAR;
+	ici.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	ici.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VkImage imageA = VK_NULL_HANDLE;
+	VkImage imageB = VK_NULL_HANDLE;
+	VK_CHECK(vkCreateImage(device, &ici, nullptr, &imageA));
+	VK_CHECK(vkCreateImage(device, &ici, nullptr, &imageB));
+
+	auto allocAndBindImage = [&](VkImage img, VkDeviceMemory& mem)
+	{
+		VkMemoryRequirements req{};
+		vkGetImageMemoryRequirements(device, img, &req);
+		VkMemoryAllocateInfo mai{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+		mai.allocationSize = req.size;
+		uint32_t typeIndex = findMemoryType(pysicalDevice, req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		mai.memoryTypeIndex = typeIndex;
+		VK_CHECK(vkAllocateMemory(device, &mai, nullptr, &mem));
+		VK_CHECK(vkBindImageMemory(device, img, mem, 0));
+	};
+
+	VkDeviceMemory memImageA = VK_NULL_HANDLE;
+	VkDeviceMemory memImageB = VK_NULL_HANDLE;
+	allocAndBindImage(imageA, memImageA);
+	allocAndBindImage(imageB, memImageB);
+
+	constexpr VkDeviceSize ImageBufferSize = 16 * 16 * 4;
+	VkBuffer bufImage = VK_NULL_HANDLE;
+	VkBufferCreateInfo bciImage{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+	bciImage.size = ImageBufferSize;
+	bciImage.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bciImage.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VK_CHECK(vkCreateBuffer(device, &bciImage, nullptr, &bufImage));
+
+	VkDeviceMemory memBufImage = VK_NULL_HANDLE;
+	allocAndBind(bufImage, memBufImage);
+
+	void* mappedBufImage = nullptr;
+	VK_CHECK(vkMapMemory(device, memBufImage, 0, ImageBufferSize, 0, &mappedBufImage));
+	cct::UInt32* bufImageData = static_cast<cct::UInt32*>(mappedBufImage);
+	for (size_t i = 0; i < ImageBufferSize / sizeof(cct::UInt32); ++i)
+		bufImageData[i] = 0xAABBCCDD;
+	vkUnmapMemory(device, memBufImage);
+
+	VkCommandBuffer cmdImage = VK_NULL_HANDLE;
+	VK_CHECK(vkAllocateCommandBuffers(device, &cbai, &cmdImage));
+
+	VK_CHECK(vkBeginCommandBuffer(cmdImage, &cmdBufferBeginInfo));
+	{
+		VkClearColorValue clearColor{};
+		clearColor.uint32[0] = 0xFF;
+		clearColor.uint32[1] = 0x00;
+		clearColor.uint32[2] = 0xFF;
+		clearColor.uint32[3] = 0xFF;
+
+		VkImageSubresourceRange range{};
+		range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		range.baseMipLevel = 0;
+		range.levelCount = 1;
+		range.baseArrayLayer = 0;
+		range.layerCount = 1;
+
+		vkCmdClearColorImage(cmdImage, imageA, VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1, &range);
+
+		VkBufferImageCopy copyRegion{};
+		copyRegion.bufferOffset = 0;
+		copyRegion.bufferRowLength = 0;
+		copyRegion.bufferImageHeight = 0;
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageOffset = { 0, 0, 0 };
+		copyRegion.imageExtent = { 16, 16, 1 };
+
+		vkCmdCopyBufferToImage(cmdImage, bufImage, imageB, VK_IMAGE_LAYOUT_GENERAL, 1, &copyRegion);
+
+		VkImageCopy imageCopyRegion{};
+		imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageCopyRegion.srcSubresource.mipLevel = 0;
+		imageCopyRegion.srcSubresource.baseArrayLayer = 0;
+		imageCopyRegion.srcSubresource.layerCount = 1;
+		imageCopyRegion.srcOffset = { 0, 0, 0 };
+		imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageCopyRegion.dstSubresource.mipLevel = 0;
+		imageCopyRegion.dstSubresource.baseArrayLayer = 0;
+		imageCopyRegion.dstSubresource.layerCount = 1;
+		imageCopyRegion.dstOffset = { 0, 0, 0 };
+		imageCopyRegion.extent = { 8, 8, 1 };
+
+		vkCmdCopyImage(cmdImage, imageA, VK_IMAGE_LAYOUT_GENERAL, imageB, VK_IMAGE_LAYOUT_GENERAL, 1, &imageCopyRegion);
+	}
+	VK_CHECK(vkEndCommandBuffer(cmdImage));
+
+	VkBuffer bufImageResult = VK_NULL_HANDLE;
+	VK_CHECK(vkCreateBuffer(device, &bciImage, nullptr, &bufImageResult));
+	VkDeviceMemory memBufImageResult = VK_NULL_HANDLE;
+	allocAndBind(bufImageResult, memBufImageResult);
+
+	VkCommandBuffer cmdImageCopy = VK_NULL_HANDLE;
+	VK_CHECK(vkAllocateCommandBuffers(device, &cbai, &cmdImageCopy));
+	VK_CHECK(vkBeginCommandBuffer(cmdImageCopy, &cmdBufferBeginInfo));
+	{
+		VkBufferImageCopy copyRegion{};
+		copyRegion.bufferOffset = 0;
+		copyRegion.bufferRowLength = 0;
+		copyRegion.bufferImageHeight = 0;
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageOffset = { 0, 0, 0 };
+		copyRegion.imageExtent = { 16, 16, 1 };
+		vkCmdCopyImageToBuffer(cmdImageCopy, imageB, VK_IMAGE_LAYOUT_GENERAL, bufImageResult, 1, &copyRegion);
+	}
+	VK_CHECK(vkEndCommandBuffer(cmdImageCopy));
+
+	VkFence fenceImage = VK_NULL_HANDLE;
+	VK_CHECK(vkCreateFence(device, &fci, nullptr, &fenceImage));
+
+	VkSubmitInfo siImage{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	siImage.commandBufferCount = 1;
+	siImage.pCommandBuffers = &cmdImage;
+	VK_CHECK(vkQueueSubmit(queue, 1, &siImage, fenceImage));
+	vkWaitForFences(device, 1, &fenceImage, VK_TRUE, std::numeric_limits<cct::UInt64>::max());
+
+	vkResetFences(device, 1, &fenceImage);
+	siImage.pCommandBuffers = &cmdImageCopy;
+	VK_CHECK(vkQueueSubmit(queue, 1, &siImage, fenceImage));
+	vkWaitForFences(device, 1, &fenceImage, VK_TRUE, std::numeric_limits<cct::UInt64>::max());
+
+	void* mappedResult = nullptr;
+	VK_CHECK(vkMapMemory(device, memBufImageResult, 0, ImageBufferSize, 0, &mappedResult));
+	cct::UInt32* resultData = static_cast<cct::UInt32*>(mappedResult);
+
+	for (size_t y = 0; y < 8; ++y)
+	{
+		for (size_t x = 0; x < 8; ++x)
+		{
+			size_t idx = y * 16 + x;
+			if (resultData[idx] != 0xFFFF00FF)
+			{
+				cct::Logger::Error("CopyImage: imageB[{},{}] = 0x{:x}, expected 0xFFFF00FF", x, y, resultData[idx]);
+				totalErrors++;
+				break;
+			}
+		}
+		if (totalErrors > 0) break;
+	}
+
+	for (size_t y = 0; y < 16; ++y)
+	{
+		for (size_t x = 8; x < 16; ++x)
+		{
+			if (y < 8) continue;
+			size_t idx = y * 16 + x;
+			if (resultData[idx] != 0xAABBCCDD)
+			{
+				cct::Logger::Error("CopyBufferToImage: imageB[{},{}] = 0x{:x}, expected 0xAABBCCDD", x, y, resultData[idx]);
+				totalErrors++;
+				break;
+			}
+		}
+		if (totalErrors > 0) break;
+	}
+
+	vkUnmapMemory(device, memBufImageResult);
+
+	if (totalErrors == 0)
+		cct::Logger::Info("Image operations succeeded: ClearColorImage, CopyBufferToImage, CopyImage, CopyImageToBuffer");
+
+	vkDestroyFence(device, fenceImage, nullptr);
+	vkFreeCommandBuffers(device, pool, 1, &cmdImage);
+	vkFreeCommandBuffers(device, pool, 1, &cmdImageCopy);
+	vkDestroyBuffer(device, bufImageResult, nullptr);
+	vkFreeMemory(device, memBufImageResult, nullptr);
+	vkDestroyImage(device, imageA, nullptr);
+	vkDestroyImage(device, imageB, nullptr);
+	vkFreeMemory(device, memImageA, nullptr);
+	vkFreeMemory(device, memImageB, nullptr);
+	vkDestroyBuffer(device, bufImage, nullptr);
+	vkFreeMemory(device, memBufImage, nullptr);
+
 	vkDestroyFence(device, fence, nullptr);
 	vkFreeCommandBuffers(device, pool, 1, &cmd);
 	vkDestroyCommandPool(device, pool, nullptr);

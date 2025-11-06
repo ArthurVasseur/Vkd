@@ -102,6 +102,49 @@ namespace vkd
 		m_ops.emplace_back(Buffer::OpUpdate{ dstBufferObj, dstOffset, std::move(data)});
 	}
 
+	inline void CommandBuffer::PushCopyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkImageCopy* pRegions)
+	{
+		VKD_FROM_HANDLE(Image, srcImageObj, srcImage);
+		VKD_FROM_HANDLE(Image, dstImageObj, dstImage);
+
+		std::vector<VkImageCopy> regions;
+		regions.resize(regionCount);
+		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkImageCopy));
+		m_ops.emplace_back(Image::OpCopy{ srcImageObj, dstImageObj, std::move(regions)});
+	}
+
+	inline void CommandBuffer::PushCopyBufferToImage(VkBuffer srcBuffer, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkBufferImageCopy* pRegions)
+	{
+		VKD_FROM_HANDLE(Buffer, srcBufferObj, srcBuffer);
+		VKD_FROM_HANDLE(Image, dstImageObj, dstImage);
+
+		std::vector<VkBufferImageCopy> regions;
+		regions.resize(regionCount);
+		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
+		m_ops.emplace_back(Buffer::OpCopyBufferToImage{ srcBufferObj, dstImageObj, dstImageLayout, std::move(regions)});
+	}
+
+	inline void CommandBuffer::PushCopyImageToBuffer(VkImage srcImage, VkImageLayout srcImageLayout, VkBuffer dstBuffer, UInt32 regionCount, const VkBufferImageCopy* pRegions)
+	{
+		VKD_FROM_HANDLE(Image, srcImageObj, srcImage);
+		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
+
+		std::vector<VkBufferImageCopy> regions;
+		regions.resize(regionCount);
+		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
+		m_ops.emplace_back(Buffer::OpCopyImageToBuffer{ srcImageObj, srcImageLayout, dstBufferObj, std::move(regions)});
+	}
+
+	inline void CommandBuffer::PushClearColorImage(VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, UInt32 rangeCount, const VkImageSubresourceRange* pRanges)
+	{
+		VKD_FROM_HANDLE(Image, imageObj, image);
+
+		std::vector<VkImageSubresourceRange> ranges;
+		ranges.resize(rangeCount);
+		std::memcpy(ranges.data(), pRanges, ranges.size() * sizeof(VkImageSubresourceRange));
+		m_ops.emplace_back(Image::OpClearColorImage{ imageObj, imageLayout, *pColor, std::move(ranges)});
+	}
+
 	inline void CommandBuffer::PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)
 	{
 		VKD_FROM_HANDLE(Pipeline, pipelineObject, pipeline);

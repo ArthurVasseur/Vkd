@@ -123,6 +123,7 @@ target("vkd")
         "Device",
         "DeviceMemory",
         "Icd",
+        "Image",
         "Instance",
         "Memory",
         "ObjectBase",

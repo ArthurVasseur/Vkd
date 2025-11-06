@@ -50,6 +50,26 @@ namespace vkd::software
 		return m_context->UpdateBuffer(std::move(op));
 	}
 
+	VkResult CommandDispatcher::operator()(vkd::Buffer::OpCopyBufferToImage op)
+	{
+		return m_context->CopyBufferToImage(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::Buffer::OpCopyImageToBuffer op)
+	{
+		return m_context->CopyImageToBuffer(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::Image::OpCopy op)
+	{
+		return m_context->CopyImage(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::Image::OpClearColorImage op)
+	{
+		return m_context->ClearColorImage(std::move(op));
+	}
+
 	VkResult CommandDispatcher::operator()(vkd::OpBindVertexBuffer op)
 	{
 		return m_context->BindVertexBuffer(std::move(op));

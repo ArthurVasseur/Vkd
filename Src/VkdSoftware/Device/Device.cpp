@@ -12,6 +12,7 @@
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
+#include "VkdSoftware/Image/Image.hpp"
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
 #include "VkdUtils/System/System.hpp"
@@ -108,6 +109,18 @@ namespace vkd::software
 		}
 
 		return buffer;
+	}
+
+	Result<vkd::Image*, VkResult> SoftwareDevice::CreateImage()
+	{
+		auto* image = mem::New<Image>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!image)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Image");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return image;
 	}
 
 	Result<vkd::DeviceMemory*, VkResult> SoftwareDevice::CreateDeviceMemory()

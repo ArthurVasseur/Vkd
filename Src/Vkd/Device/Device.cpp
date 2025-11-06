@@ -14,6 +14,7 @@
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 #include "Vkd/Buffer/Buffer.hpp"
+#include "Vkd/Image/Image.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
 
@@ -223,6 +224,10 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetBufferMemoryRequirements);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindBufferMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateImage);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyImage);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageMemoryRequirements);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindImageMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, AllocateMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, MapMemory);
@@ -242,6 +247,10 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdUpdateBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyImage);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBufferToImage);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyImageToBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdClearColorImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindPipeline);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindVertexBuffers);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDraw);
@@ -623,6 +632,67 @@ namespace vkd
 		VKD_CHECK(!bufferObj->IsBound());
 
 		bufferObj->BindBufferMemory(*memoryObj, memoryOffset);
+
+		return VK_SUCCESS;
+	}
+
+	VkResult Device::CreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImage* pImage)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pImage);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto imageResult = deviceObj->CreateImage();
+		if (imageResult.IsError())
+			return imageResult.GetError();
+
+		auto* imageObj = std::move(imageResult).GetValue();
+		VkResult result = imageObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, imageObj);
+			return result;
+		}
+
+		*pImage = VKD_TO_HANDLE(VkImage, imageObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Image, imageObj, image);
+
+		mem::Delete(imageObj->GetAllocationCallbacks(), imageObj);
+	}
+
+	void Device::GetImageMemoryRequirements(VkDevice device, VkImage image, VkMemoryRequirements* pMemoryRequirements)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Image, imageObj, image);
+		VKD_CHECK(pMemoryRequirements);
+
+		imageObj->GetMemoryRequirements(*pMemoryRequirements);
+	}
+
+	VkResult Device::BindImageMemory(VkDevice device, VkImage image, VkDeviceMemory memory, VkDeviceSize memoryOffset)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Image, imageObj, image);
+		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
+		VKD_CHECK(!imageObj->IsBound());
+
+		imageObj->BindImageMemory(*memoryObj, memoryOffset);
 
 		return VK_SUCCESS;
 	}
