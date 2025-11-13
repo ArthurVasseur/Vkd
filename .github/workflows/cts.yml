@@ -1,0 +1,156 @@
+name: Vulkan CTS
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - feature/cts
+    paths-ignore:
+      - '.gitignore'
+      - 'LICENSE'
+      - 'CHANGELOG.md'
+      - 'README.md'
+  pull_request:
+    paths-ignore:
+      - '.gitignore'
+      - 'LICENSE'
+      - 'CHANGELOG.md'
+      - 'README.md'
+
+jobs:
+  cts:
+    strategy:
+      fail-fast: false
+      matrix:
+        confs:
+        - { name: Windows, runner: windows-latest, shell: bash, plat: windows, arch: x64, mode: releasedbg }
+        # - { name: Linux,   runner: ubuntu-latest,  shell: bash, plat: linux,   arch: x86_64, mode: releasedbg }
+        # - { name: macOS,   runner: macos-15,       shell: bash, plat: macosx,  arch: arm64,  mode: releasedbg }
+
+    defaults:
+      run:
+        shell: ${{ matrix.confs.shell }}
+
+    name: CTS ${{ matrix.confs.name }} ${{ matrix.confs.arch }}
+    runs-on: ${{ matrix.confs.runner }}
+    if: ${{ !contains(github.event.head_commit.message, 'ci skip') }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Setup Linux
+      if: ${{ matrix.confs.plat == 'linux'}}
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install mesa-common-dev
+        ln -s /usr/bin/g++-13 /usr/local/bin/g++
+        ln -s /usr/bin/gcc-13 /usr/local/bin/gcc
+
+    - name: Update clang to 20
+      if: ${{ matrix.confs.plat == 'macosx' }}
+      run: brew install llvm@20
+
+    - name: Set xmake global dir
+      run: echo "XMAKE_GLOBALDIR=${{ runner.workspace }}/xmake-global" >> $GITHUB_ENV
+
+    - name: Setup xmake
+      uses: xmake-io/github-action-setup-xmake@v1
+      with:
+        xmake-version: latest
+        actions-cache-folder: .xmake-cache-W${{ steps.cache_key.outputs.key }}
+
+    - name: Update xmake repository
+      run: xmake repo --update
+
+    - name: Retrieve dependencies hash
+      id: dep_hash
+      run: echo "hash=$(xmake l utils.ci.packageskey)" >> $GITHUB_OUTPUT
+
+    - name: Restore cached xmake dependencies
+      id: restore-depcache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ env.XMAKE_GLOBALDIR }}/.xmake/packages
+        key: cts-${{ matrix.confs.plat }}-${{ matrix.confs.arch }}-${{ matrix.confs.mode }}-${{ steps.dep_hash.outputs.hash }}-W${{ steps.cache_key.outputs.key }}
+
+    - name: Setup platform config
+      run: |
+        PLATFORM_CONF=""
+
+        if [ "${{ matrix.confs.plat }}" = "macosx" ]; then
+          LLVM_PREFIX=$(brew --prefix llvm@20)
+          echo "LLVM_PREFIX=${LLVM_PREFIX}" >> $GITHUB_ENV
+          PLATFORM_CONF="${PLATFORM_CONF} --toolchain=llvm --runtimes=c++_shared --sdk=${LLVM_PREFIX}"
+        fi
+
+        echo "ADDITIONAL_CONF=${PLATFORM_CONF}" >> "$GITHUB_ENV"
+
+    - name: Configure xmake with CTS support
+      run: xmake config --plat=${{ matrix.confs.plat }} --arch=${{ matrix.confs.arch }} --mode=${{ matrix.confs.mode }} --debug_checks=y --cts=y ${{ env.ADDITIONAL_CONF }} --ccache=n --yes
+
+    - name: Save cached xmake dependencies
+      if: ${{ !steps.restore-depcache.outputs.cache-hit }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ env.XMAKE_GLOBALDIR }}/.xmake/packages
+        key: ${{ steps.restore-depcache.outputs.cache-primary-key }}
+
+    - name: Build project
+      run: xmake build vkd-Software
+
+    - name: Register Software ICD in Vulkan registry
+      shell: pwsh
+      run: |
+        $icdPath = Resolve-Path "vkd-Software.json"
+        Write-Host "Registering ICD manifest at $icdPath"
+
+        reg add "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" `
+          /v "$icdPath" `
+          /t REG_DWORD `
+          /d 0 `
+          /f
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.11"
+
+    - name: Install Python dependencies
+      run: pip install pandas
+
+    - name: Run Vulkan CTS
+      run: xmake run -v vk-cts-Software
+
+    - name: Archive CTS results
+      if: always()
+      run: |
+        if [ -d "Software-cts-results" ]; then
+          if [ "${{ matrix.confs.plat }}" = "windows" ]; then
+            7z a -tzip Software-cts-results.zip Software-cts-results/
+          else
+            tar -czf Software-cts-results.tar.gz Software-cts-results/
+          fi
+        fi
+
+    - name: Upload CTS results (Windows)
+      if: ${{ always() && matrix.confs.plat == 'windows' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: cts-results-${{ matrix.confs.name }}-${{ matrix.confs.arch }}
+        path: Software-cts-results.zip
+        retention-days: 30
+        if-no-files-found: warn
+
+    - name: Upload CTS results (Unix)
+      if: ${{ always() && matrix.confs.plat != 'windows' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: cts-results-${{ matrix.confs.name }}-${{ matrix.confs.arch }}
+        path: Software-cts-results.tar.gz
+        retention-days: 30
+        if-no-files-found: warn
