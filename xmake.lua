@@ -8,10 +8,16 @@ add_requires("catch2")
 option("debug_checks", {default = is_mode("debug"), description = "Enable additional debug checks"})
 option("profiling", { description = "Build with tracy profiler", default = false })
 option("tests", { description = "Build test applications", default = true })
+option("cts", { description = "Build Vulkan CTS", default = false })
 
 if has_config("profiling") then
-    add_requires("tracy")
+	add_requires("tracy")
 end
+
+if has_config("cts") then
+	add_requires("vk-gl-cts")
+end
+
 
 function add_files_to_target(p, hpp_as_files)
     for _, dir in ipairs(os.filedirs(p)) do
@@ -187,10 +193,11 @@ for driver_name, driver in pairs(drivers) do
                     "library_arch" : "64",
                     "is_portability_driver": false
                 }
-            },
+            }
             ]], lib_path)
 
             io.writefile("vkd-" .. driver_name .. ".json", json_content)
+            target:add("installfiles", lib_path)
         end)
     target_end()
 end
@@ -205,17 +212,94 @@ if has_config("tests") then
         add_deps("vkd-Utils")
     target_end()
 
-    -- target("vkd-test-app")
-    --     set_languages("c++20")
-    --     set_kind("binary")
-    --     add_files("Tests/**.cpp")
-    --     add_includedirs("Src", { public = true })
-    --     add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk")
-    --     add_defines("VK_NO_PROTOTYPES")
-    --     add_files("Src/TestApp/main.cpp")
+    target("vkd-test-app")
+        set_languages("c++20")
+        set_kind("binary")
+        add_files("Tests/**.cpp")
+        add_includedirs("Src", { public = true })
+        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk")
+        add_defines("VK_NO_PROTOTYPES")
+        add_files("Src/TestApp/main.cpp")
 
-    --     for driver_name, driver in pairs(drivers) do
-    --         add_deps("vkd-" .. driver_name)
-    --     end
+        for driver_name, driver in pairs(drivers) do
+            add_deps("vkd-" .. driver_name)
+        end
+    target_end()
 end
 
+if has_config("cts") then
+    package("vk-gl-cts")
+        set_homepage("https://github.com/KhronosGroup/VK-GL-CTS")
+        set_description("Khronos Vulkan Conformance Test Suite")
+        set_license("Apache-2.0")
+
+        add_urls(
+            "https://data.arthurvasseur.fr/vk-gl-cts/vk-gl-cts-$(version).1.zip"
+        )
+        
+        add_versions("1.4.4", "d82631c355351c96ec10aa4a9eaf7701c661a42d6347c3a169357be27878936b")
+
+        on_install(function (package)
+            os.trycp("bin/*.exe", package:installdir("bin"))
+            os.trycp("scripts/*", package:installdir("scripts"))
+        end)
+
+        on_test(function (package)
+            local deqp_vk = path.join(package:installdir("bin"), "deqp-vk" .. (is_host("windows") and ".exe" or ""))
+            assert(os.isfile(deqp_vk), "deqp-vk executable not found")
+        end)
+    package_end()
+
+    add_requires("python 3.x", "vulkan-loader")
+
+    for driver_name, driver in pairs(drivers) do
+        target("vk-cts-" .. driver_name)
+            set_kind("phony")
+            add_packages("vk-gl-cts", "python", "vulkan-loader")
+            add_deps("vkd-" .. driver_name)
+
+            on_run(function (target)
+                import("lib.detect.find_tool")
+                
+                local vk_gl_cts = target:pkg("vk-gl-cts")
+                if not vk_gl_cts then
+                    raise("VK-GL-CTS package not found. Please run 'xmake f --cts=y' and rebuild.")
+                end
+
+                local vulkan_loader = target:pkg("vulkan-loader")
+                if not vulkan_loader then
+                    raise("Vulkan Loader package not found. Please run 'xmake f --cts=y' and rebuild.")
+                end
+                
+                local deqp_vk = path.join(vk_gl_cts:installdir(), "bin", "deqp-vk" .. (is_host("windows") and ".exe" or ""))
+                local envs = os.joinenvs(os.getenvs(), {
+                    VK_LOADER_DEBUG = "all",
+                    VK_DRIVER_FILES = path.absolute("vkd-" .. driver_name .. ".json"),
+                    VK_SDK_PATH = vulkan_loader:installdir(),
+                })
+                print("Environment set to: ")
+                print(envs)
+                os.mkdir("./" .. driver_name .. "-cts-results/")
+                os.vrunv(deqp_vk, {
+                    "--deqp-archive-dir=./" .. driver_name .. "-cts-results/",
+                    "--deqp-shadercache-filename=./" .. driver_name .. "-cts-results/vk-cts-shadercache.bin",
+                    "--deqp-log-filename=./" .. driver_name .. "-cts-results/vk-cts-log.txt",
+                    "-n",
+                    "dEQP-VK.info.*"
+                }, {envs = envs}
+                )
+                
+                local python = find_tool("python")
+                assert(python, "python not found!")
+
+                os.vrunv(python.program, {"-m", "pip", "install", "pandas"})
+            
+                local report_script = path.join(vk_gl_cts:installdir(), "scripts", "log/log_to_xml.py")
+                os.vrunv(python.program, {report_script, "./" .. driver_name .. "-cts-results/vk-cts-log.txt", "./" .. driver_name .. "-cts-results/vk-cts-report.xml"})
+
+                local reporter_script = path.join(os.scriptdir(), "scripts", "cts_report.py")
+                os.vrunv(python.program, {reporter_script, "./" .. driver_name .. "-cts-results/vk-cts-report.xml", "./" .. driver_name .. "-cts-results/result.html"})
+            end)
+        target_end()
+    end
+end
