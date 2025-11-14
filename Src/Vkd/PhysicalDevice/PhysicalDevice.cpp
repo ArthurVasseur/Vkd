@@ -199,12 +199,13 @@ namespace vkd
 		// Define the single memory heap (system RAM)
 		// No VK_MEMORY_HEAP_DEVICE_LOCAL_BIT because this is CPU-accessible system memory
 		pMemoryProperties->memoryHeaps[0].size = heapSize;
-		pMemoryProperties->memoryHeaps[0].flags = 0; // Not device-local, this is host memory
+		pMemoryProperties->memoryHeaps[0].flags = VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
 
 		// Define the single memory type
 		// HOST_VISIBLE: CPU can map and access this memory
 		// HOST_COHERENT: No explicit cache management needed (simplifies CPU backend)
 		pMemoryProperties->memoryTypes[0].propertyFlags =
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
 			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		pMemoryProperties->memoryTypes[0].heapIndex = 0; // References the heap defined above
