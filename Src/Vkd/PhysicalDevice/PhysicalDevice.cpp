@@ -175,7 +175,7 @@ namespace vkd
 		if (pQueueFamilyPropertyCount && pQueueFamilyProperties && *pQueueFamilyPropertyCount > 0)
 		{
 			auto properties = physicalDevice->GetQueueFamilyProperties();
-			std::memcpy(pQueueFamilyProperties, properties.data(), properties.size());
+			std::memcpy(pQueueFamilyProperties, properties.data(), properties.size_bytes());
 			*pQueueFamilyPropertyCount = static_cast<UInt32>(properties.size());
 		}
 	}
