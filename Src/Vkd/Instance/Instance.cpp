@@ -62,7 +62,11 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		CCT_ASSERT_FALSE("Not Implemented");
+		if (pPropertyCount && !pProperties)
+		{
+			*pPropertyCount = 0;
+			return VK_SUCCESS;
+		}
 		return VK_ERROR_INCOMPATIBLE_DRIVER;
 	}
 

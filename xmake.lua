@@ -287,7 +287,7 @@ if has_config("cts") then
                         "--deqp-archive-dir=" .. output_dir,
                         "--deqp-shadercache-filename=" .. path.join(output_dir, "vk-cts-shadercache.bin"),
                         "--deqp-log-filename=" .. path.join(output_dir, "vk-cts-log.txt"),
-                        "-n",
+                       "-n",
                         "dEQP-VK.info.*"
                     },
                     {envs = envs, try = true}

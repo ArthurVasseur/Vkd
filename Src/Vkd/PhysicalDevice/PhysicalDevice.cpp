@@ -10,9 +10,6 @@
 namespace vkd
 {
 	// Supported device extensions for the CPU backend
-	// Currently empty - extensions will be added as they are implemented
-	// TODO: Add VK_KHR_SWAPCHAIN_EXTENSION_NAME when swapchain support is implemented
-	// TODO: Add VK_EXT_DEBUG_MARKER_EXTENSION_NAME when debug marker support is implemented
 	std::array<VkExtensionProperties, 0> PhysicalDevice::s_supportedExtensions = {};
 
 	PhysicalDevice::PhysicalDevice() :
@@ -71,6 +68,44 @@ namespace vkd
 		// - No sparse resources (not needed for basic CPU backend)
 		// This minimal feature set supports vkCmdFillBuffer, vkCmdCopyBuffer,
 		// and basic compute shaders for a software-based Vulkan implementation
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceFeatures2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures2* pFeatures)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
+		CCT_ASSERT(pFeatures, "pFeatures cannot be null");
+
+		pFeatures->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		GetPhysicalDeviceFeatures(pPhysicalDevice, &pFeatures->features);
+
+		VkBaseOutStructure* pNext = static_cast<VkBaseOutStructure*>(pFeatures->pNext);
+		while (pNext)
+		{
+			switch (pNext->sType)
+			{
+				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES:
+				{
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,sizeof(VkPhysicalDeviceVulkan11Features) - sizeof(VkBaseOutStructure));
+					break;
+				}
+				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES:
+				{
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,sizeof(VkPhysicalDeviceVulkan12Features) - sizeof(VkBaseOutStructure));
+					break;
+				}
+				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES:
+				{
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,sizeof(VkPhysicalDeviceVulkan13Features) - sizeof(VkBaseOutStructure));
+					break;
+				}
+				default:
+					break;
+			}
+			pNext = pNext->pNext;
+		}
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkFormatProperties* pFormatProperties)
@@ -155,8 +190,46 @@ namespace vkd
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 
-
+		std::memset(pProperties, 0, sizeof(VkPhysicalDeviceProperties));
 		*pProperties = physicalDevice->GetPhysicalDeviceProperties();
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceProperties2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceProperties2* pProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
+		CCT_ASSERT(pProperties, "pProperties cannot be null");
+
+		pProperties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		pProperties->properties = physicalDevice->GetPhysicalDeviceProperties();
+
+		VkBaseOutStructure* pNext = reinterpret_cast<VkBaseOutStructure*>(pProperties->pNext);
+		while (pNext)
+		{
+			switch (pNext->sType)
+			{
+				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES:
+				{
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0, sizeof(VkPhysicalDeviceVulkan11Properties) - sizeof(VkBaseOutStructure));
+					break;
+				}
+				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES:
+				{
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0, sizeof(VkPhysicalDeviceVulkan12Properties) - sizeof(VkBaseOutStructure));
+					break;
+				}
+				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES:
+				{
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0, sizeof(VkPhysicalDeviceVulkan13Properties) - sizeof(VkBaseOutStructure));
+					break;
+				}
+				default:
+					break;
+			}
+			pNext = pNext->pNext;
+		}
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties)
