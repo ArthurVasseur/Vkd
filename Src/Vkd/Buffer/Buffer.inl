@@ -29,7 +29,8 @@ namespace vkd
 
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline void Buffer::BindBufferMemory(DeviceMemory& deviceMemory, VkDeviceSize memoryOffset)
@@ -47,31 +48,37 @@ namespace vkd
 
 	inline Device* Buffer::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline VkDeviceSize Buffer::GetSize() const
 	{
+		AssertValid();
 		return m_size;
 	}
 
 	inline VkBufferUsageFlags Buffer::GetUsage() const
 	{
+		AssertValid();
 		return m_usage;
 	}
 
 	inline DeviceMemory* Buffer::GetMemory() const
 	{
+		AssertValid();
 		return m_memory;
 	}
 
 	inline VkDeviceSize Buffer::GetMemoryOffset() const
 	{
+		AssertValid();
 		return m_memoryOffset;
 	}
 
 	inline bool Buffer::IsBound() const
 	{
+		AssertValid();
 		return m_memory != nullptr;
 	}
 }

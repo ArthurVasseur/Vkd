@@ -41,7 +41,8 @@ namespace vkd
 
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline void Image::BindImageMemory(DeviceMemory& deviceMemory, VkDeviceSize memoryOffset)
@@ -62,61 +63,73 @@ namespace vkd
 
 	inline Device* Image::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline VkImageType Image::GetImageType() const
 	{
+		AssertValid();
 		return m_imageType;
 	}
 
 	inline VkFormat Image::GetFormat() const
 	{
+		AssertValid();
 		return m_format;
 	}
 
 	inline VkExtent3D Image::GetExtent() const
 	{
+		AssertValid();
 		return m_extent;
 	}
 
 	inline UInt32 Image::GetMipLevels() const
 	{
+		AssertValid();
 		return m_mipLevels;
 	}
 
 	inline UInt32 Image::GetArrayLayers() const
 	{
+		AssertValid();
 		return m_arrayLayers;
 	}
 
 	inline VkSampleCountFlagBits Image::GetSamples() const
 	{
+		AssertValid();
 		return m_samples;
 	}
 
 	inline VkImageTiling Image::GetTiling() const
 	{
+		AssertValid();
 		return m_tiling;
 	}
 
 	inline VkImageUsageFlags Image::GetUsage() const
 	{
+		AssertValid();
 		return m_usage;
 	}
 
 	inline DeviceMemory* Image::GetMemory() const
 	{
+		AssertValid();
 		return m_memory;
 	}
 
 	inline VkDeviceSize Image::GetMemoryOffset() const
 	{
+		AssertValid();
 		return m_memoryOffset;
 	}
 
 	inline bool Image::IsBound() const
 	{
+		AssertValid();
 		return m_memory != nullptr;
 	}
 }

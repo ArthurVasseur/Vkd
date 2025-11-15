@@ -28,26 +28,31 @@ namespace vkd
 
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline Device* DeviceMemory::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline VkDeviceSize DeviceMemory::GetSize() const
 	{
+		AssertValid();
 		return m_size;
 	}
 
 	inline UInt32 DeviceMemory::GetTypeIndex() const
 	{
+		AssertValid();
 		return m_typeIndex;
 	}
 
 	inline bool DeviceMemory::IsMapped() const
 	{
+		AssertValid();
 		return m_mapped;
 	}
 }

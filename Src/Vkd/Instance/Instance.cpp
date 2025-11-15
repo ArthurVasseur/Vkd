@@ -31,7 +31,8 @@ namespace vkd
 	{
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	VkResult Instance::EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties)

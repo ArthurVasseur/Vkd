@@ -27,11 +27,13 @@ namespace vkd
 		m_queueFamilyProperties = queueFamilyProperties;
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	const VkPhysicalDeviceProperties& PhysicalDevice::GetPhysicalDeviceProperties() const
 	{
+
 		return m_physicalDeviceProperties;
 	}
 
