@@ -23,11 +23,11 @@ namespace vkd
 	{
 	}
 
-	VkResult PhysicalDevice::Create(Instance& owner, VkPhysicalDeviceProperties physicalDeviceProperties, std::array<VkQueueFamilyProperties, 3> queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks)
+	VkResult PhysicalDevice::Create(Instance& owner, const VkPhysicalDeviceProperties& physicalDeviceProperties, const std::array<VkQueueFamilyProperties, 3>& queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks)
 	{
 		m_instance = &owner;
-		m_physicalDeviceProperties = std::move(physicalDeviceProperties);
-		m_queueFamilyProperties = std::move(queueFamilyProperties);
+		m_physicalDeviceProperties = physicalDeviceProperties;
+		m_queueFamilyProperties = queueFamilyProperties;
 		SetAllocationCallbacks(allocationCallbacks);
 
 		return VK_SUCCESS;

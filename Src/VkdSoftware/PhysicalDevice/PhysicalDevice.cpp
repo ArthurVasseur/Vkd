@@ -11,15 +11,15 @@ namespace vkd::software
 {
 	VkResult PhysicalDevice::Create(Instance& owner, const VkAllocationCallbacks& allocationCallbacks)
 	{
-		VkPhysicalDeviceProperties physicalDeviceProperties = {
-			.apiVersion = VKD_VK_API_VERSION,
-			.driverVersion = VKD_DRIVER_VERSION,
-			.vendorID = 0x0601,
-			.deviceID = 0x060103,
-			.deviceType = VK_PHYSICAL_DEVICE_TYPE_CPU,
-			.deviceName = {},
-			.pipelineCacheUUID = {},
-			.limits = {
+		VkPhysicalDeviceProperties physicalDeviceProperties{};
+
+		physicalDeviceProperties.apiVersion = VKD_VK_API_VERSION;
+		physicalDeviceProperties.driverVersion = VKD_DRIVER_VERSION;
+		physicalDeviceProperties.vendorID = 0x0601;
+		physicalDeviceProperties.deviceID = 0x060103;
+		physicalDeviceProperties.deviceType = VK_PHYSICAL_DEVICE_TYPE_CPU;
+
+		physicalDeviceProperties.limits = {
 			.maxImageDimension1D = 4096,
 			.maxImageDimension2D = 4096,
 			.maxImageDimension3D = 256,
@@ -126,8 +126,6 @@ namespace vkd::software
 			.optimalBufferCopyOffsetAlignment = 1,
 			.optimalBufferCopyRowPitchAlignment = 1,
 			.nonCoherentAtomSize = 256,
-		},
-			.sparseProperties = {},
 		};
 
 		using namespace std::string_view_literals;
@@ -158,7 +156,7 @@ namespace vkd::software
 			}
 		};
 
-		return vkd::PhysicalDevice::Create(owner, std::move(physicalDeviceProperties), std::move(queueFamilyProperties), allocationCallbacks);
+		return vkd::PhysicalDevice::Create(owner, physicalDeviceProperties, queueFamilyProperties, allocationCallbacks);
 	}
 
 	DispatchableObjectResult<vkd::Device> PhysicalDevice::CreateDevice()
