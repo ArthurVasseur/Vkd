@@ -131,6 +131,8 @@ namespace vkd::software
 		using namespace std::string_view_literals;
 		constexpr std::string_view deviceName = "Vkd software device"sv;
 		std::memcpy(physicalDeviceProperties.deviceName, deviceName.data(), deviceName.size());
+		physicalDeviceProperties.sparseProperties = {};
+
 
 		std::array queueFamilyProperties = {
 			VkQueueFamilyProperties

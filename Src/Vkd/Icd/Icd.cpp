@@ -27,6 +27,9 @@ namespace vkd
 		#define VKD_ENTRYPOINT_LOOKUP(klass, name)	\
 			if (strcmp(pName, "vk" #name) == 0) \
 				return (PFN_vkVoidFunction)static_cast<PFN_vk##name>(klass::name)
+		#define VKD_ENTRYPOINT_LOOKUP_KHR(klass, name)	\
+			if (strcmp(pName, "vk" #name "KHR") == 0)	\
+				return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceExtensionProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceLayerProperties);
@@ -36,16 +39,22 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, DestroyInstance);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumeratePhysicalDevices);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFeatures);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFeatures2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceFeatures2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFormatProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceImageFormatProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceProperties2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceProperties2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceQueueFamilyProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceMemoryProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, EnumerateDeviceExtensionProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
+
 		#undef VKD_ENTRYPOINT_LOOKUP
+		#undef VKD_ENTRYPOINT_LOOKUP_KHR
 
 
 		#define VKD_ICD_ENTRYPOINT_LOOKUP(klass, name)	\
@@ -58,8 +67,12 @@ namespace vkd
 	#ifdef CCT_PLATFORM_WINDOWS
 		VKD_ICD_ENTRYPOINT_LOOKUP(vkd::Icd, EnumerateAdapterPhysicalDevices);
 	#endif
-		#undef VKD_ICD_ENTRYPOINT_LOOKUP
+	#undef VKD_ICD_ENTRYPOINT_LOOKUP
+
+#ifdef VKD_DEBUG_CHECKS
 		cct::Logger::Warning("Could not find '{}' function", pName);
+#endif
+
 		return nullptr;
 	}
 
