@@ -250,12 +250,12 @@ if has_config("cts") then
         end)
     package_end()
 
-    add_requires("python 3.x", "vulkan-loader")
+    add_requires("python 3.x")
 
     for driver_name, driver in pairs(drivers) do
         target("vk-cts-" .. driver_name)
             set_kind("phony")
-            add_packages("vk-gl-cts", "python", "vulkan-loader")
+            add_packages("vk-gl-cts", "python")
             add_deps("vkd-" .. driver_name)
 
             on_run(function (target)
@@ -266,28 +266,34 @@ if has_config("cts") then
                     raise("VK-GL-CTS package not found. Please run 'xmake f --cts=y' and rebuild.")
                 end
 
-                local vulkan_loader = target:pkg("vulkan-loader")
-                if not vulkan_loader then
-                    raise("Vulkan Loader package not found. Please run 'xmake f --cts=y' and rebuild.")
-                end
-                
-                local deqp_vk = path.join(vk_gl_cts:installdir(), "bin", "deqp-vk" .. (is_host("windows") and ".exe" or ""))
+                local deqp_vk = find_tool("deqp-vk", {paths = {path.join(vk_gl_cts:installdir(), "bin")}, check = "-h"})
+                assert(deqp_vk, "deqp-vk not found in VK-GL-CTS package!")
+
                 local envs = os.joinenvs(os.getenvs(), {
-                    VK_LOADER_DEBUG = "all",
-                    VK_DRIVER_FILES = path.absolute("vkd-" .. driver_name .. ".json"),
-                    VK_SDK_PATH = vulkan_loader:installdir(),
+                    VK_DRIVER_FILES = path.absolute("vkd-" .. driver_name .. ".json")
                 })
-                print("Environment set to: ")
-                print(envs)
-                os.mkdir("./" .. driver_name .. "-cts-results/")
-                os.vrunv(deqp_vk, {
-                    "--deqp-archive-dir=./" .. driver_name .. "-cts-results/",
-                    "--deqp-shadercache-filename=./" .. driver_name .. "-cts-results/vk-cts-shadercache.bin",
-                    "--deqp-log-filename=./" .. driver_name .. "-cts-results/vk-cts-log.txt",
-                    "-n",
-                    "dEQP-VK.info.*"
-                }, {envs = envs}
+
+                local output_dir = path.join(os.scriptdir(), driver_name .. "-cts-results/")
+                if os.isdir(output_dir) then
+                    os.rm(output_dir)
+                end
+
+                os.mkdir(output_dir)
+
+                local bin_dir = path.join(vk_gl_cts:installdir(), "bin")
+                os.cd(bin_dir)
+
+                local ret = os.execv(deqp_vk.program, {
+                        "--deqp-archive-dir=" .. output_dir,
+                        "--deqp-shadercache-filename=" .. path.join(output_dir, "vk-cts-shadercache.bin"),
+                        "--deqp-log-filename=" .. path.join(output_dir, "vk-cts-log.txt"),
+                        "-n",
+                        "dEQP-VK.info.*"
+                    },
+                    {envs = envs, try = true}
                 )
+
+                os.cd("-")
                 
                 local python = find_tool("python")
                 assert(python, "python not found!")
