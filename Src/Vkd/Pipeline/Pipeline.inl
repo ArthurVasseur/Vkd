@@ -43,16 +43,19 @@ namespace vkd
 
 	inline Device* Pipeline::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline VkPipelineBindPoint Pipeline::GetBindPoint() const
 	{
+		AssertValid();
 		return m_bindPoint;
 	}
 
 	inline VkPipelineLayout Pipeline::GetLayout() const
 	{
+		AssertValid();
 		return m_layout;
 	}
 }

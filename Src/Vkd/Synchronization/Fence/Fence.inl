@@ -25,16 +25,19 @@ namespace vkd
 
 		SetAllocationCallbacks(m_owner->GetAllocationCallbacks());
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline Device* Fence::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline VkFenceCreateFlags Fence::GetFlags() const
 	{
+		AssertValid();
 		return m_flags;
 	}
 }

@@ -24,12 +24,17 @@ namespace vkd
 		ObjectBase& operator=(ObjectBase&&) = default;
 		ObjectBase& operator=(const ObjectBase&) = delete;
 
+		[[nodiscard]] inline bool IsValid() const;
 		[[nodiscard]] inline VkObjectType GetObjectType() const;
 		[[nodiscard]] inline const VkAllocationCallbacks& GetAllocationCallbacks() const;
 		inline void SetAllocationCallbacks(const VkAllocationCallbacks& allocationCallbacks);
+
+		inline void AssertValid() const;
 	private:
 		const VkAllocationCallbacks* m_allocationCallbacks;
 		VkObjectType m_objectType;
+	protected:
+		VkResult m_createResult;
 	};
 
 	template<typename T>

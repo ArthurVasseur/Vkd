@@ -11,7 +11,7 @@ namespace vkd::software
 {
 	VkResult PhysicalDevice::Create(Instance& owner, const VkAllocationCallbacks& allocationCallbacks)
 	{
-		VkPhysicalDeviceProperties physicalDeviceProperties{};
+		VkPhysicalDeviceProperties physicalDeviceProperties = {};
 
 		physicalDeviceProperties.apiVersion = VKD_VK_API_VERSION;
 		physicalDeviceProperties.driverVersion = VKD_DRIVER_VERSION;

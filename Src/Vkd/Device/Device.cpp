@@ -45,11 +45,13 @@ namespace vkd
 		m_owner = &owner;
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return CreateQueues(pDeviceCreateInfo);
+		m_createResult = CreateQueues(pDeviceCreateInfo);
+		return m_createResult;
 	}
 
 	PhysicalDevice* Device::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 

@@ -27,16 +27,19 @@ namespace vkd
 
 		SetAllocationCallbacks(m_owner->GetAllocationCallbacks());
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline CommandPool* CommandBuffer::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline VkCommandBufferLevel CommandBuffer::GetLevel() const
 	{
+		AssertValid();
 		return m_level;
 	}
 

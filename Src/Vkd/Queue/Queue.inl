@@ -29,26 +29,31 @@ namespace vkd
 
 		SetAllocationCallbacks(m_owner->GetAllocationCallbacks());
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline Device* Queue::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline UInt32 Queue::GetQueueFamilyIndex() const
 	{
+		AssertValid();
 		return m_queueFamilyIndex;
 	}
 
 	inline UInt32 Queue::GetQueueIndex() const
 	{
+		AssertValid();
 		return m_queueIndex;
 	}
 
 	inline VkDeviceQueueCreateFlags Queue::GetFlags() const
 	{
+		AssertValid();
 		return m_flags;
 	}
 }

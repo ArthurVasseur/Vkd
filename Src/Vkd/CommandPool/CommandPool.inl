@@ -27,21 +27,25 @@ namespace vkd
 
 		SetAllocationCallbacks(pAllocator);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline Device* CommandPool::GetOwner() const
 	{
+		AssertValid();
 		return m_owner;
 	}
 
 	inline VkCommandPoolCreateFlags CommandPool::GetFlags() const
 	{
+		AssertValid();
 		return m_flags;
 	}
 
 	inline UInt32 CommandPool::GetQueueFamilyIndex() const
 	{
+		AssertValid();
 		return m_queueFamilyIndex;
 	}
 }
