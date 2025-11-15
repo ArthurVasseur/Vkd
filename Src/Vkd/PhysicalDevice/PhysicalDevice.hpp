@@ -46,7 +46,7 @@ namespace vkd
 		static void VKAPI_CALL DestroyPhysicalDevice(VkPhysicalDevice pPhysicalDevice);
 
 	protected:
-		VkResult Create(Instance& owner, VkPhysicalDeviceProperties physicalDeviceProperties, std::array<VkQueueFamilyProperties, 3> queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks);
+		VkResult Create(Instance& owner, const VkPhysicalDeviceProperties& physicalDeviceProperties, const std::array<VkQueueFamilyProperties, 3>& queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks);
 	private:
 		static std::array<VkExtensionProperties, 0> s_supportedExtensions;
 
