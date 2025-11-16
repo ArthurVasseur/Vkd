@@ -78,8 +78,7 @@ namespace vkd
 
 	PFN_vkVoidFunction Icd::GetPhysicalDeviceProcAddr(VkInstance instance, const char* pName)
 	{
-		CCT_ASSERT_FALSE("Not Implemented");
-		return nullptr;
+		return GetInstanceProcAddr(instance, pName);
 	}
 
 #if defined(CCT_PLATFORM_WINDOWS)

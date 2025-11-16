@@ -27,6 +27,7 @@
 	#include <Windows.h>
 	#undef min
 	#undef max
+	#undef GetClassName
 	#include <vulkan/vulkan_win32.h>
 #endif
 
@@ -37,6 +38,7 @@
 
 #ifdef VKD_DEBUG_CHECKS
 #define VKD_CHECK(cond) CCT_ASSERT(cond, #cond " is false / null.")
+#include <Concerto/Core/TypeInfo/TypeInfo.hpp>
 #else
 #define VKD_CHECK(cond) do {} while(false)
 #endif
@@ -52,6 +54,13 @@
 #define VKD_AUTO_PROFILER_SCOPE()
 #endif
 
+
+#ifdef VKD_DEBUG_CHECKS
+	#define VKD_CLASSNAME_METHOD(type) std::string_view GetClassName() const override { return #type; }
+#else
+	#define VKD_CLASSNAME_METHOD(type)
+#endif
+
 #define VKD_FROM_HANDLE(type, name, handle)	\
 	VKD_CHECK(handle != nullptr);			\
 	type* name = type::FromHandle(handle);	\
@@ -62,6 +71,7 @@
 	(type)(handle)
 
 #define VKD_DISPATCHABLE_HANDLE(type)															\
+		VKD_CLASSNAME_METHOD(type)																\
 		static inline type* FromHandle(Vk##type instance)										\
 		{																						\
 			auto* dispatchable = reinterpret_cast<DispatchableObject<type>*>(instance);			\
@@ -76,10 +86,12 @@
 		}
 
 #define VKD_NON_DISPATCHABLE_HANDLE(type)														\
+		VKD_CLASSNAME_METHOD(type)																\
 		static inline type* FromHandle(Vk##type instance)										\
 		{																						\
 			return reinterpret_cast<type*>(instance);											\
 		}
+
 
 namespace vkd
 {

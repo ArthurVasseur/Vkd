@@ -30,6 +30,10 @@ namespace vkd
 		inline void SetAllocationCallbacks(const VkAllocationCallbacks& allocationCallbacks);
 
 		inline void AssertValid() const;
+#ifdef VKD_DEBUG_CHECKS
+	  virtual std::string_view GetClassName() const = 0;
+#endif // VKD_DEBUG_CHECKS
+
 	private:
 		const VkAllocationCallbacks* m_allocationCallbacks;
 		VkObjectType m_objectType;
