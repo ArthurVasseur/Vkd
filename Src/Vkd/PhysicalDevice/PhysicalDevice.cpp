@@ -33,12 +33,13 @@ namespace vkd
 
 	const VkPhysicalDeviceProperties& PhysicalDevice::GetPhysicalDeviceProperties() const
 	{
-
+		AssertValid();
 		return m_physicalDeviceProperties;
 	}
 
 	std::span<VkQueueFamilyProperties> PhysicalDevice::GetQueueFamilyProperties()
 	{
+		AssertValid();
 		return m_queueFamilyProperties;
 	}
 

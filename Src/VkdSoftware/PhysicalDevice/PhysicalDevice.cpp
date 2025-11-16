@@ -100,16 +100,16 @@ namespace vkd::software
 			.maxFramebufferWidth = 4096,
 			.maxFramebufferHeight = 4096,
 			.maxFramebufferLayers = 256,
-			.framebufferColorSampleCounts = VK_SAMPLE_COUNT_1_BIT,
-			.framebufferDepthSampleCounts = VK_SAMPLE_COUNT_1_BIT,
-			.framebufferStencilSampleCounts = VK_SAMPLE_COUNT_1_BIT,
-			.framebufferNoAttachmentsSampleCounts = VK_SAMPLE_COUNT_1_BIT,
+			.framebufferColorSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
+			.framebufferDepthSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
+			.framebufferStencilSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
+			.framebufferNoAttachmentsSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
 			.maxColorAttachments = 4,
-			.sampledImageColorSampleCounts = VK_SAMPLE_COUNT_1_BIT,
-			.sampledImageIntegerSampleCounts = VK_SAMPLE_COUNT_1_BIT,
-			.sampledImageDepthSampleCounts = VK_SAMPLE_COUNT_1_BIT,
-			.sampledImageStencilSampleCounts = VK_SAMPLE_COUNT_1_BIT,
-			.storageImageSampleCounts = VK_SAMPLE_COUNT_1_BIT,
+			.sampledImageColorSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
+			.sampledImageIntegerSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
+			.sampledImageDepthSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
+			.sampledImageStencilSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
+			.storageImageSampleCounts = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT,
 			.maxSampleMaskWords = 1,
 			.timestampComputeAndGraphics = VK_FALSE,
 			.timestampPeriod = 1.0f,
@@ -157,7 +157,6 @@ namespace vkd::software
 				.minImageTransferGranularity = {1, 1, 1},
 			}
 		};
-
 		return vkd::PhysicalDevice::Create(owner, physicalDeviceProperties, queueFamilyProperties, allocationCallbacks);
 	}
 
