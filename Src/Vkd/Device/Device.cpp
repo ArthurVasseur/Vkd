@@ -16,6 +16,7 @@
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/Queue/Queue.hpp"
+#include "Vkd/RenderPass/RenderPass.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 
 namespace vkd
@@ -241,6 +242,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateGraphicsPipelines);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateComputePipelines);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipeline);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateRenderPass);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyRenderPass);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
@@ -880,5 +883,41 @@ namespace vkd
 		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
 
 		mem::Delete(pipelineObj->GetAllocationCallbacks(), pipelineObj);
+	}
+
+	VkResult Device::CreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pRenderPass);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto renderPassResult = deviceObj->CreateRenderPass();
+		if (renderPassResult.IsError())
+			return renderPassResult.GetError();
+
+		auto* renderPassObj = std::move(renderPassResult).GetValue();
+		VkResult result = renderPassObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, renderPassObj);
+			return result;
+		}
+
+		*pRenderPass = VKD_TO_HANDLE(VkRenderPass, renderPassObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(RenderPass, renderPassObj, renderPass);
+
+		mem::Delete(renderPassObj->GetAllocationCallbacks(), renderPassObj);
 	}
 } // namespace vkd

@@ -24,6 +24,7 @@ namespace vkd
 	class Image;
 	class DeviceMemory;
 	class Pipeline;
+	class RenderPass;
 
 	class Device : public ObjectBase
 	{
@@ -81,6 +82,9 @@ namespace vkd
 		static VkResult VKAPI_CALL CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines);
 		static void VKAPI_CALL DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator);
 
+		static VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass);
+		static void VKAPI_CALL DestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator);
+
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
 		virtual Result<Fence*, VkResult> CreateFence() = 0;
@@ -88,6 +92,7 @@ namespace vkd
 		virtual Result<Image*, VkResult> CreateImage() = 0;
 		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory() = 0;
 		virtual Result<Pipeline*, VkResult> CreatePipeline() = 0;
+		virtual Result<RenderPass*, VkResult> CreateRenderPass() = 0;
 
 	private:
 		PhysicalDevice* m_owner;
