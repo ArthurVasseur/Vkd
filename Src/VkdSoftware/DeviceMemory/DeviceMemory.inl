@@ -6,12 +6,13 @@
 
 #pragma once
 
-#include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 #include "VkdSoftware/Device/Device.hpp"
+#include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 
 namespace vkd::software
 {
-	inline DeviceMemory::DeviceMemory() : m_allocation{0, 0},
+	inline DeviceMemory::DeviceMemory() :
+		m_allocation{0, 0},
 		m_mapOffset(0)
 	{
 	}
@@ -31,4 +32,4 @@ namespace vkd::software
 		auto* softwareDevice = static_cast<const SoftwareDevice*>(m_owner);
 		return const_cast<SoftwareDevice*>(softwareDevice)->GetAllocator().GetPoolBase() + m_allocation.offset;
 	}
-}
+} // namespace vkd::software

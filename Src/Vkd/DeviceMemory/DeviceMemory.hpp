@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include "Vkd/ObjectBase/ObjectBase.hpp"
+
+#include <vulkan/vulkan.h>
 
 namespace vkd
 {
@@ -40,6 +40,6 @@ namespace vkd
 		UInt32 m_typeIndex;
 		bool m_mapped;
 	};
-}
+} // namespace vkd
 
 #include "DeviceMemory.inl"

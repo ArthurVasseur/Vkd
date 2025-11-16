@@ -8,7 +8,7 @@
 
 #ifdef VKD_DEBUG_CHECKS
 #include <cpptrace/cpptrace.hpp>
-#endif// VKD_DEBUG_CHECKS
+#endif // VKD_DEBUG_CHECKS
 
 #include "Vkd/ObjectBase/ObjectBase.hpp"
 
@@ -47,4 +47,4 @@ namespace vkd
 		CCT_ASSERT(IsValid(), "Error, object '{}' is not in a valid state.\n{}", GetClassName(), cpptrace::generate_trace().to_string());
 #endif // VKD_DEBUG_CHECKS
 	}
-	}
+} // namespace vkd

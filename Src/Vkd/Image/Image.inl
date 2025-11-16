@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "Vkd/Image/Image.hpp"
 #include "Vkd/Device/Device.hpp"
+#include "Vkd/Image/Image.hpp"
 
 namespace vkd
 {
@@ -132,4 +132,4 @@ namespace vkd
 		AssertValid();
 		return m_memory != nullptr;
 	}
-}
+} // namespace vkd

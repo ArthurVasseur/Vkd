@@ -5,9 +5,9 @@
  */
 
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
-#include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
 
 #include "Vkd/Memory/Memory.hpp"
+#include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
 
 namespace vkd::software
 {
@@ -39,4 +39,4 @@ namespace vkd::software
 
 		return reinterpret_cast<DispatchableObject<vkd::CommandBuffer>*>(buffer);
 	}
-}
+} // namespace vkd::software

@@ -26,5 +26,4 @@ namespace vkd
 #endif
 	};
 
-}
-
+} // namespace vkd

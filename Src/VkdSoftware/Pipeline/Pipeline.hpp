@@ -21,4 +21,4 @@ namespace vkd::software
 		VkResult CreateGraphicsPipeline(Device& owner, const VkGraphicsPipelineCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;
 		VkResult CreateComputePipeline(Device& owner, const VkComputePipelineCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;
 	};
-}
+} // namespace vkd::software

@@ -16,4 +16,4 @@ namespace vkd::software
 		m_boundVertexBuffers.clear();
 		m_vertexBufferOffsets.clear();
 	}
-}
+} // namespace vkd::software

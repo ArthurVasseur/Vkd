@@ -3,10 +3,11 @@
 //
 
 #include "VkdUtils/ThreadPool/ThreadPool.hpp"
-#include "VkdUtils/System/System.hpp"
 
 #include <algorithm>
 #include <iostream>
+
+#include "VkdUtils/System/System.hpp"
 
 namespace vkd
 {
@@ -26,9 +27,7 @@ namespace vkd
 		for (unsigned int i = 0; i < numThreads; ++i)
 		{
 			m_workers.emplace_back([this, i](std::stop_token st)
-				{
-					WorkerLoop(st, i + 1);
-				});
+								   { WorkerLoop(st, i + 1); });
 		}
 	}
 
@@ -48,9 +47,7 @@ namespace vkd
 				std::unique_lock lock(m_queueMutex);
 
 				m_queueCv.wait(lock, stopToken, [this]()
-					{
-						return !m_taskQueue.empty() || m_stopRequested.load(std::memory_order_acquire);
-					});
+							   { return !m_taskQueue.empty() || m_stopRequested.load(std::memory_order_acquire); });
 
 				if (stopToken.stop_requested() && m_taskQueue.empty())
 					break;
@@ -101,9 +98,7 @@ namespace vkd
 		std::unique_lock lock(m_waitMutex);
 
 		return m_waitCv.wait_until(lock, deadline, [this]()
-			{
-				return m_tasksInFlight.load(std::memory_order_acquire) == 0;
-			});
+								   { return m_tasksInFlight.load(std::memory_order_acquire) == 0; });
 	}
 
 	bool ThreadPool::WaitFor(std::chrono::milliseconds timeout)

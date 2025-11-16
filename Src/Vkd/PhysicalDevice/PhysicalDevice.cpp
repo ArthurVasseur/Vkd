@@ -5,6 +5,7 @@
  */
 
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
+
 #include "VkdUtils/System/System.hpp"
 
 namespace vkd
@@ -20,7 +21,9 @@ namespace vkd
 	{
 	}
 
-	VkResult PhysicalDevice::Create(Instance& owner, const VkPhysicalDeviceProperties& physicalDeviceProperties, const std::array<VkQueueFamilyProperties, 3>& queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks)
+	VkResult PhysicalDevice::Create(Instance& owner, const VkPhysicalDeviceProperties& physicalDeviceProperties,
+									const std::array<VkQueueFamilyProperties, 3>& queueFamilyProperties,
+									const VkAllocationCallbacks& allocationCallbacks)
 	{
 		m_instance = &owner;
 		m_physicalDeviceProperties = physicalDeviceProperties;
@@ -43,8 +46,8 @@ namespace vkd
 		return m_queueFamilyProperties;
 	}
 
-
-	void PhysicalDevice::GetPhysicalDeviceFeatures(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures* pFeatures)
+	void PhysicalDevice::GetPhysicalDeviceFeatures(VkPhysicalDevice pPhysicalDevice,
+												   VkPhysicalDeviceFeatures* pFeatures)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -61,8 +64,8 @@ namespace vkd
 
 		// Enable basic compute shader support for simple compute pipelines
 		// This is necessary for vkCmdDispatch and compute operations
-		pFeatures->shaderFloat64 = VK_FALSE;  // 64-bit floats not required for basic compute
-		pFeatures->shaderInt64 = VK_FALSE;    // 64-bit integers not required for basic compute
+		pFeatures->shaderFloat64 = VK_FALSE; // 64-bit floats not required for basic compute
+		pFeatures->shaderInt64 = VK_FALSE; // 64-bit integers not required for basic compute
 
 		// All other features remain VK_FALSE:
 		// - No tessellation/geometry shader support (CPU backend)
@@ -73,7 +76,8 @@ namespace vkd
 		// and basic compute shaders for a software-based Vulkan implementation
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceFeatures2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures2* pFeatures)
+	void PhysicalDevice::GetPhysicalDeviceFeatures2(VkPhysicalDevice pPhysicalDevice,
+													VkPhysicalDeviceFeatures2* pFeatures)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -91,17 +95,20 @@ namespace vkd
 			{
 				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES:
 				{
-					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,sizeof(VkPhysicalDeviceVulkan11Features) - sizeof(VkBaseOutStructure));
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,
+								sizeof(VkPhysicalDeviceVulkan11Features) - sizeof(VkBaseOutStructure));
 					break;
 				}
 				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES:
 				{
-					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,sizeof(VkPhysicalDeviceVulkan12Features) - sizeof(VkBaseOutStructure));
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,
+								sizeof(VkPhysicalDeviceVulkan12Features) - sizeof(VkBaseOutStructure));
 					break;
 				}
 				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES:
 				{
-					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,sizeof(VkPhysicalDeviceVulkan13Features) - sizeof(VkBaseOutStructure));
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,
+								sizeof(VkPhysicalDeviceVulkan13Features) - sizeof(VkBaseOutStructure));
 					break;
 				}
 				default:
@@ -111,7 +118,8 @@ namespace vkd
 		}
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkFormatProperties* pFormatProperties)
+	void PhysicalDevice::GetPhysicalDeviceFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format,
+														   VkFormatProperties* pFormatProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -143,8 +151,9 @@ namespace vkd
 	}
 
 	VkResult PhysicalDevice::GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format,
-		VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
-		VkImageFormatProperties* pImageFormatProperties)
+																	VkImageType type, VkImageTiling tiling,
+																	VkImageUsageFlags usage, VkImageCreateFlags flags,
+																	VkImageFormatProperties* pImageFormatProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -160,15 +169,13 @@ namespace vkd
 		// TODO: Implement support for VK_IMAGE_TYPE_2D with VK_IMAGE_TILING_LINEAR
 
 		// Check for unsupported image usage flags
-		const VkImageUsageFlags unsupportedUsageFlags =
-			VK_IMAGE_USAGE_SAMPLED_BIT |
-			VK_IMAGE_USAGE_STORAGE_BIT |
-			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-			VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-			VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-			VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-			VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		const VkImageUsageFlags unsupportedUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
+														VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+														VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+														VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+														VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+														VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+														VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 		if (usage & unsupportedUsageFlags)
 		{
@@ -187,7 +194,8 @@ namespace vkd
 		return VK_ERROR_FORMAT_NOT_SUPPORTED;
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceProperties(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceProperties* pProperties)
+	void PhysicalDevice::GetPhysicalDeviceProperties(VkPhysicalDevice pPhysicalDevice,
+													 VkPhysicalDeviceProperties* pProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -197,7 +205,8 @@ namespace vkd
 		*pProperties = physicalDevice->GetPhysicalDeviceProperties();
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceProperties2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceProperties2* pProperties)
+	void PhysicalDevice::GetPhysicalDeviceProperties2(VkPhysicalDevice pPhysicalDevice,
+													  VkPhysicalDeviceProperties2* pProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -215,17 +224,20 @@ namespace vkd
 			{
 				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES:
 				{
-					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0, sizeof(VkPhysicalDeviceVulkan11Properties) - sizeof(VkBaseOutStructure));
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,
+								sizeof(VkPhysicalDeviceVulkan11Properties) - sizeof(VkBaseOutStructure));
 					break;
 				}
 				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES:
 				{
-					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0, sizeof(VkPhysicalDeviceVulkan12Properties) - sizeof(VkBaseOutStructure));
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,
+								sizeof(VkPhysicalDeviceVulkan12Properties) - sizeof(VkBaseOutStructure));
 					break;
 				}
 				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES:
 				{
-					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0, sizeof(VkPhysicalDeviceVulkan13Properties) - sizeof(VkBaseOutStructure));
+					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,
+								sizeof(VkPhysicalDeviceVulkan13Properties) - sizeof(VkBaseOutStructure));
 					break;
 				}
 				default:
@@ -235,7 +247,9 @@ namespace vkd
 		}
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties)
+	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice pPhysicalDevice,
+																uint32_t* pQueueFamilyPropertyCount,
+																VkQueueFamilyProperties* pQueueFamilyProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -256,7 +270,8 @@ namespace vkd
 		}
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties)
+	void PhysicalDevice::GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice,
+														   VkPhysicalDeviceMemoryProperties* pMemoryProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -280,15 +295,15 @@ namespace vkd
 		// Define the single memory type
 		// HOST_VISIBLE: CPU can map and access this memory
 		// HOST_COHERENT: No explicit cache management needed (simplifies CPU backend)
-		pMemoryProperties->memoryTypes[0].propertyFlags =
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		pMemoryProperties->memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
+														  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+														  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		pMemoryProperties->memoryTypes[0].heapIndex = 0; // References the heap defined above
 	}
 
-	VkResult PhysicalDevice::EnumerateDeviceExtensionProperties(VkPhysicalDevice pPhysicalDevice, const char* pLayerName,
-		uint32_t* pPropertyCount, VkExtensionProperties* pProperties)
+	VkResult PhysicalDevice::EnumerateDeviceExtensionProperties(VkPhysicalDevice pPhysicalDevice,
+																const char* pLayerName, uint32_t* pPropertyCount,
+																VkExtensionProperties* pProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -314,9 +329,11 @@ namespace vkd
 		return VK_SUCCESS;
 	}
 
-	void PhysicalDevice::GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice pPhysicalDevice,
-		VkFormat format, VkImageType type, VkSampleCountFlagBits samples, VkImageUsageFlags usage, VkImageTiling tiling,
-		uint32_t* pPropertyCount, VkSparseImageFormatProperties* pProperties)
+	void PhysicalDevice::GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format,
+																	  VkImageType type, VkSampleCountFlagBits samples,
+																	  VkImageUsageFlags usage, VkImageTiling tiling,
+																	  uint32_t* pPropertyCount,
+																	  VkSparseImageFormatProperties* pProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -335,4 +352,4 @@ namespace vkd
 		auto* dispatchable = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(pPhysicalDevice);
 		mem::DeleteDispatchable(dispatchable);
 	}
-}
+} // namespace vkd

@@ -4,30 +4,30 @@
  * @date 2025-04-23
  */
 
+#include "VkdSoftware/Device/Device.hpp"
+
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
-
-#include "VkdSoftware/Device/Device.hpp"
-#include "VkdSoftware/Queue/Queue.hpp"
-#include "VkdSoftware/CommandPool/CommandPool.hpp"
-#include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
-#include "VkdSoftware/Image/Image.hpp"
+#include "VkdSoftware/CommandPool/CommandPool.hpp"
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
+#include "VkdSoftware/Image/Image.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
+#include "VkdSoftware/Queue/Queue.hpp"
+#include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 #include "VkdUtils/System/System.hpp"
 
 namespace vkd::software
 {
-	SoftwareDevice::SoftwareDevice() : m_allocator([]() -> std::size_t
-	{
+	SoftwareDevice::SoftwareDevice() :
+		m_allocator([]() -> std::size_t
+					{
 		System system;
 		const std::optional<UInt64> availableRam = system.GetAvailableRamBytes();
 		if (availableRam)
 			return static_cast<std::size_t>(System::ComputeDeviceMemoryHeapSize(*availableRam));
 		CCT_ASSERT_FALSE("Could not query system ram, using 256 Mb");
-		return 256ULL * 1024ULL * 1024ULL;
-	}())
+		return 256ULL * 1024ULL * 1024ULL; }())
 	{
 	}
 
@@ -146,4 +146,4 @@ namespace vkd::software
 
 		return pipeline;
 	}
-}
+} // namespace vkd::software

@@ -6,7 +6,7 @@ namespace vkd
 {
 
 	template<typename F>
-		requires std::invocable<std::decay_t<F>>&& std::is_void_v<std::invoke_result_t<std::decay_t<F>>>
+		requires std::invocable<std::decay_t<F>> && std::is_void_v<std::invoke_result_t<std::decay_t<F>>>
 	void ThreadPool::AddTask(F&& f)
 	{
 		if (m_stopRequested.load(std::memory_order_acquire))
@@ -15,20 +15,20 @@ namespace vkd
 		m_tasksInFlight.fetch_add(1, std::memory_order_acq_rel);
 
 		auto wrapped = [func = std::forward<F>(f), this]() mutable
+		{
+			try
 			{
-				try
-				{
-					func();
-				}
-				catch (const std::exception& e)
-				{
-					std::cerr << "[ThreadPool] Task threw exception: " << e.what() << '\n';
-				}
-				catch (...)
-				{
-					std::cerr << "[ThreadPool] Task threw unknown exception" << '\n';
-				}
-			};
+				func();
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "[ThreadPool] Task threw exception: " << e.what() << '\n';
+			}
+			catch (...)
+			{
+				std::cerr << "[ThreadPool] Task threw unknown exception" << '\n';
+			}
+		};
 
 		{
 			std::lock_guard lock(m_queueMutex);
@@ -64,28 +64,30 @@ namespace vkd
 		m_tasksInFlight.fetch_add(1, std::memory_order_acq_rel);
 
 		auto wrapped_task = [promise, func]()
+		{
+			try
+			{
+				if constexpr (std::is_void_v<ReturnType>)
+				{
+					(*func)();
+					promise->set_value();
+				}
+				else
+				{
+					promise->set_value((*func)());
+				}
+			}
+			catch (...)
 			{
 				try
 				{
-					if constexpr (std::is_void_v<ReturnType>)
-					{
-						(*func)();
-						promise->set_value();
-					}
-					else
-					{
-						promise->set_value((*func)());
-					}
+					promise->set_exception(std::current_exception());
 				}
 				catch (...)
 				{
-					try
-					{
-						promise->set_exception(std::current_exception());
-					}
-					catch (...) {}
 				}
-			};
+			}
+		};
 
 		{
 			std::lock_guard lock(m_queueMutex);
@@ -98,7 +100,9 @@ namespace vkd
 				{
 					promise->set_exception(std::make_exception_ptr(std::runtime_error("ThreadPool is shutting down")));
 				}
-				catch (...) {}
+				catch (...)
+				{
+				}
 
 				return result;
 			}

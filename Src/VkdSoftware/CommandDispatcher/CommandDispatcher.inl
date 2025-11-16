@@ -14,4 +14,4 @@ namespace vkd::software
 		m_context(&ctx)
 	{
 	}
-}
+} // namespace vkd::software

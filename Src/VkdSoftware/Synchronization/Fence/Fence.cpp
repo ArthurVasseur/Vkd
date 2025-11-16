@@ -46,12 +46,14 @@ namespace vkd::software
 
 		if (timeout == std::numeric_limits<uint64_t>::max())
 		{
-			m_cv.wait(lock, [this] { return m_signaled; });
+			m_cv.wait(lock, [this]
+					  { return m_signaled; });
 			return VK_SUCCESS;
 		}
 
 		const auto deadline = Clock::now() + std::chrono::nanoseconds(timeout);
-		if (!m_cv.wait_until(lock, deadline, [this] { return m_signaled; }))
+		if (!m_cv.wait_until(lock, deadline, [this]
+							 { return m_signaled; }))
 			return VK_TIMEOUT;
 
 		return VK_SUCCESS;
@@ -75,4 +77,4 @@ namespace vkd::software
 		m_cv.notify_all();
 		return VK_SUCCESS;
 	}
-}
+} // namespace vkd::software

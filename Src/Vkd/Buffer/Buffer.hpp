@@ -8,10 +8,11 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
 #include <vector>
 
 #include "Vkd/ObjectBase/ObjectBase.hpp"
+
+#include <vulkan/vulkan.h>
 
 namespace vkd
 {
@@ -93,6 +94,6 @@ namespace vkd
 		DeviceMemory* m_memory;
 		VkDeviceSize m_memoryOffset;
 	};
-}
+} // namespace vkd
 
 #include "Buffer.inl"

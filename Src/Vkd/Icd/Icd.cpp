@@ -5,8 +5,9 @@
  */
 
 #include "Vkd/Icd/Icd.hpp"
-#include "Vkd/Instance/Instance.hpp"
+
 #include "Vkd/Device/Device.hpp"
+#include "Vkd/Instance/Instance.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 
 namespace vkd
@@ -24,12 +25,12 @@ namespace vkd
 		if (pName == nullptr)
 			return nullptr;
 
-		#define VKD_ENTRYPOINT_LOOKUP(klass, name)	\
-			if (strcmp(pName, "vk" #name) == 0) \
-				return (PFN_vkVoidFunction)static_cast<PFN_vk##name>(klass::name)
-		#define VKD_ENTRYPOINT_LOOKUP_KHR(klass, name)	\
-			if (strcmp(pName, "vk" #name "KHR") == 0)	\
-				return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
+#define VKD_ENTRYPOINT_LOOKUP(klass, name) \
+	if (strcmp(pName, "vk" #name) == 0)    \
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
+#define VKD_ENTRYPOINT_LOOKUP_KHR(klass, name) \
+	if (strcmp(pName, "vk" #name "KHR") == 0)  \
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceExtensionProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceLayerProperties);
@@ -53,21 +54,20 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
 
-		#undef VKD_ENTRYPOINT_LOOKUP
-		#undef VKD_ENTRYPOINT_LOOKUP_KHR
+#undef VKD_ENTRYPOINT_LOOKUP
+#undef VKD_ENTRYPOINT_LOOKUP_KHR
 
-
-		#define VKD_ICD_ENTRYPOINT_LOOKUP(klass, name)	\
-			if (strcmp(pName, "vk_icd" #name) == 0) \
-				return (PFN_vkVoidFunction) klass::name
+#define VKD_ICD_ENTRYPOINT_LOOKUP(klass, name) \
+	if (strcmp(pName, "vk_icd" #name) == 0)    \
+	return (PFN_vkVoidFunction)klass::name
 
 		VKD_ICD_ENTRYPOINT_LOOKUP(vkd::Icd, NegotiateLoaderICDInterfaceVersion);
 		VKD_ICD_ENTRYPOINT_LOOKUP(vkd::Icd, GetInstanceProcAddr);
 		VKD_ICD_ENTRYPOINT_LOOKUP(vkd::Icd, GetPhysicalDeviceProcAddr);
-	#ifdef CCT_PLATFORM_WINDOWS
+#ifdef CCT_PLATFORM_WINDOWS
 		VKD_ICD_ENTRYPOINT_LOOKUP(vkd::Icd, EnumerateAdapterPhysicalDevices);
-	#endif
-	#undef VKD_ICD_ENTRYPOINT_LOOKUP
+#endif
+#undef VKD_ICD_ENTRYPOINT_LOOKUP
 
 #ifdef VKD_DEBUG_CHECKS
 		cct::Logger::Warning("Could not find '{}' function", pName);
@@ -101,12 +101,12 @@ namespace vkd
 		std::size_t swapWith = 0;
 		for (std::size_t i = 0; i < *pPhysicalDeviceCount; ++i)
 		{
-			//auto luid = static_cast<vkd::WddmPhysicalDevice&>(*physicalDevices[i]->Object).GetLuid();
+			// auto luid = static_cast<vkd::WddmPhysicalDevice&>(*physicalDevices[i]->Object).GetLuid();
 			//
-			//if (*reinterpret_cast<UInt64*>(&luid) == *reinterpret_cast<UInt64*>(&adapterLUID))
+			// if (*reinterpret_cast<UInt64*>(&luid) == *reinterpret_cast<UInt64*>(&adapterLUID))
 			//{
 			//	swapWith = i;
-			//}
+			// }
 
 			pPhysicalDevices[i] = VKD_TO_HANDLE(VkPhysicalDevice, physicalDevices[i]);
 		}
@@ -116,4 +116,4 @@ namespace vkd
 		return VK_SUCCESS;
 	}
 #endif
-}
+} // namespace vkd

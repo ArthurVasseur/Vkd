@@ -9,7 +9,7 @@
 #ifndef VKD_SOFTWARE_DEFINE_HPP
 #define VKD_SOFTWARE_DEFINE_HPP
 
-#include <Concerto/Core/Types/Types.hpp>
 #include <Concerto/Core/Assert.hpp>
+#include <Concerto/Core/Types/Types.hpp>
 
 #endif // VKD_SOFTWARE_DEFINE_HPP

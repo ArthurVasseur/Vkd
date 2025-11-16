@@ -8,9 +8,10 @@
 
 #pragma once
 
-#include "Vkd/Queue/Queue.hpp"
 #include <future>
 #include <mutex>
+
+#include "Vkd/Queue/Queue.hpp"
 
 namespace vkd::software
 {
@@ -32,4 +33,4 @@ namespace vkd::software
 		std::future<bool> m_previousSubmit;
 		std::mutex m_submitMutex;
 	};
-}
+} // namespace vkd::software

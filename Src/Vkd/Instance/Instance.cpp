@@ -4,9 +4,10 @@
  * @date 2025-04-23
  */
 
+#include "Vkd/Instance/Instance.hpp"
+
 #include <mimalloc.h>
 
-#include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Icd/Icd.hpp"
 #include "VkdSoftware/PhysicalDevice/PhysicalDevice.hpp"
 
@@ -18,8 +19,7 @@ namespace vkd
 		.pfnReallocation = ReallocationFunction,
 		.pfnFree = FreeFunction,
 		.pfnInternalAllocation = nullptr,
-		.pfnInternalFree = nullptr
-	};
+		.pfnInternalFree = nullptr};
 
 	Instance::Instance() :
 		ObjectBase(ObjectType),
@@ -49,11 +49,11 @@ namespace vkd
 			return VK_SUCCESS;
 		}
 
-		//std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
-		//for (std::size_t i = 0; i < max; ++i)
+		// std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
+		// for (std::size_t i = 0; i < max; ++i)
 		//	pProperties[i] = s_supportedExtensions[i];
 
-		//if (max < s_supportedExtensions.size())
+		// if (max < s_supportedExtensions.size())
 		//	return VK_INCOMPLETE;
 
 		return VK_SUCCESS;
@@ -89,7 +89,6 @@ namespace vkd
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
 
 		instance->Object->Create(*pAllocator);
-		
 
 		auto result = instance->Object->EnumeratePlatformPhysicalDevices(); // Force physical device enumeration
 		if (result != VK_SUCCESS)
@@ -212,4 +211,4 @@ namespace vkd
 
 		mi_free(pMemory);
 	}
-}
+} // namespace vkd

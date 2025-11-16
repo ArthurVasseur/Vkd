@@ -8,15 +8,15 @@
 #include <chrono>
 #include <thread>
 
-#include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
-#include "Vkd/Queue/Queue.hpp"
-#include "Vkd/CommandPool/CommandPool.hpp"
-#include "Vkd/CommandBuffer/CommandBuffer.hpp"
-#include "Vkd/Synchronization/Fence/Fence.hpp"
 #include "Vkd/Buffer/Buffer.hpp"
-#include "Vkd/Image/Image.hpp"
+#include "Vkd/CommandBuffer/CommandBuffer.hpp"
+#include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
+#include "Vkd/Image/Image.hpp"
+#include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
+#include "Vkd/Queue/Queue.hpp"
+#include "Vkd/Synchronization/Fence/Fence.hpp"
 
 namespace vkd
 {
@@ -47,7 +47,7 @@ namespace vkd
 
 #ifdef VKD_DEBUG_CHECKS
 		m_createResult = VK_SUCCESS; // avoid false positive in AssertValid()
-#endif //VKD_DEBUG_CHECKS
+#endif // VKD_DEBUG_CHECKS
 
 		m_createResult = CreateQueues(pDeviceCreateInfo);
 		return m_createResult;
@@ -127,7 +127,7 @@ namespace vkd
 		if (queueIndex >= familyQueues.size())
 		{
 			CCT_ASSERT_FALSE("GetQueue: queueIndex '{}' out of range (size '{}') for family '{}'",
-				queueIndex, familyQueues.size(), queueFamilyIndex);
+							 queueIndex, familyQueues.size(), queueFamilyIndex);
 			return nullptr;
 		}
 
@@ -147,7 +147,7 @@ namespace vkd
 		if (queueIndex >= familyQueues.size())
 		{
 			CCT_ASSERT_FALSE("GetQueue: queueIndex '{}' out of range (size '{}') for family '{}'",
-				queueIndex, familyQueues.size(), queueFamilyIndex);
+							 queueIndex, familyQueues.size(), queueFamilyIndex);
 			return nullptr;
 		}
 
@@ -159,7 +159,7 @@ namespace vkd
 		if (queue->Object->GetFlags() != flags)
 		{
 			CCT_ASSERT_FALSE("GetQueue: queue at family '{}' index '{}' has flags '{}' but requested flags '{}'",
-				queueFamilyIndex, queueIndex, queue->Object->GetFlags(), flags);
+							 queueFamilyIndex, queueIndex, queue->Object->GetFlags(), flags);
 			return nullptr;
 		}
 
@@ -207,9 +207,9 @@ namespace vkd
 		if (pName == nullptr)
 			return nullptr;
 
-#define VKD_ENTRYPOINT_LOOKUP(klass, name)	\
-	if (strcmp(pName, "vk" #name) == 0) \
-		return (PFN_vkVoidFunction)static_cast<PFN_vk##name>(klass::name)
+#define VKD_ENTRYPOINT_LOOKUP(klass, name) \
+	if (strcmp(pName, "vk" #name) == 0)    \
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyDevice);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
@@ -356,7 +356,6 @@ namespace vkd
 		VKD_CHECK(pAllocateInfo && pCommandBuffers);
 		VKD_FROM_HANDLE(CommandPool, poolObj, pAllocateInfo->commandPool);
 
-
 		// Allocate command buffers from the pool
 		for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; ++i)
 		{
@@ -484,8 +483,8 @@ namespace vkd
 				while (true)
 				{
 					const uint64_t remainingNs = (deadline == Clock::time_point::max())
-						? std::numeric_limits<uint64_t>::max()
-						: static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(deadline - Clock::now()).count());
+													 ? std::numeric_limits<uint64_t>::max()
+													 : static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(deadline - Clock::now()).count());
 
 					if (!infinite && Clock::now() >= deadline)
 						return VK_TIMEOUT;
@@ -515,8 +514,10 @@ namespace vkd
 					return VK_ERROR_DEVICE_LOST;
 				}
 				VkResult r = fenceObj->Wait(0);
-				if (r == VK_SUCCESS) return VK_SUCCESS;
-				if (r != VK_TIMEOUT) return r;
+				if (r == VK_SUCCESS)
+					return VK_SUCCESS;
+				if (r != VK_TIMEOUT)
+					return r;
 			}
 			return VK_TIMEOUT;
 		}
@@ -533,8 +534,10 @@ namespace vkd
 				}
 
 				VkResult r = fenceObj->Wait(0);
-				if (r == VK_SUCCESS) return VK_SUCCESS;
-				if (r != VK_TIMEOUT) return r;
+				if (r == VK_SUCCESS)
+					return VK_SUCCESS;
+				if (r != VK_TIMEOUT)
+					return r;
 			}
 
 			if (!infinite && Clock::now() >= deadline)
@@ -878,4 +881,4 @@ namespace vkd
 
 		mem::Delete(pipelineObj->GetAllocationCallbacks(), pipelineObj);
 	}
-}
+} // namespace vkd

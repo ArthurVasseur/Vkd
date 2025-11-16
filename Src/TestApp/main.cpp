@@ -8,20 +8,30 @@
 
 #define VOLK_IMPLEMENTATION
 
-#include <vulkan/vulkan.h>
-#include <Concerto/Core/DynLib/DynLib.hpp>
-#include <Concerto/Core/Logger/Logger.hpp>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
-#include <array>
-#include <vector>
 #include <cstring>
 #include <iostream>
-#include <volk.h>
 #include <thread>
+#include <vector>
+#include <volk.h>
 
-#define VK_CHECK(x) do { VkResult err = (x); if (err != VK_SUCCESS) { \
-    cct::Logger::Error("VK_CHECK failed at {}:{} -> {}", __FILE__, __LINE__, static_cast<int>(err)); std::abort(); } } while(0)
+#include <Concerto/Core/DynLib/DynLib.hpp>
+#include <Concerto/Core/Logger/Logger.hpp>
+
+#include <vulkan/vulkan.h>
+
+#define VK_CHECK(x)                                                                                          \
+	do                                                                                                       \
+	{                                                                                                        \
+		VkResult err = (x);                                                                                  \
+		if (err != VK_SUCCESS)                                                                               \
+		{                                                                                                    \
+			cct::Logger::Error("VK_CHECK failed at {}:{} -> {}", __FILE__, __LINE__, static_cast<int>(err)); \
+			std::abort();                                                                                    \
+		}                                                                                                    \
+	} while (0)
 
 static uint32_t findQueueFamily(VkPhysicalDevice pd)
 {
@@ -51,7 +61,8 @@ static uint32_t findMemoryType(VkPhysicalDevice pd, uint32_t typeBits, VkMemoryP
 	}
 	for (uint32_t i = 0; i < mp.memoryTypeCount; ++i)
 	{
-		if (typeBits & (1u << i)) return i;
+		if (typeBits & (1u << i))
+			return i;
 	}
 	return 0;
 }
@@ -59,18 +70,18 @@ static uint32_t findMemoryType(VkPhysicalDevice pd, uint32_t typeBits, VkMemoryP
 int main()
 {
 	volkInitialize();
-	VkApplicationInfo app{ VK_STRUCTURE_TYPE_APPLICATION_INFO };
+	VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
 	app.pApplicationName = "Vkd MVP Test";
 	app.apiVersion = VK_API_VERSION_1_1;
 
 	cct::DynLib driver;
 	if (driver.Load(
-		"./"
-		#ifdef CCT_PLATFORM_POSIX
-		"lib"
-		#endif
-		"vkd-Software" CONCERTO_DYNLIB_EXTENSION) == false)
-			return EXIT_FAILURE;
+			"./"
+#ifdef CCT_PLATFORM_POSIX
+			"lib"
+#endif
+			"vkd-Software" CONCERTO_DYNLIB_EXTENSION) == false)
+		return EXIT_FAILURE;
 
 	VkDirectDriverLoadingInfoLUNARG directLoadingInfo = {};
 	directLoadingInfo.sType = VK_STRUCTURE_TYPE_DIRECT_DRIVER_LOADING_INFO_LUNARG;
@@ -82,7 +93,7 @@ int main()
 	directDriverList.driverCount = 1;
 	directDriverList.pDrivers = &directLoadingInfo;
 
-	constexpr std::array<const char*, 1> extensions = { VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME };
+	constexpr std::array<const char*, 1> extensions = {VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME};
 
 	VkInstanceCreateInfo instanceCreateInfo = {};
 	instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -107,12 +118,12 @@ int main()
 
 	uint32_t qFamily = findQueueFamily(pysicalDevice);
 	float priority = 1.0f;
-	VkDeviceQueueCreateInfo deviceQueueCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+	VkDeviceQueueCreateInfo deviceQueueCreateInfo{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
 	deviceQueueCreateInfo.queueFamilyIndex = qFamily;
 	deviceQueueCreateInfo.queueCount = 1;
 	deviceQueueCreateInfo.pQueuePriorities = &priority;
 
-	VkDeviceCreateInfo dci{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+	VkDeviceCreateInfo dci{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
 	dci.queueCreateInfoCount = 1;
 	dci.pQueueCreateInfos = &deviceQueueCreateInfo;
 
@@ -123,14 +134,14 @@ int main()
 	VkQueue queue = VK_NULL_HANDLE;
 	vkGetDeviceQueue(device, qFamily, 0, &queue);
 
-	VkCommandPoolCreateInfo cpci{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+	VkCommandPoolCreateInfo cpci{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
 	cpci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	cpci.queueFamilyIndex = qFamily;
 
 	VkCommandPool pool = VK_NULL_HANDLE;
 	VK_CHECK(vkCreateCommandPool(device, &cpci, nullptr, &pool));
 
-	VkCommandBufferAllocateInfo cbai{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+	VkCommandBufferAllocateInfo cbai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
 	cbai.commandPool = pool;
 	cbai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	cbai.commandBufferCount = 1;
@@ -142,7 +153,7 @@ int main()
 
 	auto createBuffer = [&](VkBuffer& buf)
 	{
-		VkBufferCreateInfo bci{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+		VkBufferCreateInfo bci{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
 		bci.size = BufferSize;
 		bci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -157,7 +168,7 @@ int main()
 	{
 		VkMemoryRequirements req{};
 		vkGetBufferMemoryRequirements(device, buf, &req);
-		VkMemoryAllocateInfo mai{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+		VkMemoryAllocateInfo mai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
 		mai.allocationSize = req.size;
 		uint32_t typeIndex = findMemoryType(pysicalDevice, req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		mai.memoryTypeIndex = typeIndex;
@@ -170,7 +181,7 @@ int main()
 	allocAndBind(bufA, memA);
 	allocAndBind(bufB, memB);
 
-	VkCommandBufferBeginInfo cmdBufferBeginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	VkCommandBufferBeginInfo cmdBufferBeginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
 	VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBufferBeginInfo));
 	{
 		vkCmdFillBuffer(cmd, bufA, 0, BufferSize, 0x7F);
@@ -184,12 +195,12 @@ int main()
 		std::vector<cct::UInt32> updateData(16, 0xDEADBEEF);
 		vkCmdUpdateBuffer(cmd, bufB, 0, updateData.size() * sizeof(cct::UInt32), updateData.data());
 
-		VkBufferCopy2 region2{ VK_STRUCTURE_TYPE_BUFFER_COPY_2 };
+		VkBufferCopy2 region2{VK_STRUCTURE_TYPE_BUFFER_COPY_2};
 		region2.srcOffset = 0;
 		region2.dstOffset = BufferSize / 2;
 		region2.size = BufferSize / 2;
 
-		VkCopyBufferInfo2 copyInfo2{ VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2 };
+		VkCopyBufferInfo2 copyInfo2{VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2};
 		copyInfo2.srcBuffer = bufB;
 		copyInfo2.dstBuffer = bufA;
 		copyInfo2.regionCount = 1;
@@ -198,12 +209,11 @@ int main()
 	}
 	VK_CHECK(vkEndCommandBuffer(cmd));
 
-
-	VkFenceCreateInfo fci{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+	VkFenceCreateInfo fci{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
 	VkFence fence = VK_NULL_HANDLE;
 	VK_CHECK(vkCreateFence(device, &fci, nullptr, &fence));
 
-	VkSubmitInfo si{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};
 	si.commandBufferCount = 1;
 	si.pCommandBuffers = &cmd;
 
@@ -283,10 +293,10 @@ int main()
 	cct::Logger::Info("All buffer tests completed successfully!");
 
 	cct::Logger::Info("Starting image tests...");
-	VkImageCreateInfo ici{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	VkImageCreateInfo ici{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
 	ici.imageType = VK_IMAGE_TYPE_2D;
 	ici.format = VK_FORMAT_R8G8B8A8_UNORM;
-	ici.extent = { 16, 16, 1 };
+	ici.extent = {16, 16, 1};
 	ici.mipLevels = 1;
 	ici.arrayLayers = 1;
 	ici.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -304,7 +314,7 @@ int main()
 	{
 		VkMemoryRequirements req{};
 		vkGetImageMemoryRequirements(device, img, &req);
-		VkMemoryAllocateInfo mai{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+		VkMemoryAllocateInfo mai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
 		mai.allocationSize = req.size;
 		uint32_t typeIndex = findMemoryType(pysicalDevice, req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		mai.memoryTypeIndex = typeIndex;
@@ -319,7 +329,7 @@ int main()
 
 	constexpr VkDeviceSize ImageBufferSize = 16 * 16 * 4;
 	VkBuffer bufImage = VK_NULL_HANDLE;
-	VkBufferCreateInfo bciImage{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+	VkBufferCreateInfo bciImage{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
 	bciImage.size = ImageBufferSize;
 	bciImage.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	bciImage.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -363,8 +373,8 @@ int main()
 		copyRegion.imageSubresource.mipLevel = 0;
 		copyRegion.imageSubresource.baseArrayLayer = 0;
 		copyRegion.imageSubresource.layerCount = 1;
-		copyRegion.imageOffset = { 0, 0, 0 };
-		copyRegion.imageExtent = { 16, 16, 1 };
+		copyRegion.imageOffset = {0, 0, 0};
+		copyRegion.imageExtent = {16, 16, 1};
 
 		vkCmdCopyBufferToImage(cmdImage, bufImage, imageB, VK_IMAGE_LAYOUT_GENERAL, 1, &copyRegion);
 
@@ -373,13 +383,13 @@ int main()
 		imageCopyRegion.srcSubresource.mipLevel = 0;
 		imageCopyRegion.srcSubresource.baseArrayLayer = 0;
 		imageCopyRegion.srcSubresource.layerCount = 1;
-		imageCopyRegion.srcOffset = { 0, 0, 0 };
+		imageCopyRegion.srcOffset = {0, 0, 0};
 		imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		imageCopyRegion.dstSubresource.mipLevel = 0;
 		imageCopyRegion.dstSubresource.baseArrayLayer = 0;
 		imageCopyRegion.dstSubresource.layerCount = 1;
-		imageCopyRegion.dstOffset = { 0, 0, 0 };
-		imageCopyRegion.extent = { 8, 8, 1 };
+		imageCopyRegion.dstOffset = {0, 0, 0};
+		imageCopyRegion.extent = {8, 8, 1};
 
 		vkCmdCopyImage(cmdImage, imageA, VK_IMAGE_LAYOUT_GENERAL, imageB, VK_IMAGE_LAYOUT_GENERAL, 1, &imageCopyRegion);
 	}
@@ -402,8 +412,8 @@ int main()
 		copyRegion.imageSubresource.mipLevel = 0;
 		copyRegion.imageSubresource.baseArrayLayer = 0;
 		copyRegion.imageSubresource.layerCount = 1;
-		copyRegion.imageOffset = { 0, 0, 0 };
-		copyRegion.imageExtent = { 16, 16, 1 };
+		copyRegion.imageOffset = {0, 0, 0};
+		copyRegion.imageExtent = {16, 16, 1};
 		vkCmdCopyImageToBuffer(cmdImageCopy, imageB, VK_IMAGE_LAYOUT_GENERAL, bufImageResult, 1, &copyRegion);
 	}
 	VK_CHECK(vkEndCommandBuffer(cmdImageCopy));
@@ -411,7 +421,7 @@ int main()
 	VkFence fenceImage = VK_NULL_HANDLE;
 	VK_CHECK(vkCreateFence(device, &fci, nullptr, &fenceImage));
 
-	VkSubmitInfo siImage{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	VkSubmitInfo siImage{VK_STRUCTURE_TYPE_SUBMIT_INFO};
 	siImage.commandBufferCount = 1;
 	siImage.pCommandBuffers = &cmdImage;
 	VK_CHECK(vkQueueSubmit(queue, 1, &siImage, fenceImage));
@@ -438,14 +448,16 @@ int main()
 				break;
 			}
 		}
-		if (totalErrors > 0) break;
+		if (totalErrors > 0)
+			break;
 	}
 
 	for (size_t y = 0; y < 16; ++y)
 	{
 		for (size_t x = 8; x < 16; ++x)
 		{
-			if (y < 8) continue;
+			if (y < 8)
+				continue;
 			size_t idx = y * 16 + x;
 			if (resultData[idx] != 0xAABBCCDD)
 			{
@@ -454,7 +466,8 @@ int main()
 				break;
 			}
 		}
-		if (totalErrors > 0) break;
+		if (totalErrors > 0)
+			break;
 	}
 
 	vkUnmapMemory(device, memBufImageResult);

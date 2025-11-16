@@ -64,6 +64,5 @@ namespace vkd
 		OpDrawIndexed,
 		OpDrawIndirect,
 		OpDrawIndexedIndirect,
-		OpBindPipeline
-	>;
-}
+		OpBindPipeline>;
+} // namespace vkd

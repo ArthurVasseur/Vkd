@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "Vkd/Queue/Queue.hpp"
 #include "Vkd/Device/Device.hpp"
+#include "Vkd/Queue/Queue.hpp"
 
 namespace vkd
 {
@@ -56,4 +56,4 @@ namespace vkd
 		AssertValid();
 		return m_flags;
 	}
-}
+} // namespace vkd

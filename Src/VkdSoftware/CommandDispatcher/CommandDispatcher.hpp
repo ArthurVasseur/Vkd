@@ -41,6 +41,6 @@ namespace vkd::software
 
 		CpuContext* m_context;
 	};
-}
+} // namespace vkd::software
 
 #include "VkdSoftware/CommandDispatcher/CommandDispatcher.inl"
