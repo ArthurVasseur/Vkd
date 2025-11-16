@@ -48,4 +48,4 @@ namespace vkd
 		AssertValid();
 		return m_queueFamilyIndex;
 	}
-}
+} // namespace vkd

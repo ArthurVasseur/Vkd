@@ -10,12 +10,14 @@
 #define NOMINMAX
 #include <windows.h>
 #elif defined(CCT_PLATFORM_LINUX)
+#include <pthread.h>
+
 #include <sys/sysinfo.h>
-#include <pthread.h>
 #elif defined(CCT_PLATFORM_FREEBSD) || defined(CCT_PLATFORM_MACOS)
-#include <sys/types.h>
-#include <sys/sysctl.h>
 #include <pthread.h>
+
+#include <sys/sysctl.h>
+#include <sys/types.h>
 #endif
 
 namespace vkd
@@ -80,7 +82,7 @@ namespace vkd
 #endif
 		}
 
-	}
+	} // namespace
 	UInt64 System::GetTotalRamBytes()
 	{
 		if (!m_totalRamBytes.has_value())
@@ -135,4 +137,4 @@ namespace vkd
 		pthread_set_name_np(pthread_self(), name.c_str());
 #endif
 	}
-}
+} // namespace vkd

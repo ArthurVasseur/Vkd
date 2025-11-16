@@ -9,6 +9,7 @@
 
 #pragma once
 #include <Concerto/Core/Result/Result.hpp>
+
 #include "Vkd/Defines.hpp"
 
 namespace vkd
@@ -31,12 +32,13 @@ namespace vkd
 
 		inline void AssertValid() const;
 #ifdef VKD_DEBUG_CHECKS
-	  virtual std::string_view GetClassName() const = 0;
+		virtual std::string_view GetClassName() const = 0;
 #endif // VKD_DEBUG_CHECKS
 
 	private:
 		const VkAllocationCallbacks* m_allocationCallbacks;
 		VkObjectType m_objectType;
+
 	protected:
 		VkResult m_createResult;
 	};
@@ -50,9 +52,9 @@ namespace vkd
 
 	template<typename T>
 	using DispatchableObjectResult = cct::Result<DispatchableObject<T>*, VkResult>;
-}
+} // namespace vkd
 
 #include "Vkd/ObjectBase/ObjectBase.inl"
 
-//Do not remove this include:
+// Do not remove this include:
 #include "Vkd/Memory/Memory.hpp"

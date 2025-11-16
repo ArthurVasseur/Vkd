@@ -10,9 +10,9 @@
 
 namespace vkd::utils
 {
-	inline System::System()
-		: m_totalRamBytes(std::nullopt)
-		, m_availableRamBytes(std::nullopt)
+	inline System::System() :
+		m_totalRamBytes(std::nullopt),
+		m_availableRamBytes(std::nullopt)
 	{
 	}
 
@@ -21,4 +21,4 @@ namespace vkd::utils
 		m_totalRamBytes.reset();
 		m_availableRamBytes.reset();
 	}
-}
+} // namespace vkd::utils

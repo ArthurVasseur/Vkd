@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include "Vkd/ObjectBase/ObjectBase.hpp"
+
+#include <vulkan/vulkan.h>
 
 namespace vkd
 {
@@ -35,7 +35,7 @@ namespace vkd
 		// Vulkan API entry points
 		static VkResult VKAPI_CALL QueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence);
 		static VkResult VKAPI_CALL QueueWaitIdle(VkQueue queue);
-		static VkResult VKAPI_CALL QueueBindSparse(VkQueue queue, uint32_t bindInfoCount,const VkBindSparseInfo* pBindInfo, VkFence fence);
+		static VkResult VKAPI_CALL QueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence);
 
 	protected:
 		virtual VkResult Submit(uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence) = 0;
@@ -48,6 +48,6 @@ namespace vkd
 		UInt32 m_queueIndex;
 		VkDeviceQueueCreateFlags m_flags;
 	};
-}
+} // namespace vkd
 
 #include "Queue.inl"

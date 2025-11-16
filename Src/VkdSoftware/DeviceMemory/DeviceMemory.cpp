@@ -5,6 +5,7 @@
  */
 
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
+
 #include "VkdSoftware/Device/Device.hpp"
 
 namespace vkd::software
@@ -55,4 +56,4 @@ namespace vkd::software
 
 		m_mapOffset = 0;
 	}
-}
+} // namespace vkd::software

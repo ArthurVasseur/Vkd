@@ -81,4 +81,4 @@ namespace vkd
 		AssertValid();
 		return m_memory != nullptr;
 	}
-}
+} // namespace vkd

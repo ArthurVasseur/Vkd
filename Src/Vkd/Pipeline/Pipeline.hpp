@@ -8,8 +8,9 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
 #include "Vkd/ObjectBase/ObjectBase.hpp"
+
+#include <vulkan/vulkan.h>
 
 namespace vkd
 {
@@ -36,6 +37,6 @@ namespace vkd
 		VkPipelineBindPoint m_bindPoint;
 		VkPipelineLayout m_layout;
 	};
-}
+} // namespace vkd
 
 #include "Pipeline.inl"

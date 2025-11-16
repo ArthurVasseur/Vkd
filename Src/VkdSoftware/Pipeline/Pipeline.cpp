@@ -5,6 +5,7 @@
  */
 
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
+
 #include "Vkd/Device/Device.hpp"
 
 namespace vkd::software
@@ -32,4 +33,4 @@ namespace vkd::software
 
 		return VK_SUCCESS;
 	}
-}
+} // namespace vkd::software

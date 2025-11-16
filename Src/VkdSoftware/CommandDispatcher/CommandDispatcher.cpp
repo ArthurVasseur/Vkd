@@ -19,9 +19,7 @@ namespace vkd::software
 		for (const auto& op : ops)
 		{
 			VkResult result = std::visit([this]<typename T>(T operation)
-			{
-				return (*this)(std::move(operation));
-			}, op);
+										 { return (*this)(std::move(operation)); }, op);
 
 			if (result != VK_SUCCESS)
 				return result;
@@ -102,4 +100,4 @@ namespace vkd::software
 	{
 		return m_context->BindPipeline(std::move(op));
 	}
-}
+} // namespace vkd::software

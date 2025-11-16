@@ -32,6 +32,6 @@ namespace vkd::software
 		vkd::Allocation m_allocation;
 		std::size_t m_mapOffset;
 	};
-}
+} // namespace vkd::software
 
 #include "DeviceMemory.inl"

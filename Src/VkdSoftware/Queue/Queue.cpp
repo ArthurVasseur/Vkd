@@ -4,11 +4,12 @@
  * @date 2025-10-27
  */
 
-#include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Queue/Queue.hpp"
+
 #include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
 #include "VkdSoftware/CommandDispatcher/CommandDispatcher.hpp"
 #include "VkdSoftware/CpuContext/CpuContext.hpp"
+#include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 
 namespace vkd::software
@@ -38,7 +39,7 @@ namespace vkd::software
 		auto previousSubmit = std::move(m_previousSubmit);
 
 		m_previousSubmit = threadPool.Submit([cmdBuffers, fence, previousSubmit = std::move(previousSubmit)]() mutable -> bool
-		{
+											 {
 			// Wait for the previous submit to complete before starting the new one
 			if (previousSubmit.valid())
 			{
@@ -57,8 +58,7 @@ namespace vkd::software
 				VKD_FROM_HANDLE(vkd::Fence, fenceObj, fence);
 				fenceObj->Signal();
 			}
-			return true;
-		});
+			return true; });
 
 		return VK_SUCCESS;
 	}
@@ -85,4 +85,4 @@ namespace vkd::software
 		// Sparse binding is an optional feature, not implemented for software queue
 		return VK_ERROR_FEATURE_NOT_PRESENT;
 	}
-}
+} // namespace vkd::software

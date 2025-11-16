@@ -5,6 +5,7 @@
  */
 
 #include "Vkd/Queue/Queue.hpp"
+
 #include "Vkd/Device/Device.hpp"
 
 namespace vkd
@@ -50,4 +51,4 @@ namespace vkd
 
 		return queueObj->BindSparse(bindInfoCount, pBindInfo, fence);
 	}
-}
+} // namespace vkd

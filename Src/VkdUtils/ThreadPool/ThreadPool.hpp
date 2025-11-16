@@ -6,8 +6,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <concepts>
+#include <condition_variable>
 #include <deque>
 #include <functional>
 #include <future>
@@ -42,7 +42,7 @@ namespace vkd
 		 * @note This method is thread-safe. Tasks are not accepted after RequestStop().
 		 */
 		template<typename F>
-			requires std::invocable<std::decay_t<F>>&& std::is_void_v<std::invoke_result_t<std::decay_t<F>>>
+			requires std::invocable<std::decay_t<F>> && std::is_void_v<std::invoke_result_t<std::decay_t<F>>>
 		void AddTask(F&& f);
 
 		/**
@@ -97,12 +97,12 @@ namespace vkd
 		std::condition_variable_any m_queueCv;
 
 		// Wait synchronization
-		std::atomic<size_t> m_tasksInFlight{ 0 };
+		std::atomic<size_t> m_tasksInFlight{0};
 		std::condition_variable m_waitCv;
 		std::mutex m_waitMutex;
 
 		// State
-		std::atomic<bool> m_stopRequested{ false };
+		std::atomic<bool> m_stopRequested{false};
 	};
 
 } // namespace vkd

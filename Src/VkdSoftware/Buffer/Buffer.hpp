@@ -18,4 +18,4 @@ namespace vkd::software
 		Buffer() = default;
 		~Buffer() override = default;
 	};
-}
+} // namespace vkd::software

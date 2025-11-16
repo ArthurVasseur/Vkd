@@ -16,4 +16,4 @@ namespace vkd::software
 		m_bound(false)
 	{
 	}
-}
+} // namespace vkd::software

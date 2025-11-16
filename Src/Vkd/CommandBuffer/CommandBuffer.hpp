@@ -9,12 +9,13 @@
 #pragma once
 
 #include <span>
-#include <vulkan/vulkan.h>
 
-#include "Vkd/ObjectBase/ObjectBase.hpp"
 #include "Vkd/Buffer/Buffer.hpp"
-#include "Vkd/Image/Image.hpp"
 #include "Vkd/CommandBuffer/Ops.hpp"
+#include "Vkd/Image/Image.hpp"
+#include "Vkd/ObjectBase/ObjectBase.hpp"
+
+#include <vulkan/vulkan.h>
 
 namespace vkd
 {
@@ -85,12 +86,13 @@ namespace vkd
 
 	protected:
 		inline VkResult Transition(State to, std::initializer_list<State> allowed);
+
 	private:
 		CommandPool* m_owner;
 		VkCommandBufferLevel m_level;
 		State m_state;
 		std::vector<Op> m_ops;
 	};
-}
+} // namespace vkd
 
 #include "Vkd/CommandBuffer/CommandBuffer.inl"

@@ -128,4 +128,4 @@ namespace vkd
 
 		commandBufferObj->PushDraw(vertexCount, instanceCount, firstVertex, firstInstance);
 	}
-}
+} // namespace vkd

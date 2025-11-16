@@ -10,9 +10,10 @@
 #pragma once
 
 #include <vector>
+
 #include "Vkd/Buffer/Buffer.hpp"
-#include "Vkd/Image/Image.hpp"
 #include "Vkd/CommandBuffer/Ops.hpp"
+#include "Vkd/Image/Image.hpp"
 
 namespace vkd::software
 {
@@ -43,6 +44,6 @@ namespace vkd::software
 		std::vector<Buffer*> m_boundVertexBuffers;
 		std::vector<VkDeviceSize> m_vertexBufferOffsets;
 	};
-}
+} // namespace vkd::software
 
 #include "VkdSoftware/CpuContext/CpuContext.inl"

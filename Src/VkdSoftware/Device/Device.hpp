@@ -9,8 +9,8 @@
 #pragma once
 
 #include "Vkd/Device/Device.hpp"
-#include "VkdUtils/ThreadPool/ThreadPool.hpp"
 #include "VkdUtils/Allocator/Allocator.hpp"
+#include "VkdUtils/ThreadPool/ThreadPool.hpp"
 
 namespace vkd::software
 {
@@ -32,8 +32,9 @@ namespace vkd::software
 		Result<vkd::Image*, VkResult> CreateImage() override;
 		Result<vkd::DeviceMemory*, VkResult> CreateDeviceMemory() override;
 		Result<vkd::Pipeline*, VkResult> CreatePipeline() override;
+
 	private:
 		ThreadPool m_threadPool;
 		Allocator m_allocator;
 	};
-}
+} // namespace vkd::software

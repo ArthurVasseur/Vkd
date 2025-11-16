@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/Device/Device.hpp"
+#include "Vkd/DeviceMemory/DeviceMemory.hpp"
 
 namespace vkd
 {
@@ -55,4 +55,4 @@ namespace vkd
 		AssertValid();
 		return m_mapped;
 	}
-}
+} // namespace vkd

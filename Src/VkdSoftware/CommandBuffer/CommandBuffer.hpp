@@ -18,6 +18,6 @@ namespace vkd::software
 		CommandBuffer() = default;
 		~CommandBuffer() override = default;
 	};
-}
+} // namespace vkd::software
 
 #include "VkdSoftware/CommandBuffer/CommandBuffer.inl"

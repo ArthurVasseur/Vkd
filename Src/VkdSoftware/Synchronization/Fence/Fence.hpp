@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
 
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 
@@ -35,4 +35,4 @@ namespace vkd::software
 		std::condition_variable m_cv;
 		bool m_signaled;
 	};
-}
+} // namespace vkd::software

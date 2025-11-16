@@ -5,6 +5,7 @@
  */
 
 #include "VkdSoftware/PhysicalDevice/PhysicalDevice.hpp"
+
 #include "VkdSoftware/Device/Device.hpp"
 
 namespace vkd::software
@@ -133,30 +134,24 @@ namespace vkd::software
 		std::memcpy(physicalDeviceProperties.deviceName, deviceName.data(), deviceName.size());
 		physicalDeviceProperties.sparseProperties = {};
 
-
 		std::array queueFamilyProperties = {
-			VkQueueFamilyProperties
-			{
+			VkQueueFamilyProperties{
 				.queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT,
 				.queueCount = 1,
 				.timestampValidBits = 0,
-				.minImageTransferGranularity = {1, 1, 1}
-			},
-			VkQueueFamilyProperties
-			{
+				.minImageTransferGranularity = {1, 1, 1}},
+			VkQueueFamilyProperties{
 				.queueFlags = VK_QUEUE_GRAPHICS_BIT,
 				.queueCount = 1,
 				.timestampValidBits = 0,
 				.minImageTransferGranularity = {1, 1, 1},
 			},
-			VkQueueFamilyProperties
-			{
+			VkQueueFamilyProperties{
 				.queueFlags = VK_QUEUE_TRANSFER_BIT,
 				.queueCount = 1,
 				.timestampValidBits = 0,
 				.minImageTransferGranularity = {1, 1, 1},
-			}
-		};
+			}};
 		return vkd::PhysicalDevice::Create(owner, physicalDeviceProperties, queueFamilyProperties, allocationCallbacks);
 	}
 
@@ -173,4 +168,4 @@ namespace vkd::software
 
 		return reinterpret_cast<DispatchableObject<Device>*>(softwareDevice);
 	}
-}
+} // namespace vkd::software

@@ -6,7 +6,6 @@
 
 #include "VkdSoftware/Buffer/Buffer.hpp"
 
-
 namespace vkd::software
 {
 

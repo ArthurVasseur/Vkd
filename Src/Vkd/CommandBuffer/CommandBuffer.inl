@@ -46,7 +46,7 @@ namespace vkd
 	inline VkResult CommandBuffer::Begin(const VkCommandBufferBeginInfo& beginInfo)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		Transition(State::Recording, { State::Initial });
+		Transition(State::Recording, {State::Initial});
 
 		return VK_SUCCESS;
 	}
@@ -54,7 +54,7 @@ namespace vkd
 	inline VkResult CommandBuffer::End()
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		Transition(State::Executable, { State::Recording });
+		Transition(State::Executable, {State::Recording});
 
 		return VK_SUCCESS;
 	}
@@ -62,7 +62,7 @@ namespace vkd
 	inline VkResult CommandBuffer::Reset(VkCommandBufferResetFlags flags)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		Transition(State::Initial, { State::Executable, State::Pending });
+		Transition(State::Initial, {State::Executable, State::Pending});
 
 		return VK_SUCCESS;
 	}
@@ -70,7 +70,7 @@ namespace vkd
 	inline void CommandBuffer::PushFillBuffer(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, uint32_t data)
 	{
 		VKD_FROM_HANDLE(Buffer, bufferObj, dst);
-		m_ops.emplace_back(Buffer::OpFill{ bufferObj, off, size, data });
+		m_ops.emplace_back(Buffer::OpFill{bufferObj, off, size, data});
 	}
 
 	inline void CommandBuffer::PushCopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
@@ -81,7 +81,7 @@ namespace vkd
 		std::vector<VkBufferCopy> regions;
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy));
-		m_ops.emplace_back(Buffer::OpCopy{ srcBufferObj, dstBufferObj, std::move(regions)});
+		m_ops.emplace_back(Buffer::OpCopy{srcBufferObj, dstBufferObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushCopyBuffer2(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy2* pRegions)
@@ -92,7 +92,7 @@ namespace vkd
 		std::vector<VkBufferCopy2> regions;
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy2));
-		m_ops.emplace_back(Buffer::OpCopy2{ srcBufferObj, dstBufferObj, std::move(regions)});
+		m_ops.emplace_back(Buffer::OpCopy2{srcBufferObj, dstBufferObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushUpdateBuffer(VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize dataSize, const void* pData)
@@ -102,7 +102,7 @@ namespace vkd
 		std::vector<UInt8> data;
 		data.resize(dataSize);
 		std::memcpy(data.data(), pData, dataSize);
-		m_ops.emplace_back(Buffer::OpUpdate{ dstBufferObj, dstOffset, std::move(data)});
+		m_ops.emplace_back(Buffer::OpUpdate{dstBufferObj, dstOffset, std::move(data)});
 	}
 
 	inline void CommandBuffer::PushCopyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkImageCopy* pRegions)
@@ -113,7 +113,7 @@ namespace vkd
 		std::vector<VkImageCopy> regions;
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkImageCopy));
-		m_ops.emplace_back(Image::OpCopy{ srcImageObj, dstImageObj, std::move(regions)});
+		m_ops.emplace_back(Image::OpCopy{srcImageObj, dstImageObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushCopyBufferToImage(VkBuffer srcBuffer, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkBufferImageCopy* pRegions)
@@ -124,7 +124,7 @@ namespace vkd
 		std::vector<VkBufferImageCopy> regions;
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
-		m_ops.emplace_back(Buffer::OpCopyBufferToImage{ srcBufferObj, dstImageObj, dstImageLayout, std::move(regions)});
+		m_ops.emplace_back(Buffer::OpCopyBufferToImage{srcBufferObj, dstImageObj, dstImageLayout, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushCopyImageToBuffer(VkImage srcImage, VkImageLayout srcImageLayout, VkBuffer dstBuffer, UInt32 regionCount, const VkBufferImageCopy* pRegions)
@@ -135,7 +135,7 @@ namespace vkd
 		std::vector<VkBufferImageCopy> regions;
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
-		m_ops.emplace_back(Buffer::OpCopyImageToBuffer{ srcImageObj, srcImageLayout, dstBufferObj, std::move(regions)});
+		m_ops.emplace_back(Buffer::OpCopyImageToBuffer{srcImageObj, srcImageLayout, dstBufferObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushClearColorImage(VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, UInt32 rangeCount, const VkImageSubresourceRange* pRanges)
@@ -145,7 +145,7 @@ namespace vkd
 		std::vector<VkImageSubresourceRange> ranges;
 		ranges.resize(rangeCount);
 		std::memcpy(ranges.data(), pRanges, ranges.size() * sizeof(VkImageSubresourceRange));
-		m_ops.emplace_back(Image::OpClearColorImage{ imageObj, imageLayout, *pColor, std::move(ranges)});
+		m_ops.emplace_back(Image::OpClearColorImage{imageObj, imageLayout, *pColor, std::move(ranges)});
 	}
 
 	inline void CommandBuffer::PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)
@@ -173,9 +173,9 @@ namespace vkd
 		}
 
 		m_ops.emplace_back(OpBindVertexBuffer{
-				.Buffers = std::move(buffers),
-				.Offsets = std::move(offsets),
-				.FirstBinding = firstBinding,
+			.Buffers = std::move(buffers),
+			.Offsets = std::move(offsets),
+			.FirstBinding = firstBinding,
 		});
 	}
 
@@ -191,12 +191,12 @@ namespace vkd
 
 	inline VkResult CommandBuffer::MarkSubmitted()
 	{
-		return Transition(State::Pending, { State::Executable });
+		return Transition(State::Pending, {State::Executable});
 	}
 
 	inline VkResult CommandBuffer::MarkComplete()
 	{
-		return Transition(State::Executable, { State::Pending });
+		return Transition(State::Executable, {State::Pending});
 	}
 
 	inline std::span<const CommandBuffer::Op> CommandBuffer::GetOps() const
@@ -223,4 +223,4 @@ namespace vkd
 		CCT_ASSERT_FALSE("Invalid CB state transition {} -> {}", (int)m_state, (int)to);
 		return VK_ERROR_VALIDATION_FAILED_EXT;
 	}
-}
+} // namespace vkd

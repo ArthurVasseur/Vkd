@@ -22,4 +22,4 @@ namespace vkd::software
 
 		DispatchableObjectResult<vkd::Device> CreateDevice() override;
 	};
-}
+} // namespace vkd::software

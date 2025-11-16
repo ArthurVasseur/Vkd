@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "Vkd/Synchronization/Fence/Fence.hpp"
 #include "Vkd/Device/Device.hpp"
+#include "Vkd/Synchronization/Fence/Fence.hpp"
 
 namespace vkd
 {
@@ -40,4 +40,4 @@ namespace vkd
 		AssertValid();
 		return m_flags;
 	}
-}
+} // namespace vkd

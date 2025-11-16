@@ -4,13 +4,13 @@
  * @date 2025-10-30
  */
 
+#include <algorithm>
 #include <random>
 #include <vector>
-#include <algorithm>
 
 #define CATCH_CONFIG_RUNNER
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <VkdUtils/Allocator/Allocator.hpp>
 
 using namespace vkd;
@@ -130,11 +130,11 @@ TEST_CASE("Allocator - Alignment", "[allocator][alignment]")
 
 		// Verify no overlaps
 		REQUIRE(((alloc1.offset + alloc1.size <= alloc2.offset) ||
-		         (alloc2.offset + alloc2.size <= alloc1.offset)));
+				 (alloc2.offset + alloc2.size <= alloc1.offset)));
 		REQUIRE(((alloc1.offset + alloc1.size <= alloc3.offset) ||
-		         (alloc3.offset + alloc3.size <= alloc1.offset)));
+				 (alloc3.offset + alloc3.size <= alloc1.offset)));
 		REQUIRE(((alloc2.offset + alloc2.size <= alloc3.offset) ||
-		         (alloc3.offset + alloc3.size <= alloc2.offset)));
+				 (alloc3.offset + alloc3.size <= alloc2.offset)));
 	}
 }
 

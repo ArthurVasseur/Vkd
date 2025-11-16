@@ -11,6 +11,7 @@
 
 #include <optional>
 #include <string>
+
 #include <Concerto/Core/Types/Types.hpp>
 
 namespace vkd
@@ -34,4 +35,4 @@ namespace vkd
 		std::optional<UInt64> m_totalRamBytes;
 		std::optional<UInt64> m_availableRamBytes;
 	};
-}
+} // namespace vkd

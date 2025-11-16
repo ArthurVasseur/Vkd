@@ -13,6 +13,7 @@ UseTab: Always
 TabWidth: 4
 IndentWidth: 4
 ContinuationIndentWidth: 4
+AccessModifierOffset: -4
 
 # Braces - Allman style (braces on their own line)
 BreakBeforeBraces: Allman
@@ -49,7 +50,7 @@ ReferenceAlignment: Left
 DerivePointerAlignment: false
 
 # Line breaks
-ColumnLimit: 120
+ColumnLimit: 0
 AlwaysBreakAfterReturnType: None
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
@@ -62,16 +63,14 @@ FixNamespaceComments: true
 SortIncludes: CaseInsensitive
 IncludeBlocks: Regroup
 IncludeCategories:
-  # Project headers
-  - Regex: '^"Vkd/'
-    Priority: 1
-  - Regex: '^"VkdUtils/'
+  # System headers
+  - Regex: '^<[^/]+>'
     Priority: 1
   # External libraries (Concerto)
   - Regex: '^<Concerto/'
     Priority: 2
-  # System headers
-  - Regex: '^<[^/]+>'
+  # Project headers
+  - Regex: '^"(Vkd|VkdSoftware|VkdUtils)/'
     Priority: 3
   # Other
   - Regex: '.*'
@@ -80,7 +79,7 @@ IncludeCategories:
 # Spacing
 SpaceAfterCStyleCast: false
 SpaceAfterLogicalNot: false
-SpaceAfterTemplateKeyword: true
+SpaceAfterTemplateKeyword: false
 SpaceBeforeAssignmentOperators: true
 SpaceBeforeCpp11BracedList: false
 SpaceBeforeCtorInitializerColon: true
@@ -96,7 +95,7 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 
 # Constructor initialization lists - Colon on same line, commas at end
-BreakConstructorInitializers: BeforeComma
+BreakConstructorInitializers: AfterColon
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 AllowAllConstructorInitializersOnNextLine: true
 PackConstructorInitializers: Never
@@ -107,7 +106,7 @@ AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignEscapedNewlines: Right
 AlignOperands: true
-AlignTrailingComments: true
+AlignTrailingComments: false
 AllowAllArgumentsOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
 BinPackArguments: true
@@ -121,7 +120,7 @@ IndentPPDirectives: None
 IndentWrappedFunctionNames: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
-NamespaceIndentation: None
+NamespaceIndentation: All
 ReflowComments: true
 SortUsingDeclarations: true
 

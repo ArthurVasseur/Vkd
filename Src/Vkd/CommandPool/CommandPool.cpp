@@ -12,4 +12,4 @@ namespace vkd
 	{
 		return CreateCommandBuffer(level);
 	}
-}
+} // namespace vkd

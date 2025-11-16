@@ -27,4 +27,4 @@ namespace vkd::software
 	private:
 		// TODO: implement CPU command buffer pool management
 	};
-}
+} // namespace vkd::software

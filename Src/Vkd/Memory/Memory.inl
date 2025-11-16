@@ -9,7 +9,7 @@
 
 namespace vkd::mem
 {
-	template <typename T>
+	template<typename T>
 	T* Allocate(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope)
 	{
 		return static_cast<T*>(pAllocator.pfnAllocation(pAllocator.pUserData, sizeof(T), alignof(T), allocationScope));
@@ -20,8 +20,7 @@ namespace vkd::mem
 		pAllocator.pfnFree(pAllocator.pUserData, memory);
 	}
 
-
-	template <typename T>
+	template<typename T>
 	T* New(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope)
 	{
 		T* allocation = Allocate<T>(pAllocator, allocationScope);
@@ -29,7 +28,7 @@ namespace vkd::mem
 		return new (allocation) T;
 	}
 
-	template <typename T, typename... Args>
+	template<typename T, typename... Args>
 	T* New(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope, Args&&... args)
 	{
 		T* allocation = Allocate<T>(pAllocator, allocationScope);
@@ -45,8 +44,8 @@ namespace vkd::mem
 		Free(pAllocator, object);
 	}
 
-	template <typename T>
-	requires std::is_base_of_v<ObjectBase, T>
+	template<typename T>
+		requires std::is_base_of_v<ObjectBase, T>
 	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope)
 	{
 		auto* dispatchableObject = Allocate<DispatchableObject<T>>(pAllocator, allocationScope);
@@ -59,8 +58,8 @@ namespace vkd::mem
 		return dispatchableObject;
 	}
 
-	template <typename T, typename... Args>
-	requires std::is_base_of_v<ObjectBase, T>
+	template<typename T, typename... Args>
+		requires std::is_base_of_v<ObjectBase, T>
 	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope, Args&&... args)
 	{
 		auto* dispatchableObject = Allocate<DispatchableObject<T>>(pAllocator, allocationScope);
@@ -73,8 +72,8 @@ namespace vkd::mem
 		return dispatchableObject;
 	}
 
-	template <typename T>
-	requires std::is_base_of_v<ObjectBase, T>
+	template<typename T>
+		requires std::is_base_of_v<ObjectBase, T>
 	void DeleteDispatchable(DispatchableObject<T>* object)
 	{
 		const VkAllocationCallbacks& pAllocator = object->Object->GetAllocationCallbacks();
@@ -82,4 +81,4 @@ namespace vkd::mem
 		Free(pAllocator, object->Object);
 		Free(pAllocator, object);
 	}
-}
+} // namespace vkd::mem

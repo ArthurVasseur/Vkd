@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/Device/Device.hpp"
+#include "Vkd/Pipeline/Pipeline.hpp"
 
 namespace vkd
 {
@@ -58,4 +58,4 @@ namespace vkd
 		AssertValid();
 		return m_layout;
 	}
-}
+} // namespace vkd

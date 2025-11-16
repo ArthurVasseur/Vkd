@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include "Vkd/ObjectBase/ObjectBase.hpp"
+
+#include <vulkan/vulkan.h>
 
 namespace vkd
 {
@@ -35,7 +35,6 @@ namespace vkd
 		DispatchableObjectResult<CommandBuffer> AllocateCommandBuffer(VkCommandBufferLevel level);
 
 		// Vulkan API entry points
-		
 
 		virtual VkResult Reset(VkCommandPoolResetFlags flags) = 0;
 		virtual DispatchableObjectResult<CommandBuffer> CreateCommandBuffer(VkCommandBufferLevel level) = 0;
@@ -45,6 +44,6 @@ namespace vkd
 		VkCommandPoolCreateFlags m_flags;
 		UInt32 m_queueFamilyIndex;
 	};
-}
+} // namespace vkd
 
 #include "CommandPool.inl"

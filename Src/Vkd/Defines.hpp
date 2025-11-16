@@ -11,24 +11,22 @@
 
 #include <cstring>
 
-#include <Concerto/Core/Types/Types.hpp>
 #include <Concerto/Core/Assert.hpp>
 #include <Concerto/Core/EnumFlags/EnumFlags.hpp>
 #include <Concerto/Core/Logger/Logger.hpp>
+#include <Concerto/Core/Types/Types.hpp>
 
 #include <NazaraUtils/TypeList.hpp>
-
-#include <vulkan/vulkan_core.h>
-#include <vulkan/vk_icd.h>
 #include <vulkan/utility/vk_dispatch_table.h>
-
+#include <vulkan/vk_icd.h>
+#include <vulkan/vulkan_core.h>
 
 #ifdef CCT_PLATFORM_WINDOWS
-	#include <Windows.h>
-	#undef min
-	#undef max
-	#undef GetClassName
-	#include <vulkan/vulkan_win32.h>
+#include <Windows.h>
+#undef min
+#undef max
+#undef GetClassName
+#include <vulkan/vulkan_win32.h>
 #endif
 
 #define VKD_EXPORT extern "C" CCT_EXPORT
@@ -40,13 +38,17 @@
 #define VKD_CHECK(cond) CCT_ASSERT(cond, #cond " is false / null.")
 #include <Concerto/Core/TypeInfo/TypeInfo.hpp>
 #else
-#define VKD_CHECK(cond) do {} while(false)
+#define VKD_CHECK(cond) \
+	do                  \
+	{                   \
+	} while (false)
 #endif
 
 #ifdef VKD_PROFILING
 #define TRACY_ENABLE
-#include <tracy/Tracy.hpp>
 #include <source_location>
+
+#include <tracy/Tracy.hpp>
 #define VKD_PROFILER_SCOPE(name) ZoneScopedN(name)
 #define VKD_AUTO_PROFILER_SCOPE() ZoneScoped
 #else
@@ -54,44 +56,46 @@
 #define VKD_AUTO_PROFILER_SCOPE()
 #endif
 
-
 #ifdef VKD_DEBUG_CHECKS
-	#define VKD_CLASSNAME_METHOD(type) std::string_view GetClassName() const override { return #type; }
+#define VKD_CLASSNAME_METHOD(type)                 \
+	std::string_view GetClassName() const override \
+	{                                              \
+		return #type;                              \
+	}
 #else
-	#define VKD_CLASSNAME_METHOD(type)
+#define VKD_CLASSNAME_METHOD(type)
 #endif
 
-#define VKD_FROM_HANDLE(type, name, handle)	\
-	VKD_CHECK(handle != nullptr);			\
-	type* name = type::FromHandle(handle);	\
-	VKD_CHECK((name) != nullptr);			\
+#define VKD_FROM_HANDLE(type, name, handle) \
+	VKD_CHECK(handle != nullptr);           \
+	type* name = type::FromHandle(handle);  \
+	VKD_CHECK((name) != nullptr);           \
 	VKD_CHECK(dynamic_cast<type*>(name) != nullptr)
 
-#define VKD_TO_HANDLE(type, handle)	\
+#define VKD_TO_HANDLE(type, handle) \
 	(type)(handle)
 
-#define VKD_DISPATCHABLE_HANDLE(type)															\
-		VKD_CLASSNAME_METHOD(type)																\
-		static inline type* FromHandle(Vk##type instance)										\
-		{																						\
-			auto* dispatchable = reinterpret_cast<DispatchableObject<type>*>(instance);			\
-			if (!dispatchable)																	\
-				return nullptr;																	\
-			if (dispatchable->Object->GetObjectType() != type::ObjectType)						\
-			{																					\
-				CCT_ASSERT_FALSE("Invalid Object Type for: " #type);							\
-				return nullptr;																	\
-			}																					\
-			return dispatchable->Object;														\
-		}
+#define VKD_DISPATCHABLE_HANDLE(type)                                               \
+	VKD_CLASSNAME_METHOD(type)                                                      \
+	static inline type* FromHandle(Vk##type instance)                               \
+	{                                                                               \
+		auto* dispatchable = reinterpret_cast<DispatchableObject<type>*>(instance); \
+		if (!dispatchable)                                                          \
+			return nullptr;                                                         \
+		if (dispatchable->Object->GetObjectType() != type::ObjectType)              \
+		{                                                                           \
+			CCT_ASSERT_FALSE("Invalid Object Type for: " #type);                    \
+			return nullptr;                                                         \
+		}                                                                           \
+		return dispatchable->Object;                                                \
+	}
 
-#define VKD_NON_DISPATCHABLE_HANDLE(type)														\
-		VKD_CLASSNAME_METHOD(type)																\
-		static inline type* FromHandle(Vk##type instance)										\
-		{																						\
-			return reinterpret_cast<type*>(instance);											\
-		}
-
+#define VKD_NON_DISPATCHABLE_HANDLE(type)             \
+	VKD_CLASSNAME_METHOD(type)                        \
+	static inline type* FromHandle(Vk##type instance) \
+	{                                                 \
+		return reinterpret_cast<type*>(instance);     \
+	}
 
 namespace vkd
 {
@@ -99,25 +103,28 @@ namespace vkd
 	enum class VendorId : UInt32
 	{
 		Microsoft = 0x1414,
-		Amd = 0x1002,//0x1022,
+		Amd = 0x1002, // 0x1022,
 		Nvidia = 0x10DE,
 		Qualcomm = 0x17CB,
 		Intel = 0x8086
 	};
-
 
 	// TODO: Move this class to ConcertoCore
 	template<typename F>
 	class DeferredExit final
 	{
 	public:
-		DeferredExit(F&& functor) : m_functor(std::move(functor)) {}
+		DeferredExit(F&& functor) :
+			m_functor(std::move(functor))
+		{
+		}
 		DeferredExit(DeferredExit&) = delete;
 
 		~DeferredExit()
 		{
 			m_functor();
 		}
+
 	private:
 		F m_functor;
 	};
@@ -126,9 +133,7 @@ namespace vkd
 	{
 		char* oldLocale = std::setlocale(LC_CTYPE, "en_US.utf8");
 		DeferredExit _([&]()
-		{
-			std::setlocale(LC_CTYPE, oldLocale);
-		});
+					   { std::setlocale(LC_CTYPE, oldLocale); });
 
 		std::mbstate_t state = {};
 		std::size_t len = std::wcsrtombs(nullptr, &wstr, 0, &state);
@@ -153,4 +158,4 @@ namespace vkd
 			CCT_BREAK_IN_DEBUGGER;
 		return result;
 	}
-}
+} // namespace vkd

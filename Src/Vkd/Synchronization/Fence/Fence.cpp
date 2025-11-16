@@ -5,9 +5,10 @@
  */
 
 #include "Vkd/Synchronization/Fence/Fence.hpp"
+
 #include "Vkd/Defines.hpp"
 
 namespace vkd
 {
-	
+
 }

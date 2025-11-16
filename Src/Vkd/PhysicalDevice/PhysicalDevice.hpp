@@ -12,8 +12,8 @@
 #include <array>
 #include <span>
 
-#include "Vkd/ObjectBase/ObjectBase.hpp"
 #include "Vkd/Device/Device.hpp"
+#include "Vkd/ObjectBase/ObjectBase.hpp"
 
 namespace vkd
 {
@@ -49,6 +49,7 @@ namespace vkd
 
 	protected:
 		VkResult Create(Instance& owner, const VkPhysicalDeviceProperties& physicalDeviceProperties, const std::array<VkQueueFamilyProperties, 3>& queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks);
+
 	private:
 		static std::array<VkExtensionProperties, 0> s_supportedExtensions;
 
@@ -56,4 +57,4 @@ namespace vkd
 		VkPhysicalDeviceProperties m_physicalDeviceProperties;
 		std::array<VkQueueFamilyProperties, 3 /*(graphics + compute + transfer), graphics, transfer*/> m_queueFamilyProperties;
 	};
-}
+} // namespace vkd

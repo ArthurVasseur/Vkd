@@ -21,12 +21,12 @@ namespace vkd::mem
 	T* New(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope);
 
 	template<typename T>
-	requires std::is_base_of_v<ObjectBase, T>
+		requires std::is_base_of_v<ObjectBase, T>
 	DispatchableObject<T>* NewDispatchable(const VkAllocationCallbacks& pAllocator, VkSystemAllocationScope allocationScope);
 
 	template<typename T>
-	requires std::is_base_of_v<ObjectBase, T>
+		requires std::is_base_of_v<ObjectBase, T>
 	void DeleteDispatchable(DispatchableObject<T>* object);
-}
+} // namespace vkd::mem
 
 #include "Vkd/Memory/Memory.inl"
