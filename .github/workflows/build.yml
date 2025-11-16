@@ -163,6 +163,23 @@ jobs:
         file_path: ${{ env.OUTPUT_FILE }}
         verbose: true
 
+    - name: Pack xmake package
+      run: xmake pack -v
+
+    - name: Upload archive artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.OUTPUT_FILE }}
+        path: ${{ env.OUTPUT_FILE }}
+        retention-days: 30
+
+    - name: Upload xpack artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: xpack-${{ matrix.confs.plat }}-${{ matrix.confs.arch }}-${{ matrix.kind }}-${{ matrix.confs.mode }}
+        path: build/xpack/*
+        retention-days: 30
+
     # Nightly tags (for commits to main branch)
     - name: Upload binaries to release (Main)
       uses: svenstaro/upload-release-action@v2
