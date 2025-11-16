@@ -6,6 +6,10 @@
 
 #pragma once
 
+#ifdef VKD_DEBUG_CHECKS
+#include <cpptrace/cpptrace.hpp>
+#endif// VKD_DEBUG_CHECKS
+
 #include "Vkd/ObjectBase/ObjectBase.hpp"
 
 namespace vkd
@@ -39,6 +43,8 @@ namespace vkd
 
 	inline void ObjectBase::AssertValid() const
 	{
-		CCT_ASSERT(IsValid(), "Error, object is not in a valid state");
+#ifdef VKD_DEBUG_CHECKS
+		CCT_ASSERT(IsValid(), "Error, object '{}' is not in a valid state.\n{}", GetClassName(), cpptrace::generate_trace().to_string());
+#endif // VKD_DEBUG_CHECKS
 	}
-}
+	}

@@ -45,6 +45,10 @@ namespace vkd
 		m_owner = &owner;
 		SetAllocationCallbacks(allocationCallbacks);
 
+#ifdef VKD_DEBUG_CHECKS
+		m_createResult = VK_SUCCESS; // avoid false positive in AssertValid()
+#endif //VKD_DEBUG_CHECKS
+
 		m_createResult = CreateQueues(pDeviceCreateInfo);
 		return m_createResult;
 	}

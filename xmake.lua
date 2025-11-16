@@ -5,6 +5,10 @@ add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "nazaraut
 add_requires("concerto-core", {configs = {asserts = get_config("debug_checks"), debug = is_mode("debug")}})
 add_requires("catch2")
 
+if has_config("debug_checks") then
+    add_requires("cpptrace")
+end
+
 option("debug_checks", {default = is_mode("debug"), description = "Enable additional debug checks"})
 option("profiling", { description = "Build with tracy profiler", default = false })
 option("tests", { description = "Build test applications", default = true })
@@ -115,6 +119,7 @@ target("vkd")
     end
     if has_config("debug_checks") then
         add_defines("VKD_DEBUG_CHECKS", { public = true })
+        add_packages("cpptrace", { public = true })
     end
     if has_config("profiling") then
         add_packages("tracy", {public = true})
@@ -270,7 +275,9 @@ if has_config("cts") then
                 assert(deqp_vk, "deqp-vk not found in VK-GL-CTS package!")
 
                 local envs = os.joinenvs(os.getenvs(), {
-                    VK_DRIVER_FILES = path.absolute("vkd-" .. driver_name .. ".json")
+                    VK_DRIVER_FILES = path.absolute("vkd-" .. driver_name .. ".json"),
+                    VK_LOADER_LAYERS_DISABLE = "~implicit~",
+                    --VK_LOADER_DEBUG = "all",
                 })
 
                 local output_dir = path.join(os.scriptdir(), driver_name .. "-cts-results/")
