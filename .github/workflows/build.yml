@@ -58,15 +58,6 @@ jobs:
       if: ${{ matrix.confs.plat == 'macosx' }}
       run: brew install llvm@20
 
-    # Setup MSYS2
-    - name: Setup MSYS2
-      if: ${{ matrix.confs.plat == 'mingw' }}
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: ${{ matrix.confs.msystem }}
-        install: base-devel git unzip p7zip mingw-w64-${{ matrix.confs.arch }}-toolchain mingw-w64-${{ matrix.confs.arch }}-xmake
-        update: true
-
     # Force xmake to a specific folder (for cache)
     - name: Set xmake global dir
       run: echo "XMAKE_GLOBALDIR=${{ runner.workspace }}/xmake-global" >> $GITHUB_ENV
@@ -104,6 +95,11 @@ jobs:
         # --tests=y flag
         if [ "${{ matrix.confs.test }}" = "true" ]; then
           PLATFORM_CONF="${PLATFORM_CONF} --tests=y"
+        fi
+
+        # --installer=y flag
+        if [ "${{ matrix.confs.package }}" = "true" ]; then
+          PLATFORM_CONF="${PLATFORM_CONF} --installer=y"
         fi
 
         if [ "${{ matrix.confs.plat }}" = "macosx" ]; then
@@ -164,9 +160,15 @@ jobs:
         verbose: true
 
     - name: Pack xmake package
-      run: xmake pack -v
+      run: |
+        if [ "${{ matrix.confs.plat }}" = "windows" ]; then
+          xmake pack -vDy --formats=nsis
+        else
+          xmake pack -v --formats=targz
+        fi
 
     - name: Upload archive artifact
+      if: ${{ matrix.confs.package }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.OUTPUT_FILE }}
@@ -174,6 +176,7 @@ jobs:
         retention-days: 30
 
     - name: Upload xpack artifacts
+      if: ${{ matrix.confs.package }}
       uses: actions/upload-artifact@v4
       with:
         name: xpack-${{ matrix.confs.plat }}-${{ matrix.confs.arch }}-${{ matrix.kind }}-${{ matrix.confs.mode }}
