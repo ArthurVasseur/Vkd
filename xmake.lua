@@ -330,7 +330,7 @@ for driver_name, _ in pairs(drivers) do
 end
 
 xpack("vkd")
-    set_formats("nsis")
+    set_formats("nsis", "zip", "targz")
     set_title("VKD Software Drivers")
     set_description("VKD Vulkan software drivers")
     set_author("Arthur Vasseur")
