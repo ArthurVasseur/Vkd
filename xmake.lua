@@ -14,6 +14,10 @@ option("profiling", { description = "Build with tracy profiler", default = false
 option("tests", { description = "Build test applications", default = true })
 option("cts", { description = "Build Vulkan CTS", default = false })
 
+if has_config("debug_checks") then
+    add_requires("cpptrace")
+end
+
 if has_config("profiling") then
 	add_requires("tracy")
 end
@@ -58,6 +62,7 @@ local drivers = {
             "PhysicalDevice",
             "Pipeline",
             "Queue",
+            "RenderPass",
             "Synchronization",
             "Synchronization/Fence",
         },
@@ -141,6 +146,7 @@ target("vkd")
         "PhysicalDevice",
         "Pipeline",
         "Queue",
+        "RenderPass",
         "Synchronization",
         "Synchronization/Fence",
     }
@@ -202,7 +208,6 @@ for driver_name, driver in pairs(drivers) do
             ]], lib_path)
 
             io.writefile("vkd-" .. driver_name .. ".json", json_content)
-            target:add("installfiles", lib_path)
         end)
     target_end()
 end

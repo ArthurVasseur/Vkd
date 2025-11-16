@@ -14,6 +14,7 @@
 #include "VkdSoftware/Image/Image.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
 #include "VkdSoftware/Queue/Queue.hpp"
+#include "VkdSoftware/RenderPass/RenderPass.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 #include "VkdUtils/System/System.hpp"
 
@@ -145,5 +146,17 @@ namespace vkd::software
 		}
 
 		return pipeline;
+	}
+
+	Result<vkd::RenderPass*, VkResult> SoftwareDevice::CreateRenderPass()
+	{
+		auto* renderPass = mem::New<RenderPass>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!renderPass)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate RenderPass");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return renderPass;
 	}
 } // namespace vkd::software
