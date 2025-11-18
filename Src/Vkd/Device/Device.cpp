@@ -13,6 +13,7 @@
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/Image/Image.hpp"
+#include "Vkd/ImageView/ImageView.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/Queue/Queue.hpp"
@@ -244,6 +245,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipeline);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateRenderPass);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyRenderPass);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateImageView);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyImageView);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
@@ -919,5 +922,41 @@ namespace vkd
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, renderPass);
 
 		mem::Delete(renderPassObj->GetAllocationCallbacks(), renderPassObj);
+	}
+
+	VkResult Device::CreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImageView* pView)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pView);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto imageViewResult = deviceObj->CreateImageView();
+		if (imageViewResult.IsError())
+			return imageViewResult.GetError();
+
+		auto* imageViewObj = std::move(imageViewResult).GetValue();
+		VkResult result = imageViewObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, imageViewObj);
+			return result;
+		}
+
+		*pView = VKD_TO_HANDLE(VkImageView, imageViewObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyImageView(VkDevice device, VkImageView imageView, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(ImageView, imageViewObj, imageView);
+
+		mem::Delete(imageViewObj->GetAllocationCallbacks(), imageViewObj);
 	}
 } // namespace vkd

@@ -33,6 +33,7 @@ namespace vkd::software
 		Result<vkd::DeviceMemory*, VkResult> CreateDeviceMemory() override;
 		Result<vkd::Pipeline*, VkResult> CreatePipeline() override;
 		Result<vkd::RenderPass*, VkResult> CreateRenderPass() override;
+		Result<vkd::ImageView*, VkResult> CreateImageView() override;
 
 	private:
 		ThreadPool m_threadPool;

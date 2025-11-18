@@ -22,6 +22,7 @@ namespace vkd
 	class Fence;
 	class Buffer;
 	class Image;
+	class ImageView;
 	class DeviceMemory;
 	class Pipeline;
 	class RenderPass;
@@ -85,6 +86,9 @@ namespace vkd
 		static VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass);
 		static void VKAPI_CALL DestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator);
 
+		static VkResult VKAPI_CALL CreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImageView* pView);
+		static void VKAPI_CALL DestroyImageView(VkDevice device, VkImageView imageView, const VkAllocationCallbacks* pAllocator);
+
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
 		virtual Result<Fence*, VkResult> CreateFence() = 0;
@@ -93,6 +97,7 @@ namespace vkd
 		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory() = 0;
 		virtual Result<Pipeline*, VkResult> CreatePipeline() = 0;
 		virtual Result<RenderPass*, VkResult> CreateRenderPass() = 0;
+		virtual Result<ImageView*, VkResult> CreateImageView() = 0;
 
 	private:
 		PhysicalDevice* m_owner;
