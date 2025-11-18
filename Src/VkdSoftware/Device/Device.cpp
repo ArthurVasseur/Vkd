@@ -12,6 +12,7 @@
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 #include "VkdSoftware/Image/Image.hpp"
+#include "VkdSoftware/ImageView/ImageView.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
 #include "VkdSoftware/Queue/Queue.hpp"
 #include "VkdSoftware/RenderPass/RenderPass.hpp"
@@ -158,5 +159,17 @@ namespace vkd::software
 		}
 
 		return renderPass;
+	}
+
+	Result<vkd::ImageView*, VkResult> SoftwareDevice::CreateImageView()
+	{
+		auto* imageView = mem::New<ImageView>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!imageView)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate ImageView");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return imageView;
 	}
 } // namespace vkd::software
