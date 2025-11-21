@@ -3,7 +3,7 @@ add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.gi
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
 add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "nazarautils", "catch2", "volk")
 add_requires("concerto-core", {configs = {asserts = get_config("debug_checks"), debug = is_mode("debug")}})
-add_requires("catch2")
+add_requires("catch2", "nzsl")
 
 if has_config("debug_checks") then
     add_requires("cpptrace")
@@ -60,6 +60,7 @@ local drivers = {
             "CpuContext",
             "Device",
             "DeviceMemory",
+            "Framebuffer",
             "PhysicalDevice",
             "Pipeline",
             "Queue",
@@ -140,6 +141,7 @@ target("vkd")
         "CommandPool",
         "Device",
         "DeviceMemory",
+        "Framebuffer",
         "Icd",
         "Image",
         "ImageView",
@@ -230,7 +232,7 @@ if has_config("tests") then
         set_kind("binary")
         add_files("Tests/**.cpp")
         add_includedirs("Src", { public = true })
-        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk")
+        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk", "nzsl")
         add_defines("VK_NO_PROTOTYPES")
         add_files("Src/TestApp/main.cpp")
 

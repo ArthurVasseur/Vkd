@@ -34,6 +34,7 @@ namespace vkd::software
 		Result<vkd::Pipeline*, VkResult> CreatePipeline() override;
 		Result<vkd::RenderPass*, VkResult> CreateRenderPass() override;
 		Result<vkd::ImageView*, VkResult> CreateImageView() override;
+		Result<vkd::Framebuffer*, VkResult> CreateFramebuffer() override;
 
 	private:
 		ThreadPool m_threadPool;
