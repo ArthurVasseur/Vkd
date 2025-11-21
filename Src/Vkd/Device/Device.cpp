@@ -19,6 +19,7 @@
 #include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/Queue/Queue.hpp"
 #include "Vkd/RenderPass/RenderPass.hpp"
+#include "Vkd/ShaderModule/ShaderModule.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 
 namespace vkd
@@ -250,6 +251,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyImageView);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateFramebuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyFramebuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateShaderModule);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyShaderModule);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
@@ -997,5 +1000,41 @@ namespace vkd
 		VKD_FROM_HANDLE(Framebuffer, framebufferObj, framebuffer);
 
 		mem::Delete(framebufferObj->GetAllocationCallbacks(), framebufferObj);
+	}
+
+	VkResult Device::CreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pShaderModule);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto shaderModuleResult = deviceObj->CreateShaderModule();
+		if (shaderModuleResult.IsError())
+			return shaderModuleResult.GetError();
+
+		auto* shaderModuleObj = std::move(shaderModuleResult).GetValue();
+		VkResult result = shaderModuleObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, shaderModuleObj);
+			return result;
+		}
+
+		*pShaderModule = VKD_TO_HANDLE(VkShaderModule, shaderModuleObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyShaderModule(VkDevice device, VkShaderModule shaderModule, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(ShaderModule, shaderModuleObj, shaderModule);
+
+		mem::Delete(shaderModuleObj->GetAllocationCallbacks(), shaderModuleObj);
 	}
 } // namespace vkd

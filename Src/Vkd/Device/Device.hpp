@@ -27,6 +27,7 @@ namespace vkd
 	class Pipeline;
 	class RenderPass;
 	class Framebuffer;
+	class ShaderModule;
 
 	class Device : public ObjectBase
 	{
@@ -93,6 +94,9 @@ namespace vkd
 		static VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer);
 		static void VKAPI_CALL DestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, const VkAllocationCallbacks* pAllocator);
 
+		static VkResult VKAPI_CALL CreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule);
+		static void VKAPI_CALL DestroyShaderModule(VkDevice device, VkShaderModule shaderModule, const VkAllocationCallbacks* pAllocator);
+
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
 		virtual Result<Fence*, VkResult> CreateFence() = 0;
@@ -103,6 +107,7 @@ namespace vkd
 		virtual Result<RenderPass*, VkResult> CreateRenderPass() = 0;
 		virtual Result<ImageView*, VkResult> CreateImageView() = 0;
 		virtual Result<Framebuffer*, VkResult> CreateFramebuffer() = 0;
+		virtual Result<ShaderModule*, VkResult> CreateShaderModule() = 0;
 
 	private:
 		PhysicalDevice* m_owner;

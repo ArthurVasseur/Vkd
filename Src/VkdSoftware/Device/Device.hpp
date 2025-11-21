@@ -35,6 +35,7 @@ namespace vkd::software
 		Result<vkd::RenderPass*, VkResult> CreateRenderPass() override;
 		Result<vkd::ImageView*, VkResult> CreateImageView() override;
 		Result<vkd::Framebuffer*, VkResult> CreateFramebuffer() override;
+		Result<vkd::ShaderModule*, VkResult> CreateShaderModule() override;
 
 	private:
 		ThreadPool m_threadPool;

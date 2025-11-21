@@ -66,6 +66,7 @@ local drivers = {
             "Queue",
             "ImageView",
             "RenderPass",
+            "ShaderModule",
             "Synchronization",
             "Synchronization/Fence",
         },
@@ -152,6 +153,7 @@ target("vkd")
         "Pipeline",
         "Queue",
         "RenderPass",
+        "ShaderModule",
         "Synchronization",
         "Synchronization/Fence",
     }
