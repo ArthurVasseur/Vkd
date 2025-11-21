@@ -26,6 +26,7 @@ namespace vkd
 	class DeviceMemory;
 	class Pipeline;
 	class RenderPass;
+	class Framebuffer;
 
 	class Device : public ObjectBase
 	{
@@ -89,6 +90,9 @@ namespace vkd
 		static VkResult VKAPI_CALL CreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImageView* pView);
 		static void VKAPI_CALL DestroyImageView(VkDevice device, VkImageView imageView, const VkAllocationCallbacks* pAllocator);
 
+		static VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer);
+		static void VKAPI_CALL DestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, const VkAllocationCallbacks* pAllocator);
+
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
 		virtual Result<Fence*, VkResult> CreateFence() = 0;
@@ -98,6 +102,7 @@ namespace vkd
 		virtual Result<Pipeline*, VkResult> CreatePipeline() = 0;
 		virtual Result<RenderPass*, VkResult> CreateRenderPass() = 0;
 		virtual Result<ImageView*, VkResult> CreateImageView() = 0;
+		virtual Result<Framebuffer*, VkResult> CreateFramebuffer() = 0;
 
 	private:
 		PhysicalDevice* m_owner;

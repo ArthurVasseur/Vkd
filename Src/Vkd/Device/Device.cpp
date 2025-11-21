@@ -12,6 +12,7 @@
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
+#include "Vkd/Framebuffer/Framebuffer.hpp"
 #include "Vkd/Image/Image.hpp"
 #include "Vkd/ImageView/ImageView.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
@@ -247,6 +248,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyRenderPass);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateImageView);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyImageView);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateFramebuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyFramebuffer);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
@@ -958,5 +961,41 @@ namespace vkd
 		VKD_FROM_HANDLE(ImageView, imageViewObj, imageView);
 
 		mem::Delete(imageViewObj->GetAllocationCallbacks(), imageViewObj);
+	}
+
+	VkResult Device::CreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pFramebuffer);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto framebufferResult = deviceObj->CreateFramebuffer();
+		if (framebufferResult.IsError())
+			return framebufferResult.GetError();
+
+		auto* framebufferObj = std::move(framebufferResult).GetValue();
+		VkResult result = framebufferObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, framebufferObj);
+			return result;
+		}
+
+		*pFramebuffer = VKD_TO_HANDLE(VkFramebuffer, framebufferObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Framebuffer, framebufferObj, framebuffer);
+
+		mem::Delete(framebufferObj->GetAllocationCallbacks(), framebufferObj);
 	}
 } // namespace vkd

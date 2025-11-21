@@ -11,6 +11,7 @@
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
+#include "VkdSoftware/Framebuffer/Framebuffer.hpp"
 #include "VkdSoftware/Image/Image.hpp"
 #include "VkdSoftware/ImageView/ImageView.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
@@ -171,5 +172,17 @@ namespace vkd::software
 		}
 
 		return imageView;
+	}
+
+	Result<vkd::Framebuffer*, VkResult> SoftwareDevice::CreateFramebuffer()
+	{
+		auto* framebuffer = mem::New<Framebuffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!framebuffer)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Framebuffer");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return framebuffer;
 	}
 } // namespace vkd::software
