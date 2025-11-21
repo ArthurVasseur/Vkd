@@ -17,6 +17,7 @@
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
 #include "VkdSoftware/Queue/Queue.hpp"
 #include "VkdSoftware/RenderPass/RenderPass.hpp"
+#include "VkdSoftware/ShaderModule/ShaderModule.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 #include "VkdUtils/System/System.hpp"
 
@@ -184,5 +185,17 @@ namespace vkd::software
 		}
 
 		return framebuffer;
+	}
+
+	Result<vkd::ShaderModule*, VkResult> SoftwareDevice::CreateShaderModule()
+	{
+		auto* shaderModule = mem::New<ShaderModule>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!shaderModule)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate ShaderModule");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return shaderModule;
 	}
 } // namespace vkd::software
