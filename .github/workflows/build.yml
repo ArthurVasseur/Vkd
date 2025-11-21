@@ -99,7 +99,7 @@ jobs:
 
         # --installer=y flag
         if [ "${{ matrix.confs.package }}" = "true" ]; then
-          PLATFORM_CONF="${PLATFORM_CONF} --installer=y"
+          PLATFORM_CONF="${PLATFORM_CONF} --installer=n"
         fi
 
         if [ "${{ matrix.confs.plat }}" = "macosx" ]; then
