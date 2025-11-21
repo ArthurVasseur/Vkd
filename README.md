@@ -31,14 +31,21 @@ Src/
  │   ├── Instance/         # VkInstance and creation routines
  │   ├── PhysicalDevice/   # Base physical device representation
  │   ├── Icd/              # Vulkan loader / ICD entry points
+ │   ├── ShaderModule/     # Shader module with SPIR-V support
+ │   ├── Framebuffer/      # Framebuffer implementation
+ │   ├── RenderPass/       # Render pass support
+ │   ├── ImageView/        # Image view abstraction
  │   ├── Synchronization/  # Fences, semaphores, etc.
  │   └── ...
- └── VkdSoftware/          # Software (CPU) driver implementation
-     ├── Device/
-     ├── PhysicalDevice/
-     ├── Queue/
-     ├── Buffer/
-     └── ...
+ ├── VkdSoftware/          # Software (CPU) driver implementation
+ │   ├── Device/
+ │   ├── PhysicalDevice/
+ │   ├── Queue/
+ │   ├── Buffer/
+ │   ├── ShaderModule/
+ │   ├── Framebuffer/
+ │   └── ...
+ └── TestApp/              # Test application with NZSL integration
 ```
 
 ---
