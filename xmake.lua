@@ -1,7 +1,12 @@
 add_rules("mode.debug", "mode.release")
 add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.git main")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
-add_requires("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "nazarautils", "catch2", "volk")
+
+for _, require in ipairs({"vulkan-headers", "vulkan-utility-libraries"}) do
+    add_requires(require .. " 1.4.309+0")
+end
+
+add_requires("mimalloc", "nazarautils", "catch2", "volk")
 add_requires("concerto-core", {configs = {asserts = get_config("debug_checks"), debug = is_mode("debug")}})
 add_requires("catch2", "nzsl")
 
@@ -251,19 +256,24 @@ if has_config("cts") then
         set_license("Apache-2.0")
 
         add_urls(
-            "https://data.arthurvasseur.fr/vk-gl-cts/vk-gl-cts-$(version).1.zip"
+            "https://data.arthurvasseur.fr/vk-gl-cts/vk-gl-cts-$(plat)-$(version).1.zip"
         )
         
-        add_versions("1.4.4", "d82631c355351c96ec10aa4a9eaf7701c661a42d6347c3a169357be27878936b")
+        if is_plat("windows") then
+            add_versions("1.4.4", "d82631c355351c96ec10aa4a9eaf7701c661a42d6347c3a169357be27878936b")
+        elseif is_plat("linux") then
+            add_versions("1.4.4", "82911bedc15138a07526a15c9598009404f2d5f7e8d8ef965b2884dcc8680d63")
+        end
 
         on_install(function (package)
-            os.trycp("bin/*.exe", package:installdir("bin"))
-            os.trycp("scripts/*", package:installdir("scripts"))
+            os.cp("bin/*", package:installdir("bin"))
+            os.cp("scripts/*", package:installdir("scripts"))
         end)
 
         on_test(function (package)
-            local deqp_vk = path.join(package:installdir("bin"), "deqp-vk" .. (is_host("windows") and ".exe" or ""))
-            assert(os.isfile(deqp_vk), "deqp-vk executable not found")
+            import("lib.detect.find_tool")
+            local deqp_vk = find_tool("deqp-vk", {paths = {path.join(package:installdir("bin"))}, check = "-h"})
+            assert(deqp_vk, "deqp-vk not found!")
         end)
     package_end()
 
@@ -306,8 +316,7 @@ if has_config("cts") then
                         "--deqp-archive-dir=" .. output_dir,
                         "--deqp-shadercache-filename=" .. path.join(output_dir, "vk-cts-shadercache.bin"),
                         "--deqp-log-filename=" .. path.join(output_dir, "vk-cts-log.txt"),
-                       "-n",
-                        "dEQP-VK.info.*"
+                        "--deqp-caselist-file=" .. path.join(os.scriptdir(), "vk-default.txt"),
                     },
                     {envs = envs, try = true}
                 )
