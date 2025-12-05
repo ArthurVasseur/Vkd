@@ -33,6 +33,9 @@ namespace vkd
 
 	const VkAllocationCallbacks& ObjectBase::GetAllocationCallbacks() const
 	{
+#ifdef VKD_DEBUG_CHECKS
+		CCT_ASSERT(m_allocationCallbacks, "Error, object '{}' does not have a valid allocation callbacks.\n{}", GetClassName(), cpptrace::generate_trace().to_string());
+#endif // VKD_DEBUG_CHECKS
 		return *m_allocationCallbacks;
 	}
 

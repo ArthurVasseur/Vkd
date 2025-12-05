@@ -253,6 +253,33 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyFramebuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateShaderModule);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyShaderModule);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateSampler);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroySampler);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateSemaphore);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroySemaphore);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateEvent);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyEvent);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetEventStatus);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, SetEvent);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetEvent);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateQueryPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyQueryPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetQueryPoolResults);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreatePipelineLayout);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipelineLayout);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDescriptorSetLayout);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyDescriptorSetLayout);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDescriptorPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyDescriptorPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetDescriptorPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, AllocateDescriptorSets);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeDescriptorSets);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, UpdateDescriptorSets);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreatePipelineCache);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipelineCache);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetPipelineCacheData);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, MergePipelineCaches);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DeviceWaitIdle);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
@@ -274,6 +301,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDraw);
 
 #undef VKD_ENTRYPOINT_LOOKUP
+		// cct::Logger::Warning("Could not find '{}' function", pName);
 
 		return nullptr;
 	}
@@ -1036,5 +1064,185 @@ namespace vkd
 		VKD_FROM_HANDLE(ShaderModule, shaderModuleObj, shaderModule);
 
 		mem::Delete(shaderModuleObj->GetAllocationCallbacks(), shaderModuleObj);
+	}
+
+	VkResult Device::CreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSampler* pSampler)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreateSampler not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroySampler(VkDevice device, VkSampler sampler, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroySampler not implemented");
+	}
+
+	VkResult Device::CreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreateSemaphore not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroySemaphore(VkDevice device, VkSemaphore semaphore, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroySemaphore not implemented");
+	}
+
+	VkResult Device::CreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkEvent* pEvent)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreateEvent not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroyEvent not implemented");
+	}
+
+	VkResult Device::GetEventStatus(VkDevice device, VkEvent event)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetEventStatus not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::SetEvent(VkDevice device, VkEvent event)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkSetEvent not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::ResetEvent(VkDevice device, VkEvent event)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkResetEvent not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::CreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreateQueryPool not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroyQueryPool(VkDevice device, VkQueryPool queryPool, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroyQueryPool not implemented");
+	}
+
+	VkResult Device::GetQueryPoolResults(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, size_t dataSize, void* pData, VkDeviceSize stride, VkQueryResultFlags flags)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetQueryPoolResults not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::CreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreatePipelineLayout not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroyPipelineLayout(VkDevice device, VkPipelineLayout pipelineLayout, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroyPipelineLayout not implemented");
+	}
+
+	VkResult Device::CreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout* pSetLayout)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreateDescriptorSetLayout not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroyDescriptorSetLayout not implemented");
+	}
+
+	VkResult Device::CreateDescriptorPool(VkDevice device, const VkDescriptorPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDescriptorPool* pDescriptorPool)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreateDescriptorPool not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroyDescriptorPool not implemented");
+	}
+
+	VkResult Device::ResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorPoolResetFlags flags)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkResetDescriptorPool not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::AllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo, VkDescriptorSet* pDescriptorSets)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkAllocateDescriptorSets not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::FreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount, const VkDescriptorSet* pDescriptorSets)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkFreeDescriptorSets not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::UpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount, const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount, const VkCopyDescriptorSet* pDescriptorCopies)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkUpdateDescriptorSets not implemented");
+	}
+
+	VkResult Device::CreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkCreatePipelineCache not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	void Device::DestroyPipelineCache(VkDevice device, VkPipelineCache pipelineCache, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDestroyPipelineCache not implemented");
+	}
+
+	VkResult Device::GetPipelineCacheData(VkDevice device, VkPipelineCache pipelineCache, size_t* pDataSize, void* pData)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPipelineCacheData not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::MergePipelineCaches(VkDevice device, VkPipelineCache dstCache, uint32_t srcCacheCount, const VkPipelineCache* pSrcCaches)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkMergePipelineCaches not implemented");
+		return VK_ERROR_FEATURE_NOT_PRESENT;
+	}
+
+	VkResult Device::DeviceWaitIdle(VkDevice device)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkDeviceWaitIdle not implemented");
+		return VK_SUCCESS;
 	}
 } // namespace vkd

@@ -211,4 +211,18 @@ namespace vkd
 
 		mi_free(pMemory);
 	}
+
+	VkResult Instance::EnumeratePhysicalDeviceGroups(VkInstance instance, uint32_t* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkEnumeratePhysicalDeviceGroups not implemented (Vulkan 1.1)");
+
+		if (pPhysicalDeviceGroupCount && !pPhysicalDeviceGroupProperties)
+		{
+			*pPhysicalDeviceGroupCount = 0;
+			return VK_SUCCESS;
+		}
+
+		return VK_SUCCESS;
+	}
 } // namespace vkd

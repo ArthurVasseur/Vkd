@@ -352,4 +352,65 @@ namespace vkd
 		auto* dispatchable = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(pPhysicalDevice);
 		mem::DeleteDispatchable(dispatchable);
 	}
+
+	void PhysicalDevice::GetPhysicalDeviceFormatProperties2(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkFormatProperties2* pFormatProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceFormatProperties2 not implemented (Vulkan 1.1)");
+	}
+
+	VkResult PhysicalDevice::GetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo, VkImageFormatProperties2* pImageFormatProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceImageFormatProperties2 not implemented (Vulkan 1.1)");
+		return VK_ERROR_FORMAT_NOT_SUPPORTED;
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties2* pQueueFamilyProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceQueueFamilyProperties2 not implemented (Vulkan 1.1)");
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceMemoryProperties2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceMemoryProperties2* pMemoryProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceMemoryProperties2 not implemented (Vulkan 1.1)");
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, uint32_t* pPropertyCount, VkSparseImageFormatProperties2* pProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceSparseImageFormatProperties2 not implemented (Vulkan 1.1)");
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceExternalBufferProperties(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceExternalBufferProperties not implemented (Vulkan 1.1)");
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceExternalFenceProperties(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceExternalFenceInfo* pExternalFenceInfo, VkExternalFenceProperties* pExternalFenceProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceExternalFenceProperties not implemented (Vulkan 1.1)");
+	}
+
+	void PhysicalDevice::GetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo, VkExternalSemaphoreProperties* pExternalSemaphoreProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceExternalSemaphoreProperties not implemented (Vulkan 1.1)");
+	}
+
+	VkResult PhysicalDevice::GetPhysicalDeviceToolProperties(VkPhysicalDevice pPhysicalDevice, uint32_t* pToolCount, VkPhysicalDeviceToolProperties* pToolProperties)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("vkGetPhysicalDeviceToolProperties not implemented (Vulkan 1.3)");
+		if (pToolCount && !pToolProperties)
+		{
+			*pToolCount = 0;
+			return VK_SUCCESS;
+		}
+		return VK_SUCCESS;
+	}
 } // namespace vkd

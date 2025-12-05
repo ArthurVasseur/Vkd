@@ -277,7 +277,7 @@ if has_config("cts") then
         end)
     package_end()
 
-    add_requires("python 3.x")
+    --add_requires("python 3.x")
 
     for driver_name, driver in pairs(drivers) do
         target("vk-cts-" .. driver_name)
@@ -324,15 +324,15 @@ if has_config("cts") then
                 os.cd("-")
                 
                 local python = find_tool("python")
-                assert(python, "python not found!")
+                --assert(python, "python not found!")
 
-                os.vrunv(python.program, {"-m", "pip", "install", "pandas"})
+                --os.vrunv(python.program, {"-m", "pip", "install", "pandas"})
             
                 local report_script = path.join(vk_gl_cts:installdir(), "scripts", "log/log_to_xml.py")
-                os.vrunv(python.program, {report_script, "./" .. driver_name .. "-cts-results/vk-cts-log.txt", "./" .. driver_name .. "-cts-results/vk-cts-report.xml"})
+               -- os.vrunv(python.program, {report_script, "./" .. driver_name .. "-cts-results/vk-cts-log.txt", "./" .. driver_name .. "-cts-results/vk-cts-report.xml"})
 
                 local reporter_script = path.join(os.scriptdir(), "scripts", "cts_report.py")
-                os.vrunv(python.program, {reporter_script, "./" .. driver_name .. "-cts-results/vk-cts-report.xml", "./" .. driver_name .. "-cts-results/result.html"})
+                --os.vrunv(python.program, {reporter_script, "./" .. driver_name .. "-cts-results/vk-cts-report.xml", "./" .. driver_name .. "-cts-results/result.html"})
             end)
         target_end()
     end

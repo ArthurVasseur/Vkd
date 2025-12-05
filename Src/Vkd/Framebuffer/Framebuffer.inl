@@ -39,4 +39,4 @@ namespace vkd
 	{
 		return m_layers;
 	}
-}
+} // namespace vkd

@@ -20,4 +20,4 @@ namespace vkd
 	{
 		return static_cast<cct::UInt32>(m_code.size() * sizeof(cct::UInt32));
 	}
-}
+} // namespace vkd
