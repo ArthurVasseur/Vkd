@@ -355,7 +355,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto poolResult = deviceObj->CreateCommandPool();
+		auto poolResult = deviceObj->CreateCommandPool(*pAllocator);
 		if (poolResult.IsError())
 			return poolResult.GetError();
 
@@ -472,7 +472,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto fenceResult = deviceObj->CreateFence();
+		auto fenceResult = deviceObj->CreateFence(*pAllocator);
 		if (fenceResult.IsError())
 			return fenceResult.GetError();
 
@@ -637,7 +637,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto bufferResult = deviceObj->CreateBuffer();
+		auto bufferResult = deviceObj->CreateBuffer(*pAllocator);
 		if (bufferResult.IsError())
 			return bufferResult.GetError();
 
@@ -698,7 +698,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto bufferViewResult = deviceObj->CreateBufferView();
+		auto bufferViewResult = deviceObj->CreateBufferView(*pAllocator);
 		if (bufferViewResult.IsError())
 			return bufferViewResult.GetError();
 
@@ -734,7 +734,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto imageResult = deviceObj->CreateImage();
+		auto imageResult = deviceObj->CreateImage(*pAllocator);
 		if (imageResult.IsError())
 			return imageResult.GetError();
 
@@ -795,7 +795,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto memoryResult = deviceObj->CreateDeviceMemory();
+		auto memoryResult = deviceObj->CreateDeviceMemory(*pAllocator);
 		if (memoryResult.IsError())
 			return memoryResult.GetError();
 
@@ -859,7 +859,7 @@ namespace vkd
 
 		for (uint32_t i = 0; i < createInfoCount; ++i)
 		{
-			auto pipelineResult = deviceObj->CreatePipeline();
+			auto pipelineResult = deviceObj->CreatePipeline(*pAllocator);
 			if (pipelineResult.IsError())
 			{
 				// Clean up any pipelines created so far
@@ -911,7 +911,7 @@ namespace vkd
 
 		for (uint32_t i = 0; i < createInfoCount; ++i)
 		{
-			auto pipelineResult = deviceObj->CreatePipeline();
+			auto pipelineResult = deviceObj->CreatePipeline(*pAllocator);
 			if (pipelineResult.IsError())
 			{
 				// Clean up any pipelines created so far
@@ -971,7 +971,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto renderPassResult = deviceObj->CreateRenderPass();
+		auto renderPassResult = deviceObj->CreateRenderPass(*pAllocator);
 		if (renderPassResult.IsError())
 			return renderPassResult.GetError();
 
@@ -1007,7 +1007,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto imageViewResult = deviceObj->CreateImageView();
+		auto imageViewResult = deviceObj->CreateImageView(*pAllocator);
 		if (imageViewResult.IsError())
 			return imageViewResult.GetError();
 
@@ -1043,7 +1043,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto framebufferResult = deviceObj->CreateFramebuffer();
+		auto framebufferResult = deviceObj->CreateFramebuffer(*pAllocator);
 		if (framebufferResult.IsError())
 			return framebufferResult.GetError();
 
@@ -1079,7 +1079,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto shaderModuleResult = deviceObj->CreateShaderModule();
+		auto shaderModuleResult = deviceObj->CreateShaderModule(*pAllocator);
 		if (shaderModuleResult.IsError())
 			return shaderModuleResult.GetError();
 
