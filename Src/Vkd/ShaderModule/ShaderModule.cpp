@@ -11,6 +11,7 @@ namespace vkd
 	VkResult ShaderModule::Create(Device& owner, const VkShaderModuleCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks)
 	{
 		m_owner = &owner;
+		SetAllocationCallbacks(allocationCallbacks);
 
 		if (info.codeSize == 0 || !info.pCode)
 			return VK_ERROR_INITIALIZATION_FAILED;

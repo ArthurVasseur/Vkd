@@ -26,6 +26,8 @@
 #undef min
 #undef max
 #undef GetClassName
+#undef CreateSemaphore
+#undef CreateEvent
 #include <vulkan/vulkan_win32.h>
 #endif
 
