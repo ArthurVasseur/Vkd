@@ -15,6 +15,7 @@ namespace vkd
 		m_width = info.width;
 		m_height = info.height;
 		m_layers = info.layers;
+		SetAllocationCallbacks(allocationCallbacks);
 
 		m_attachments.resize(info.attachmentCount);
 		for (cct::UInt32 i = 0; i < info.attachmentCount; ++i)

@@ -1,8 +1,10 @@
 .xmake
 build
 vsxmake2022
+vsxmake2026
 vkd-Software.json
 Reverse
 .vscode
 .claude
+.cache
 Software-cts-results

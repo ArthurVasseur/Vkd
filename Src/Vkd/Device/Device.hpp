@@ -138,17 +138,17 @@ namespace vkd
 		static VkResult VKAPI_CALL DeviceWaitIdle(VkDevice device);
 
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
-		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
-		virtual Result<Fence*, VkResult> CreateFence() = 0;
-		virtual Result<Buffer*, VkResult> CreateBuffer() = 0;
-		virtual Result<BufferView*, VkResult> CreateBufferView() = 0;
-		virtual Result<Image*, VkResult> CreateImage() = 0;
-		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory() = 0;
-		virtual Result<Pipeline*, VkResult> CreatePipeline() = 0;
-		virtual Result<RenderPass*, VkResult> CreateRenderPass() = 0;
-		virtual Result<ImageView*, VkResult> CreateImageView() = 0;
-		virtual Result<Framebuffer*, VkResult> CreateFramebuffer() = 0;
-		virtual Result<ShaderModule*, VkResult> CreateShaderModule() = 0;
+		virtual Result<CommandPool*, VkResult> CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Fence*, VkResult> CreateFence(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Buffer*, VkResult> CreateBuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<BufferView*, VkResult> CreateBufferView(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Pipeline*, VkResult> CreatePipeline(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<RenderPass*, VkResult> CreateRenderPass(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<ImageView*, VkResult> CreateImageView(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Framebuffer*, VkResult> CreateFramebuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<ShaderModule*, VkResult> CreateShaderModule(const VkAllocationCallbacks& allocationCallbacks) = 0;
 
 	private:
 		PhysicalDevice* m_owner;

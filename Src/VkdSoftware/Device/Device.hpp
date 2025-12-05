@@ -26,17 +26,17 @@ namespace vkd::software
 		[[nodiscard]] Allocator& GetAllocator();
 
 		DispatchableObjectResult<vkd::Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;
-		Result<vkd::CommandPool*, VkResult> CreateCommandPool() override;
-		Result<vkd::Fence*, VkResult> CreateFence() override;
-		Result<vkd::Buffer*, VkResult> CreateBuffer() override;
-		Result<vkd::BufferView*, VkResult> CreateBufferView() override;
-		Result<vkd::Image*, VkResult> CreateImage() override;
-		Result<vkd::DeviceMemory*, VkResult> CreateDeviceMemory() override;
-		Result<vkd::Pipeline*, VkResult> CreatePipeline() override;
-		Result<vkd::RenderPass*, VkResult> CreateRenderPass() override;
-		Result<vkd::ImageView*, VkResult> CreateImageView() override;
-		Result<vkd::Framebuffer*, VkResult> CreateFramebuffer() override;
-		Result<vkd::ShaderModule*, VkResult> CreateShaderModule() override;
+		Result<vkd::CommandPool*, VkResult> CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::Fence*, VkResult> CreateFence(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::Buffer*, VkResult> CreateBuffer(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::BufferView*, VkResult> CreateBufferView(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::DeviceMemory*, VkResult> CreateDeviceMemory(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::Pipeline*, VkResult> CreatePipeline(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::RenderPass*, VkResult> CreateRenderPass(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::ImageView*, VkResult> CreateImageView(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::Framebuffer*, VkResult> CreateFramebuffer(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::ShaderModule*, VkResult> CreateShaderModule(const VkAllocationCallbacks& allocationCallbacks) override;
 
 	private:
 		ThreadPool m_threadPool;

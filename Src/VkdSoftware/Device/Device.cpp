@@ -80,9 +80,9 @@ namespace vkd::software
 		return reinterpret_cast<DispatchableObject<vkd::Queue>*>(queue);
 	}
 
-	Result<vkd::CommandPool*, VkResult> SoftwareDevice::CreateCommandPool()
+	Result<vkd::CommandPool*, VkResult> SoftwareDevice::CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* pool = mem::New<CommandPool>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+		auto* pool = mem::New<CommandPool>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
 		if (!pool)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate CommandPool");
@@ -92,9 +92,9 @@ namespace vkd::software
 		return pool;
 	}
 
-	Result<vkd::Fence*, VkResult> SoftwareDevice::CreateFence()
+	Result<vkd::Fence*, VkResult> SoftwareDevice::CreateFence(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* fence = mem::New<Fence>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* fence = mem::New<Fence>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!fence)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Fence");
@@ -104,9 +104,9 @@ namespace vkd::software
 		return fence;
 	}
 
-	Result<vkd::Buffer*, VkResult> SoftwareDevice::CreateBuffer()
+	Result<vkd::Buffer*, VkResult> SoftwareDevice::CreateBuffer(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* buffer = mem::New<Buffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* buffer = mem::New<Buffer>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!buffer)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Buffer");
@@ -116,9 +116,9 @@ namespace vkd::software
 		return buffer;
 	}
 
-	Result<vkd::BufferView*, VkResult> SoftwareDevice::CreateBufferView()
+	Result<vkd::BufferView*, VkResult> SoftwareDevice::CreateBufferView(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* bufferView = mem::New<BufferView>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* bufferView = mem::New<BufferView>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!bufferView)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate BufferView");
@@ -128,9 +128,9 @@ namespace vkd::software
 		return bufferView;
 	}
 
-	Result<vkd::Image*, VkResult> SoftwareDevice::CreateImage()
+	Result<vkd::Image*, VkResult> SoftwareDevice::CreateImage(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* image = mem::New<Image>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* image = mem::New<Image>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!image)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Image");
@@ -140,9 +140,9 @@ namespace vkd::software
 		return image;
 	}
 
-	Result<vkd::DeviceMemory*, VkResult> SoftwareDevice::CreateDeviceMemory()
+	Result<vkd::DeviceMemory*, VkResult> SoftwareDevice::CreateDeviceMemory(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* memory = mem::New<DeviceMemory>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* memory = mem::New<DeviceMemory>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!memory)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate DeviceMemory");
@@ -152,9 +152,9 @@ namespace vkd::software
 		return memory;
 	}
 
-	Result<vkd::Pipeline*, VkResult> SoftwareDevice::CreatePipeline()
+	Result<vkd::Pipeline*, VkResult> SoftwareDevice::CreatePipeline(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* pipeline = mem::New<Pipeline>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* pipeline = mem::New<Pipeline>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!pipeline)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Pipeline");
@@ -164,9 +164,9 @@ namespace vkd::software
 		return pipeline;
 	}
 
-	Result<vkd::RenderPass*, VkResult> SoftwareDevice::CreateRenderPass()
+	Result<vkd::RenderPass*, VkResult> SoftwareDevice::CreateRenderPass(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* renderPass = mem::New<RenderPass>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* renderPass = mem::New<RenderPass>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!renderPass)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate RenderPass");
@@ -176,9 +176,9 @@ namespace vkd::software
 		return renderPass;
 	}
 
-	Result<vkd::ImageView*, VkResult> SoftwareDevice::CreateImageView()
+	Result<vkd::ImageView*, VkResult> SoftwareDevice::CreateImageView(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* imageView = mem::New<ImageView>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* imageView = mem::New<ImageView>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!imageView)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate ImageView");
@@ -188,9 +188,9 @@ namespace vkd::software
 		return imageView;
 	}
 
-	Result<vkd::Framebuffer*, VkResult> SoftwareDevice::CreateFramebuffer()
+	Result<vkd::Framebuffer*, VkResult> SoftwareDevice::CreateFramebuffer(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* framebuffer = mem::New<Framebuffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* framebuffer = mem::New<Framebuffer>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!framebuffer)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Framebuffer");
@@ -200,9 +200,9 @@ namespace vkd::software
 		return framebuffer;
 	}
 
-	Result<vkd::ShaderModule*, VkResult> SoftwareDevice::CreateShaderModule()
+	Result<vkd::ShaderModule*, VkResult> SoftwareDevice::CreateShaderModule(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* shaderModule = mem::New<ShaderModule>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* shaderModule = mem::New<ShaderModule>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 		if (!shaderModule)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate ShaderModule");
