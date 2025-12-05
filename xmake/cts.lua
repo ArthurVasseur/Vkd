@@ -51,7 +51,7 @@ if has_config("cts") then
                     --VK_LOADER_DEBUG = "all",
                 })
 
-                local output_dir = path.join(os.scriptdir(), driver_name .. "-cts-results/")
+                local output_dir = path.join(os.projectdir(), driver_name .. "-cts-results/")
                 if os.isdir(output_dir) then
                     os.rm(output_dir)
                 end
@@ -65,7 +65,7 @@ if has_config("cts") then
                         "--deqp-archive-dir=" .. output_dir,
                         "--deqp-shadercache-filename=" .. path.join(output_dir, "vk-cts-shadercache.bin"),
                         "--deqp-log-filename=" .. path.join(output_dir, "vk-cts-log.txt"),
-                        "--deqp-caselist-file=" .. path.join(os.scriptdir(), "vk-default.txt"),
+                        "--deqp-caselist-file=" .. path.join(os.projectdir(), "vk-default.txt"),
                     },
                     {envs = envs, try = true}
                 )
