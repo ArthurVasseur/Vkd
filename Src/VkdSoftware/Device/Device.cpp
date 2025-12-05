@@ -9,6 +9,7 @@
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
+#include "VkdSoftware/BufferView/BufferView.hpp"
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
 #include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 #include "VkdSoftware/Framebuffer/Framebuffer.hpp"
@@ -113,6 +114,18 @@ namespace vkd::software
 		}
 
 		return buffer;
+	}
+
+	Result<vkd::BufferView*, VkResult> SoftwareDevice::CreateBufferView()
+	{
+		auto* bufferView = mem::New<BufferView>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!bufferView)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate BufferView");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return bufferView;
 	}
 
 	Result<vkd::Image*, VkResult> SoftwareDevice::CreateImage()
