@@ -378,7 +378,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
 
-		mem::Delete(poolObj->GetAllocationCallbacks(), poolObj);
+		mem::Delete(pAllocator ? *pAllocator : poolObj->GetAllocationCallbacks(), poolObj);
 	}
 
 	VkResult Device::ResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags)
@@ -496,7 +496,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Fence>*>(fence);
-		mem::Delete(fenceObj->GetAllocationCallbacks(), dispatchable);
+		mem::Delete(pAllocator ? *pAllocator : fenceObj->GetAllocationCallbacks(), dispatchable);
 	}
 
 	VkResult Device::WaitForFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences, VkBool32 waitAll, uint64_t timeout)
@@ -660,7 +660,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
 
-		mem::Delete(bufferObj->GetAllocationCallbacks(), bufferObj);
+		mem::Delete(pAllocator ? *pAllocator : bufferObj->GetAllocationCallbacks(), bufferObj);
 	}
 
 	void Device::GetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements* pMemoryRequirements)
@@ -721,7 +721,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(BufferView, bufferViewObj, bufferView);
 
-		mem::Delete(bufferViewObj->GetAllocationCallbacks(), bufferViewObj);
+		mem::Delete(pAllocator ? *pAllocator : bufferViewObj->GetAllocationCallbacks(), bufferViewObj);
 	}
 
 	VkResult Device::CreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImage* pImage)
@@ -757,7 +757,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Image, imageObj, image);
 
-		mem::Delete(imageObj->GetAllocationCallbacks(), imageObj);
+		mem::Delete(pAllocator ? *pAllocator : imageObj->GetAllocationCallbacks(), imageObj);
 	}
 
 	void Device::GetImageMemoryRequirements(VkDevice device, VkImage image, VkMemoryRequirements* pMemoryRequirements)
@@ -958,7 +958,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
 
-		mem::Delete(pipelineObj->GetAllocationCallbacks(), pipelineObj);
+		mem::Delete(pAllocator ? *pAllocator : pipelineObj->GetAllocationCallbacks(), pipelineObj);
 	}
 
 	VkResult Device::CreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass)
@@ -994,7 +994,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, renderPass);
 
-		mem::Delete(renderPassObj->GetAllocationCallbacks(), renderPassObj);
+		mem::Delete(pAllocator ? *pAllocator : renderPassObj->GetAllocationCallbacks(), renderPassObj);
 	}
 
 	VkResult Device::CreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImageView* pView)
@@ -1030,7 +1030,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(ImageView, imageViewObj, imageView);
 
-		mem::Delete(imageViewObj->GetAllocationCallbacks(), imageViewObj);
+		mem::Delete(pAllocator ? *pAllocator : imageViewObj->GetAllocationCallbacks(), imageViewObj);
 	}
 
 	VkResult Device::CreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer)
@@ -1066,7 +1066,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Framebuffer, framebufferObj, framebuffer);
 
-		mem::Delete(framebufferObj->GetAllocationCallbacks(), framebufferObj);
+		mem::Delete(pAllocator ? *pAllocator : framebufferObj->GetAllocationCallbacks(), framebufferObj);
 	}
 
 	VkResult Device::CreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule)
@@ -1102,7 +1102,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(ShaderModule, shaderModuleObj, shaderModule);
 
-		mem::Delete(shaderModuleObj->GetAllocationCallbacks(), shaderModuleObj);
+		mem::Delete(pAllocator ? *pAllocator : shaderModuleObj->GetAllocationCallbacks(), shaderModuleObj);
 	}
 
 	VkResult Device::CreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSampler* pSampler)
