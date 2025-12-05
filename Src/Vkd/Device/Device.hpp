@@ -21,6 +21,7 @@ namespace vkd
 	class CommandPool;
 	class Fence;
 	class Buffer;
+	class BufferView;
 	class Image;
 	class ImageView;
 	class DeviceMemory;
@@ -70,6 +71,9 @@ namespace vkd
 		static void VKAPI_CALL DestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator);
 		static void VKAPI_CALL GetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements* pMemoryRequirements);
 		static VkResult VKAPI_CALL BindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memoryOffset);
+
+		static VkResult VKAPI_CALL CreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkBufferView* pView);
+		static void VKAPI_CALL DestroyBufferView(VkDevice device, VkBufferView bufferView, const VkAllocationCallbacks* pAllocator);
 
 		static VkResult VKAPI_CALL CreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImage* pImage);
 		static void VKAPI_CALL DestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator);
@@ -137,6 +141,7 @@ namespace vkd
 		virtual Result<CommandPool*, VkResult> CreateCommandPool() = 0;
 		virtual Result<Fence*, VkResult> CreateFence() = 0;
 		virtual Result<Buffer*, VkResult> CreateBuffer() = 0;
+		virtual Result<BufferView*, VkResult> CreateBufferView() = 0;
 		virtual Result<Image*, VkResult> CreateImage() = 0;
 		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory() = 0;
 		virtual Result<Pipeline*, VkResult> CreatePipeline() = 0;

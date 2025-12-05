@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "Vkd/Buffer/Buffer.hpp"
+#include "Vkd/BufferView/BufferView.hpp"
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
@@ -234,6 +235,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetBufferMemoryRequirements);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindBufferMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateBufferView);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyBufferView);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageMemoryRequirements);
@@ -685,6 +688,42 @@ namespace vkd
 		return VK_SUCCESS;
 	}
 
+	VkResult Device::CreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkBufferView* pView)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pView);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto bufferViewResult = deviceObj->CreateBufferView();
+		if (bufferViewResult.IsError())
+			return bufferViewResult.GetError();
+
+		auto* bufferViewObj = std::move(bufferViewResult).GetValue();
+		VkResult result = bufferViewObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, bufferViewObj);
+			return result;
+		}
+
+		*pView = VKD_TO_HANDLE(VkBufferView, bufferViewObj);
+		return VK_SUCCESS;
+	}
+
+	void Device::DestroyBufferView(VkDevice device, VkBufferView bufferView, const VkAllocationCallbacks* pAllocator)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(BufferView, bufferViewObj, bufferView);
+
+		mem::Delete(bufferViewObj->GetAllocationCallbacks(), bufferViewObj);
+	}
+
 	VkResult Device::CreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImage* pImage)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
@@ -779,7 +818,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
 
-		mem::Delete(memoryObj->GetAllocationCallbacks(), memoryObj);
+		mem::Delete(pAllocator ? *pAllocator : memoryObj->GetAllocationCallbacks(), memoryObj);
 	}
 
 	VkResult Device::MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData)

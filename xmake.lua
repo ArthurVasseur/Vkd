@@ -59,6 +59,7 @@ drivers = {
         Files = {
             ".",
             "Buffer",
+            "BufferView",
             "CommandBuffer",
             "CommandDispatcher",
             "CommandPool",
