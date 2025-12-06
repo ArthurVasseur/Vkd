@@ -105,6 +105,8 @@ namespace vkd
 
 	bool Allocator::Init() noexcept
 	{
+		std::lock_guard<std::mutex> lock(m_Mutex);
+
 		if (m_Initialized)
 			return false;
 
@@ -298,6 +300,12 @@ namespace vkd
 
 	void Allocator::RemoveFree(Block* b) noexcept
 	{
+		if (b == nullptr)
+			return;
+
+		if (!b->IsFree())
+			return;
+
 		UInt32 firstLevelIndex, secondLevelIndex;
 		Mapping(b->size, firstLevelIndex, secondLevelIndex);
 
@@ -552,6 +560,8 @@ namespace vkd
 
 	bool Allocator::Allocate(std::size_t size, std::size_t alignment, Allocation& out) noexcept
 	{
+		std::lock_guard<std::mutex> lock(m_Mutex);
+
 		if (!m_Initialized || size == 0)
 			return false;
 
@@ -620,6 +630,8 @@ namespace vkd
 
 	void Allocator::Free(const Allocation& alloc) noexcept
 	{
+		std::lock_guard<std::mutex> lock(m_Mutex);
+
 		if (!m_Initialized || alloc.offset == 0)
 			return;
 
@@ -638,6 +650,8 @@ namespace vkd
 
 	bool Allocator::ReallocateInPlace(Allocation& inOut, std::size_t newSize) noexcept
 	{
+		std::lock_guard<std::mutex> lock(m_Mutex);
+
 		if (!m_Initialized || inOut.offset == 0 || newSize == 0)
 			return false;
 
@@ -711,6 +725,8 @@ namespace vkd
 
 	std::size_t Allocator::GetLargestFreeBlock() const noexcept
 	{
+		std::lock_guard<std::mutex> lock(m_Mutex);
+
 		if (!m_Initialized || m_FirstLevelBitmap == 0)
 			return 0;
 
@@ -737,6 +753,8 @@ namespace vkd
 
 	double Allocator::GetExternalFragmentation() const noexcept
 	{
+		std::lock_guard<std::mutex> lock(m_Mutex);
+
 		if (!m_Initialized || m_UsedSize >= m_TotalSize)
 			return 0.0;
 
@@ -744,7 +762,27 @@ namespace vkd
 		if (freeSpace == 0)
 			return 0.0;
 
-		const std::size_t largestFree = GetLargestFreeBlock();
+		if (!m_Initialized || m_FirstLevelBitmap == 0)
+			return 0.0;
+
+		UInt32 firstLevelIndex = FindLastSet64(m_FirstLevelBitmap);
+
+		if (m_SecondLevelBitmaps[firstLevelIndex] == 0)
+			return 0.0;
+
+		UInt32 secondLevelIndex = FindLastSet64(m_SecondLevelBitmaps[firstLevelIndex]);
+
+		const std::size_t index = GetFreeListIndex(firstLevelIndex, secondLevelIndex);
+		const Block* block = m_FreeLists[index];
+
+		std::size_t largestFree = 0;
+		while (block != nullptr)
+		{
+			if (block->size > largestFree)
+				largestFree = block->size;
+			block = block->nextFree;
+		}
+
 		if (largestFree == 0)
 			return 1.0;
 
@@ -753,12 +791,42 @@ namespace vkd
 
 	void Allocator::DumpState(std::ostream& os) const
 	{
+		std::lock_guard<std::mutex> lock(m_Mutex);
+
+		std::size_t largestFree = 0;
+		if (m_Initialized && m_FirstLevelBitmap != 0)
+		{
+			UInt32 firstLevelIndex = FindLastSet64(m_FirstLevelBitmap);
+			if (m_SecondLevelBitmaps[firstLevelIndex] != 0)
+			{
+				UInt32 secondLevelIndex = FindLastSet64(m_SecondLevelBitmaps[firstLevelIndex]);
+				const std::size_t index = GetFreeListIndex(firstLevelIndex, secondLevelIndex);
+				const Block* block = m_FreeLists[index];
+				while (block != nullptr)
+				{
+					if (block->size > largestFree)
+						largestFree = block->size;
+					block = block->nextFree;
+				}
+			}
+		}
+
+		double fragmentation = 0.0;
+		if (m_Initialized && m_UsedSize < m_TotalSize)
+		{
+			const std::size_t freeSpace = m_TotalSize - m_UsedSize;
+			if (freeSpace > 0 && largestFree > 0)
+				fragmentation = 1.0 - (static_cast<double>(largestFree) / static_cast<double>(freeSpace));
+			else if (freeSpace > 0 && largestFree == 0)
+				fragmentation = 1.0;
+		}
+
 		os << "=== Two-Level Segregate Fit Allocator State ===\n";
 		os << "Total Size: " << m_TotalSize << " bytes\n";
 		os << "Used Size: " << m_UsedSize << " bytes\n";
 		os << "Free Size: " << (m_TotalSize - m_UsedSize) << " bytes\n";
-		os << "Largest Free Block: " << GetLargestFreeBlock() << " bytes\n";
-		os << "External Fragmentation: " << (GetExternalFragmentation() * 100.0) << "%\n";
+		os << "Largest Free Block: " << largestFree << " bytes\n";
+		os << "External Fragmentation: " << (fragmentation * 100.0) << "%\n";
 		os << "\n";
 
 		os << "First Level Bitmap: 0x" << std::hex << m_FirstLevelBitmap << std::dec << "\n";
