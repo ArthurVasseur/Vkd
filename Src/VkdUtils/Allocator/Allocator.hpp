@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <iosfwd>
+#include <mutex>
 #include <vector>
 
 #include <Concerto/Core/Types/Types.hpp>
@@ -289,6 +290,7 @@ namespace vkd
 		std::vector<UInt64> m_SecondLevelBitmaps;
 		std::vector<Block*> m_FreeLists;
 		bool m_Initialized;
+		mutable std::mutex m_Mutex;
 	};
 
 } // namespace vkd
