@@ -839,6 +839,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (memory == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
 

@@ -280,8 +280,8 @@ namespace vkd
 		CCT_ASSERT(pMemoryProperties, "pMemoryProperties cannot be null");
 
 		System system;
-		const UInt64 totalRam = system.GetTotalRamBytes();
-		const UInt64 heapSize = System::ComputeDeviceMemoryHeapSize(totalRam);
+		const std::optional<UInt64> availableRam = system.GetAvailableRamBytes();
+		const UInt64 heapSize = availableRam ? System::ComputeDeviceMemoryHeapSize(*availableRam) : 256ULL * 1024ULL * 1024ULL;
 
 		// Initialize memory properties
 		pMemoryProperties->memoryHeapCount = 1;

@@ -438,7 +438,7 @@ namespace vkd
 		if (size < MinBlockSize)
 			size = MinBlockSize;
 
-		const std::size_t searchSize = size + alignment + sizeof(Block);
+		const std::size_t searchSize = size + alignment - 1 + sizeof(Block);
 
 		UInt32 firstLevelIndex, secondLevelIndex;
 		Mapping(searchSize, firstLevelIndex, secondLevelIndex);
@@ -581,35 +581,27 @@ namespace vkd
 		const std::size_t alignedStart = AlignUp(blockStart, alignment);
 		const std::size_t alignmentPadding = alignedStart - blockStart;
 
-		if (alignmentPadding > 0)
+		if (alignmentPadding >= sizeof(Block) + MinBlockSize)
 		{
-			if (alignmentPadding >= sizeof(Block) + MinBlockSize)
-			{
-				const std::size_t originalSize = block->size;
+			const std::size_t originalSize = block->size;
 
-				Block* paddingBlock = block;
-				const std::size_t paddingSize = alignmentPadding - sizeof(Block);
+			Block* paddingBlock = block;
+			const std::size_t paddingSize = alignmentPadding - sizeof(Block);
 
-				paddingBlock->size = paddingSize;
-				MarkFree(paddingBlock);
-				InsertFree(paddingBlock);
+			paddingBlock->size = paddingSize;
+			MarkFree(paddingBlock);
+			InsertFree(paddingBlock);
 
-				const std::size_t alignedBlockOffset = GetBlockOffset(paddingBlock) + sizeof(Block) + paddingSize;
-				block = GetBlockFromOffset(alignedBlockOffset);
-				block->size = originalSize - sizeof(Block) - paddingSize;
-				block->prevPhysicalSize = paddingSize;
-				block->flags.Clear();
-				block->SetPrevFree(true);
+			const std::size_t alignedBlockOffset = GetBlockOffset(paddingBlock) + sizeof(Block) + paddingSize;
+			block = GetBlockFromOffset(alignedBlockOffset);
+			block->size = originalSize - sizeof(Block) - paddingSize;
+			block->prevPhysicalSize = paddingSize;
+			block->flags.Clear();
+			block->SetPrevFree(true);
 
-				Block* next = GetNextPhysicalBlock(block);
-				if (next != nullptr)
-					next->prevPhysicalSize = block->size;
-			}
-			else
-			{
-				InsertFree(block);
-				return false;
-			}
+			Block* next = GetNextPhysicalBlock(block);
+			if (next != nullptr)
+				next->prevPhysicalSize = block->size;
 		}
 
 		Block* remainder = nullptr;

@@ -615,3 +615,21 @@ TEST_CASE("Allocator - Edge Cases", "[allocator][edge]")
 		REQUIRE_FALSE(allocator.Allocate(1024, 16, alloc));
 	}
 }
+
+TEST_CASE("Allocator - CTS Bug Reproduction", "[allocator][cts][bug]")
+{
+	SECTION("8100 bytes then 8192 bytes with alignment 16")
+	{
+		Allocator allocator(8ULL * 1024ULL * 1024ULL * 1024ULL);
+		REQUIRE(allocator.Init());
+
+		Allocation alloc1;
+		REQUIRE(allocator.Allocate(8192, 16, alloc1));
+
+		Allocation alloc2;
+		REQUIRE(allocator.Allocate(8100, 16, alloc2));
+
+		Allocation alloc3;
+		REQUIRE(allocator.Allocate(8192, 16, alloc3));
+	}
+}
