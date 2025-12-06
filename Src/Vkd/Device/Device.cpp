@@ -245,6 +245,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, MapMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, UnmapMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FlushMappedMemoryRanges);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, InvalidateMappedMemoryRanges);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateGraphicsPipelines);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateComputePipelines);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipeline);
@@ -845,6 +847,32 @@ namespace vkd
 
 		memoryObj->Unmap();
 		memoryObj->m_mapped = false;
+	}
+
+	VkResult Device::FlushMappedMemoryRanges(VkDevice device, uint32_t memoryRangeCount, const VkMappedMemoryRange* pMemoryRanges)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		for (uint32_t i = 0; i < memoryRangeCount; ++i)
+		{
+			VKD_FROM_HANDLE(DeviceMemory, memoryObj, pMemoryRanges[i].memory);
+			VKD_CHECK(memoryObj->m_mapped);
+		}
+
+		return VK_SUCCESS;
+	}
+
+	VkResult Device::InvalidateMappedMemoryRanges(VkDevice device, uint32_t memoryRangeCount, const VkMappedMemoryRange* pMemoryRanges)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		for (uint32_t i = 0; i < memoryRangeCount; ++i)
+		{
+			VKD_FROM_HANDLE(DeviceMemory, memoryObj, pMemoryRanges[i].memory);
+			VKD_CHECK(memoryObj->m_mapped);
+		}
+
+		return VK_SUCCESS;
 	}
 
 	VkResult Device::CreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines)
