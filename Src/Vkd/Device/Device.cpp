@@ -303,7 +303,29 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdClearColorImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindPipeline);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindVertexBuffers);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindIndexBuffer);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBindDescriptorSets);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdPushConstants);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdPipelineBarrier);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDraw);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDrawIndexed);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDrawIndirect);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDrawIndexedIndirect);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDispatch);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdDispatchIndirect);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetViewport);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetScissor);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetLineWidth);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetDepthBias);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetBlendConstants);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetDepthBounds);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetStencilCompareMask);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetStencilWriteMask);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdSetStencilReference);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBeginRenderPass);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdEndRenderPass);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdNextSubpass);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdExecuteCommands);
 
 #undef VKD_ENTRYPOINT_LOOKUP
 		// cct::Logger::Warning("Could not find '{}' function", pName);
