@@ -42,8 +42,9 @@ namespace vkd
 	 */
 	struct Allocation
 	{
-		std::size_t offset; // Offset from the beginning of the pool
-		std::size_t size; // Size of the allocation in bytes
+		std::size_t offset;  // Aligned payload offset from the beginning of the pool
+		std::size_t size;    // Size of the allocation in bytes (includes alignment padding)
+		std::size_t padding; // Bytes of alignment waste before the payload
 	};
 
 	/**

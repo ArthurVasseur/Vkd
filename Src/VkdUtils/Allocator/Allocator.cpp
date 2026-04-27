@@ -7,11 +7,13 @@
 #include "VkdUtils/Allocator/Allocator.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstring>
 #include <new>
 #include <ostream>
 
 #include <Concerto/Core/EnumFlags/EnumFlags.hpp>
+#include <Concerto/Core/Assert.hpp>
 
 #if defined(CCT_PLATFORM_WINDOWS)
 #include <intrin.h>
@@ -579,7 +581,7 @@ namespace vkd
 
 		const std::size_t blockStart = GetPayloadOffset(block);
 		const std::size_t alignedStart = AlignUp(blockStart, alignment);
-		const std::size_t alignmentPadding = alignedStart - blockStart;
+		std::size_t alignmentPadding = alignedStart - blockStart;
 
 		if (alignmentPadding >= sizeof(Block) + MinBlockSize)
 		{
@@ -602,10 +604,12 @@ namespace vkd
 			Block* next = GetNextPhysicalBlock(block);
 			if (next != nullptr)
 				next->prevPhysicalSize = block->size;
+
+			alignmentPadding = 0;
 		}
 
 		Block* remainder = nullptr;
-		SplitBlock(block, size, remainder);
+		SplitBlock(block, size + alignmentPadding, remainder);
 
 		if (remainder != nullptr)
 			InsertFree(remainder);
@@ -614,8 +618,11 @@ namespace vkd
 
 		m_UsedSize += sizeof(Block) + block->size;
 
-		out.offset = GetPayloadOffset(block);
+		out.offset = GetPayloadOffset(block) + alignmentPadding;
 		out.size = block->size;
+		out.padding = alignmentPadding;
+
+		CCT_ASSERT(out.offset % alignment, "TLSF: returned offset is not aligned");
 
 		return true;
 	}
@@ -627,7 +634,7 @@ namespace vkd
 		if (!m_Initialized || alloc.offset == 0)
 			return;
 
-		const std::size_t blockOffset = alloc.offset - sizeof(Block);
+		const std::size_t blockOffset = alloc.offset - alloc.padding - sizeof(Block);
 		Block* block = GetBlockFromOffset(blockOffset);
 
 		if (block->IsFree())
@@ -647,7 +654,7 @@ namespace vkd
 		if (!m_Initialized || inOut.offset == 0 || newSize == 0)
 			return false;
 
-		const std::size_t blockOffset = inOut.offset - sizeof(Block);
+		const std::size_t blockOffset = inOut.offset - inOut.padding - sizeof(Block);
 		Block* block = GetBlockFromOffset(blockOffset);
 
 		if (block->IsFree())
@@ -707,6 +714,7 @@ namespace vkd
 		{
 			MarkFree(remainder);
 			InsertFree(remainder);
+			m_UsedSize += newSize - currentSize;
 		}
 		else
 			m_UsedSize += sizeof(Block) + next->size;

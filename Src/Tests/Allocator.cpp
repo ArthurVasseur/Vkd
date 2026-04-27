@@ -453,6 +453,14 @@ TEST_CASE("Allocator - Stress Test", "[allocator][stress]")
 				activeAllocs.push_back(alloc);
 				++allocCount;
 
+				INFO("iter=" << i
+					<< " size=" << size
+					<< " alignment=" << alignment
+					<< " offset=" << alloc.offset
+					<< " padding=" << alloc.padding
+					<< " allocSize=" << alloc.size
+					<< " used=" << allocator.GetUsed()
+					<< " active=" << activeAllocs.size());
 				REQUIRE((alloc.offset % alignment) == 0);
 			}
 		}
@@ -614,6 +622,92 @@ TEST_CASE("Allocator - Edge Cases", "[allocator][edge]")
 		Allocation alloc;
 		REQUIRE_FALSE(allocator.Allocate(1024, 16, alloc));
 	}
+}
+
+TEST_CASE("Allocator - alignment padding boundary", "[allocator][alignment]")
+{
+	Allocator allocator(1024 * 1024);
+	REQUIRE(allocator.Init());
+
+	Allocation prime;
+	REQUIRE(allocator.Allocate(73, 16, prime));
+
+	const std::size_t alignments[] = {16, 32, 64, 128, 256, 512, 1024};
+	for (std::size_t alignment : alignments)
+	{
+		Allocation a;
+		REQUIRE(allocator.Allocate(128, alignment, a));
+		INFO("alignment=" << alignment
+			<< " offset=" << a.offset
+			<< " padding=" << a.padding);
+		REQUIRE((a.offset % alignment) == 0);
+		REQUIRE(a.padding < alignment);
+		allocator.Free(a);
+	}
+}
+
+TEST_CASE("Allocator - padding survives free/realloc", "[allocator][alignment]")
+{
+	Allocator allocator(1024 * 1024);
+	REQUIRE(allocator.Init());
+
+	std::vector<Allocation> allocs;
+	for (int i = 0; i < 200; ++i)
+	{
+		Allocation a;
+		const std::size_t size = 50 + (i * 7) % 200;
+		const std::size_t alignment = 1ULL << (4 + (i % 4));
+		if (allocator.Allocate(size, alignment, a))
+		{
+			INFO("iter=" << i
+				<< " size=" << size
+				<< " alignment=" << alignment
+				<< " offset=" << a.offset
+				<< " padding=" << a.padding);
+			REQUIRE((a.offset % alignment) == 0);
+			allocs.push_back(a);
+		}
+		if ((i % 3) == 2 && !allocs.empty())
+		{
+			allocator.Free(allocs.back());
+			allocs.pop_back();
+		}
+	}
+	for (const auto& a : allocs)
+		allocator.Free(a);
+	REQUIRE(allocator.GetUsed() == 0);
+}
+
+TEST_CASE("Allocator - Allocate writes all output fields", "[allocator][api]")
+{
+	Allocator allocator(1024 * 1024);
+	REQUIRE(allocator.Init());
+
+	constexpr std::size_t Sentinel = static_cast<std::size_t>(-1);
+	Allocation a{Sentinel, Sentinel, Sentinel};
+	REQUIRE(allocator.Allocate(1024, 64, a));
+	REQUIRE(a.offset != Sentinel);
+	REQUIRE(a.size != Sentinel);
+	REQUIRE(a.padding != Sentinel);
+}
+
+TEST_CASE("Allocator - ReallocateInPlace keeps offset aligned", "[allocator][realloc]")
+{
+	Allocator allocator(1024 * 1024);
+	REQUIRE(allocator.Init());
+
+	Allocation a;
+	REQUIRE(allocator.Allocate(100, 128, a));
+	const std::size_t origOffset = a.offset;
+	const std::size_t origPadding = a.padding;
+
+	REQUIRE(allocator.ReallocateInPlace(a, 200));
+	REQUIRE(a.offset == origOffset);
+	REQUIRE(a.padding == origPadding);
+	REQUIRE((a.offset % 128) == 0);
+
+	allocator.Free(a);
+	REQUIRE(allocator.GetUsed() == 0);
 }
 
 TEST_CASE("Allocator - CTS Bug Reproduction", "[allocator][cts][bug]")
