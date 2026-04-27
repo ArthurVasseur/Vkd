@@ -1,26 +1,26 @@
 add_rules("mode.debug", "mode.release")
-add_repositories("Concerto-xrepo https://github.com/ConcertoEngine/xmake-repo.git main")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
+
+includes("deps/ConcertoFramework/xmake.lua")
 
 for _, require in ipairs({"vulkan-headers", "vulkan-utility-libraries"}) do
     add_requires(require .. " 1.4.309+0")
 end
 
 add_requires("mimalloc", "nazarautils", "catch2", "volk")
-add_requires("concerto-core", {configs = {asserts = get_config("debug_checks"), debug = is_mode("debug")}})
 add_requires("catch2", "nzsl")
 
-if has_config("debug_checks") then
+if has_config("debug-checks") then
     add_requires("cpptrace")
 end
 
-option("debug_checks", {default = is_mode("debug"), description = "Enable additional debug checks"})
+option("debug-checks", {default = is_mode("debug"), description = "Enable additional debug checks"})
 option("profiling", { description = "Build with tracy profiler", default = false })
 option("tests", { description = "Build test applications", default = true })
 option("cts", { description = "Build Vulkan CTS", default = false })
 option("installer", { description = "Build NSIS installer", default = false })
 
-if has_config("debug_checks") then
+if has_config("debug-checks") then
     add_requires("cpptrace")
 end
 
@@ -33,7 +33,7 @@ if has_config("cts") then
 end
 
 
-function add_files_to_target(p, hpp_as_files)
+local function add_files_to_target(p, hpp_as_files)
     for _, dir in ipairs(os.filedirs(p)) do
         relative_dir = path.relative(dir, "Src/")
         if os.isdir(dir) then
@@ -85,8 +85,8 @@ target("vkd-Utils")
     set_languages("c++20")
     set_kind("static")
     add_includedirs("Src", { public = true })
-    add_packages("concerto-core", "mimalloc", {public = true})
-
+    add_packages("mimalloc", {public = true})
+    add_deps("concerto-core", { public = true })
     if is_plat("linux", "macosx", "bsd") then
         add_cxflags("-fPIC")
     end
@@ -96,14 +96,9 @@ target("vkd-Utils")
         "Allocator",
         "Memory",
         "System",
-        "ThreadPool",
     }
     for _, dir in ipairs(files) do
         add_files_to_target("Src/VkdUtils/" .. dir, false)
-    end
-
-    if is_plat("mingw", "linux", "macosx", "bsd") then
-        add_syslinks("pthread")
     end
 
     -- macOS: ensure we link against the correct C++ runtime when using custom toolchain
@@ -121,7 +116,8 @@ target("vkd")
     add_files("Src/Vkd/**.cpp")
     add_includedirs("Src", { public = true })
     add_headerfiles("Src/(Vkd/**.hpp)", "Src/(Vkd/**.inl)")
-    add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc")
+    add_packages("vulkan-headers", "vulkan-utility-libraries", "mimalloc")
+    add_deps("concerto-core", { public = true })
     add_packages("nazarautils", {public = true})
     add_defines("VK_NO_PROTOTYPES")
     add_deps("vkd-Utils", { public = true })
@@ -129,15 +125,18 @@ target("vkd")
     if is_plat("linux", "macosx", "bsd") then
         add_cxflags("-fPIC")
     end
+
     if is_plat("windows") then
         add_syslinks("Gdi32", "SetupAPI")
     end
-    if has_config("debug_checks") then
-        add_defines("VKD_DEBUG_CHECKS", { public = true })
+
+    if has_config("debug-checks") then
+        add_defines("VKD_DEBUG_CHECK", { public = true })
         add_packages("cpptrace", { public = true })
     end
+
     if has_config("profiling") then
-        add_packages("tracy", {public = true})
+        add_deps("concerto-profiler", { public = true })
         add_defines("VKD_PROFILING", { public = true })
     end
 
@@ -240,7 +239,8 @@ if has_config("tests") then
         set_kind("binary")
         add_files("Tests/**.cpp")
         add_includedirs("Src", { public = true })
-        add_packages("concerto-core", "vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk", "nzsl")
+        add_packages("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk", "nzsl")
+        add_deps("concerto-core", { public = true })
         add_defines("VK_NO_PROTOTYPES")
         add_files("Src/TestApp/main.cpp")
 

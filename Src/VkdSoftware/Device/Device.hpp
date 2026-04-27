@@ -8,9 +8,9 @@
 
 #pragma once
 
+#include <Concerto/Core/ThreadPool/ThreadPool.hpp>
 #include "Vkd/Device/Device.hpp"
 #include "VkdUtils/Allocator/Allocator.hpp"
-#include "VkdUtils/ThreadPool/ThreadPool.hpp"
 
 namespace vkd::software
 {
