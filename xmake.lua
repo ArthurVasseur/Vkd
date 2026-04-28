@@ -242,6 +242,7 @@ if has_config("tests") then
         add_packages("vulkan-headers", "vulkan-utility-libraries", "mimalloc", "volk", "nzsl")
         add_deps("concerto-core", { public = true })
         add_defines("VK_NO_PROTOTYPES")
+        add_defines("VULKAN_HPP_TYPESAFE_CONVERSION=1")
         add_files("Src/TestApp/main.cpp")
 
         for driver_name, driver in pairs(drivers) do
