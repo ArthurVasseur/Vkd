@@ -17,10 +17,14 @@ namespace vkd
 		m_layers = info.layers;
 		SetAllocationCallbacks(allocationCallbacks);
 
-		m_attachments.resize(info.attachmentCount);
-		for (cct::UInt32 i = 0; i < info.attachmentCount; ++i)
-			m_attachments[i] = info.pAttachments[i];
+		if (info.attachmentCount > 0 && info.pAttachments != nullptr)
+		{
+			m_attachments.resize(info.attachmentCount);
+			for (UInt32 i = 0; i < info.attachmentCount; ++i)
+				m_attachments[i] = info.pAttachments[i];
+		}
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 } // namespace vkd

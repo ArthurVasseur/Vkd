@@ -30,10 +30,7 @@ namespace vkd
 
 		SetAllocationCallbacks(allocationCallbacks);
 
-#ifdef VKD_DEBUG_CHECKS
 		m_createResult = VK_SUCCESS;
-#endif
-
-		return VK_SUCCESS;
+		return m_createResult;
 	}
 } // namespace vkd

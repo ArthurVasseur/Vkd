@@ -13,16 +13,20 @@ namespace vkd
 		m_owner = &owner;
 		SetAllocationCallbacks(allocationCallbacks);
 
-		if (info.codeSize == 0 || !info.pCode)
-			return VK_ERROR_INITIALIZATION_FAILED;
+		if (info.codeSize == 0 || !info.pCode || (info.codeSize % sizeof(UInt32)) != 0)
+		{
+			m_createResult = VK_ERROR_INITIALIZATION_FAILED;
+			return m_createResult;
+		}
 
-		cct::UInt32 codeWordCount = info.codeSize / sizeof(cct::UInt32);
+		const UInt32 codeWordCount = static_cast<UInt32>(info.codeSize / sizeof(UInt32));
 		m_code.resize(codeWordCount);
 
-		const cct::UInt32* pCodeWords = static_cast<const cct::UInt32*>(info.pCode);
-		for (cct::UInt32 i = 0; i < codeWordCount; ++i)
+		const UInt32* pCodeWords = static_cast<const UInt32*>(info.pCode);
+		for (UInt32 i = 0; i < codeWordCount; ++i)
 			m_code[i] = pCodeWords[i];
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 } // namespace vkd

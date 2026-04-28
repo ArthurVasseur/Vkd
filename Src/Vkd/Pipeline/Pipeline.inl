@@ -27,7 +27,8 @@ namespace vkd
 
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline VkResult Pipeline::CreateComputePipeline(Device& owner, const VkComputePipelineCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks)
@@ -38,7 +39,8 @@ namespace vkd
 
 		SetAllocationCallbacks(allocationCallbacks);
 
-		return VK_SUCCESS;
+		m_createResult = VK_SUCCESS;
+		return m_createResult;
 	}
 
 	inline Device* Pipeline::GetOwner() const
