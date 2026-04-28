@@ -134,8 +134,12 @@ namespace vkd
 
 		auto physicalDevices = instance->GetPhysicalDevices();
 
+		const std::size_t available = physicalDevices.size();
+		const std::size_t requested = *pPhysicalDeviceCount;
+		const std::size_t toCopy = std::min(requested, available);
+
 		std::size_t swapWith = 0;
-		for (std::size_t i = 0; i < *pPhysicalDeviceCount; ++i)
+		for (std::size_t i = 0; i < toCopy; ++i)
 		{
 			// auto luid = static_cast<vkd::WddmPhysicalDevice&>(*physicalDevices[i]->Object).GetLuid();
 			//
@@ -147,7 +151,13 @@ namespace vkd
 			pPhysicalDevices[i] = VKD_TO_HANDLE(VkPhysicalDevice, physicalDevices[i]);
 		}
 
-		std::swap(pPhysicalDevices[0], pPhysicalDevices[swapWith]);
+		if (toCopy > 0 && swapWith < toCopy)
+			std::swap(pPhysicalDevices[0], pPhysicalDevices[swapWith]);
+
+		*pPhysicalDeviceCount = static_cast<UInt32>(toCopy);
+
+		if (requested < available)
+			return VK_INCOMPLETE;
 
 		return VK_SUCCESS;
 	}
