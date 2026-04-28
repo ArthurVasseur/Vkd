@@ -13,8 +13,8 @@
 #include <new>
 #include <ostream>
 
-#include <Concerto/Core/EnumFlags/EnumFlags.hpp>
 #include <Concerto/Core/Assert.hpp>
+#include <Concerto/Core/EnumFlags/EnumFlags.hpp>
 
 #if defined(CCT_PLATFORM_WINDOWS)
 #include <intrin.h>

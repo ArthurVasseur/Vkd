@@ -6,8 +6,8 @@
 
 #include "VkdSoftware/Device/Device.hpp"
 
-#include "Vkd/Memory/Memory.hpp"
 #include "Vkd/Instance/Instance.hpp"
+#include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/BufferView/BufferView.hpp"

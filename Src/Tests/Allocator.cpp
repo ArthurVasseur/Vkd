@@ -456,13 +456,13 @@ TEST_CASE("Allocator - Stress Test", "[allocator][stress]")
 				++allocCount;
 
 				INFO("iter=" << i
-					<< " size=" << size
-					<< " alignment=" << alignment
-					<< " offset=" << alloc.offset
-					<< " padding=" << alloc.padding
-					<< " allocSize=" << alloc.size
-					<< " used=" << allocator.GetUsed()
-					<< " active=" << activeAllocs.size());
+							 << " size=" << size
+							 << " alignment=" << alignment
+							 << " offset=" << alloc.offset
+							 << " padding=" << alloc.padding
+							 << " allocSize=" << alloc.size
+							 << " used=" << allocator.GetUsed()
+							 << " active=" << activeAllocs.size());
 				REQUIRE((alloc.offset % alignment) == 0);
 			}
 		}
@@ -640,8 +640,8 @@ TEST_CASE("Allocator - alignment padding boundary", "[allocator][alignment]")
 		Allocation a;
 		REQUIRE(allocator.Allocate(128, alignment, a));
 		INFO("alignment=" << alignment
-			<< " offset=" << a.offset
-			<< " padding=" << a.padding);
+						  << " offset=" << a.offset
+						  << " padding=" << a.padding);
 		REQUIRE((a.offset % alignment) == 0);
 		REQUIRE(a.padding < alignment);
 		allocator.Free(a);
@@ -662,10 +662,10 @@ TEST_CASE("Allocator - padding survives free/realloc", "[allocator][alignment]")
 		if (allocator.Allocate(size, alignment, a))
 		{
 			INFO("iter=" << i
-				<< " size=" << size
-				<< " alignment=" << alignment
-				<< " offset=" << a.offset
-				<< " padding=" << a.padding);
+						 << " size=" << size
+						 << " alignment=" << alignment
+						 << " offset=" << a.offset
+						 << " padding=" << a.padding);
 			REQUIRE((a.offset % alignment) == 0);
 			allocs.push_back(a);
 		}

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <Concerto/Core/ThreadPool/ThreadPool.hpp>
+
 #include "Vkd/Device/Device.hpp"
 #include "VkdUtils/Allocator/Allocator.hpp"
 

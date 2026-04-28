@@ -120,7 +120,7 @@ namespace vkd
 
 	VkResult Icd::EnumerateAdapterPhysicalDevices(VkInstance pInstance, LUID adapterLUID, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices)
 	{
-		//WaitForDebugger();
+		// WaitForDebugger();
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(vkd::Instance, instance, pInstance);
