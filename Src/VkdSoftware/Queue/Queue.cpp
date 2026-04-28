@@ -25,11 +25,15 @@ namespace vkd::software
 		VKD_CHECK(submitCount && pSubmits);
 
 		std::vector<vkd::CommandBuffer*> cmdBuffers;
-		cmdBuffers.resize(pSubmits->commandBufferCount);
-		for (std::size_t i = 0; i < pSubmits->commandBufferCount; ++i)
+		for (uint32_t s = 0; s < submitCount; ++s)
 		{
-			VKD_FROM_HANDLE(vkd::CommandBuffer, cmdBufferObj, pSubmits->pCommandBuffers[i]);
-			cmdBuffers[i] = cmdBufferObj;
+			const VkSubmitInfo& submit = pSubmits[s];
+			cmdBuffers.reserve(cmdBuffers.size() + submit.commandBufferCount);
+			for (uint32_t i = 0; i < submit.commandBufferCount; ++i)
+			{
+				VKD_FROM_HANDLE(vkd::CommandBuffer, cmdBufferObj, submit.pCommandBuffers[i]);
+				cmdBuffers.push_back(cmdBufferObj);
+			}
 		}
 
 		auto* softwareDevice = static_cast<SoftwareDevice*>(GetOwner());
@@ -38,7 +42,7 @@ namespace vkd::software
 		std::lock_guard<std::mutex> lock(m_submitMutex);
 		auto previousSubmit = std::move(m_previousSubmit);
 
-		m_previousSubmit = threadPool.Submit([cmdBuffers, fence, previousSubmit = std::move(previousSubmit)]() mutable -> bool
+		m_previousSubmit = threadPool.Submit([cmdBuffers = std::move(cmdBuffers), fence, previousSubmit = std::move(previousSubmit)]() mutable -> bool
 											 {
 			// Wait for the previous submit to complete before starting the new one
 			if (previousSubmit.valid())
