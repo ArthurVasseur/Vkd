@@ -24,10 +24,6 @@ if has_config("debug-checks") then
     add_requires("cpptrace")
 end
 
-if has_config("profiling") then
-	add_requires("tracy")
-end
-
 if has_config("cts") then
 	add_requires("vk-gl-cts")
 end
@@ -85,7 +81,6 @@ target("vkd-Utils")
     set_languages("c++20")
     set_kind("static")
     add_includedirs("Src", { public = true })
-    add_packages("mimalloc", {public = true})
     add_deps("concerto-core", { public = true })
     if is_plat("linux", "macosx", "bsd") then
         add_cxflags("-fPIC")
