@@ -93,7 +93,7 @@ jobs:
         echo "ADDITIONAL_CONF=${PLATFORM_CONF}" >> "$GITHUB_ENV"
 
     - name: Configure xmake with CTS support
-      run: xmake config --plat=${{ matrix.confs.plat }} --arch=${{ matrix.confs.arch }} --mode=${{ matrix.confs.mode }} --debug-checks=y --cts=y ${{ env.ADDITIONAL_CONF }} --ccache=n --yes
+      run: xmake config --plat=${{ matrix.confs.plat }} --arch=${{ matrix.confs.arch }} --mode=${{ matrix.confs.mode }} --asserts=y --debug-checks=y --cts=y ${{ env.ADDITIONAL_CONF }} --ccache=n --yes
 
     - name: Save cached xmake dependencies
       if: ${{ !steps.restore-depcache.outputs.cache-hit }}
