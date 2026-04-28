@@ -153,6 +153,8 @@ void saveImageToPPM(const char* filename, uint32_t width, uint32_t height, const
 
 int main()
 {
+	cct::Logger logger;
+	cct::Logger::SetContext(&logger);
 	cct::Logger::Info("Vulkan Hello Triangle with vulkan.hpp");
 
 	cct::DynLib driver;
