@@ -7,6 +7,7 @@
 #include "VkdSoftware/Device/Device.hpp"
 
 #include "Vkd/Memory/Memory.hpp"
+#include "Vkd/Instance/Instance.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/BufferView/BufferView.hpp"
@@ -46,6 +47,8 @@ namespace vkd::software
 		if (!m_allocator.Init())
 			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
+		if (cct::Logger::GetContext() == nullptr)
+			cct::Logger::SetContext(&owner.GetOwner().GetLogger());
 		cct::Logger::Info("Allocated {} Mb for SoftwareDevice allocator", m_allocator.GetTotal() / (1024ULL * 1024ULL));
 		return Device::Create(owner, pDeviceCreateInfo, allocationCallbacks);
 	}

@@ -34,6 +34,18 @@ namespace vkd
 		virtual VkResult Create(Instance& owner, const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual DispatchableObjectResult<Device> CreateDevice() = 0;
 
+		Instance& GetOwner()
+		{
+			CCT_ASSERT(m_instance, "PhysicalDevice has no owner instance");
+			return *m_instance;
+		}
+
+		const Instance& GetOwner() const
+		{
+			CCT_ASSERT(m_instance, "PhysicalDevice has no owner instance");
+			return *m_instance;
+		}
+
 		// Vulkan API entry points
 		static void VKAPI_CALL GetPhysicalDeviceFeatures(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures* pFeatures);
 		static void VKAPI_CALL GetPhysicalDeviceFeatures2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceFeatures2* pFeatures);

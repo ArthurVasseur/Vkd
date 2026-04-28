@@ -44,6 +44,15 @@ namespace vkd
 		void AddPhysicalDevice(DispatchableObject<PhysicalDevice>* physicalDevice);
 		std::span<DispatchableObject<PhysicalDevice>*> GetPhysicalDevices();
 
+		cct::Logger& GetLogger() noexcept
+		{
+			return m_logger;
+		}
+		const cct::Logger& GetLogger() const noexcept
+		{
+			return m_logger;
+		}
+
 	private:
 		static void* VKAPI_PTR AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
 		static void* VKAPI_PTR ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope);
@@ -53,5 +62,7 @@ namespace vkd
 
 		std::vector<DispatchableObject<PhysicalDevice>*> m_physicalDevices;
 		bool m_physicalDevicesAlreadyEnumerated;
+
+		cct::Logger m_logger;
 	};
 } // namespace vkd

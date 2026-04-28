@@ -30,6 +30,7 @@ namespace vkd
 	VkResult Instance::Create(const VkAllocationCallbacks& allocationCallbacks)
 	{
 		SetAllocationCallbacks(allocationCallbacks);
+		cct::Logger::SetContext(&m_logger);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;
