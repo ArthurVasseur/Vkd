@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <exception>
 #include <new>
 #include <ostream>
 
@@ -110,17 +111,24 @@ namespace vkd
 		std::lock_guard<std::mutex> lock(m_Mutex);
 
 		if (m_Initialized)
+		{
+			CCT_ASSERT_FALSE("Allocator already initialized");
 			return false;
+		}
 
 		if (m_TotalSize < MinBlockSize + sizeof(Block))
+		{
+			CCT_ASSERT_FALSE("Invalid allocator size: must be at least {} bytes", MinBlockSize + sizeof(Block));
 			return false;
+		}
 
 		try
 		{
 			m_Pool.resize(m_TotalSize);
 		}
-		catch (...)
+		catch (const std::exception& e)
 		{
+			CCT_ASSERT_FALSE("Failed to initialize allocator pool: {}", e.what());
 			return false;
 		}
 
@@ -128,9 +136,10 @@ namespace vkd
 		{
 			m_SecondLevelBitmaps.resize(m_FirstLevelCount);
 		}
-		catch (...)
+		catch (const std::exception& e)
 		{
 			m_Pool.clear();
+			CCT_ASSERT_FALSE("Failed to initialize allocator bitmaps: {}", e.what());
 			return false;
 		}
 
@@ -139,10 +148,11 @@ namespace vkd
 		{
 			m_FreeLists.resize(totalLists);
 		}
-		catch (...)
+		catch (const std::exception& e)
 		{
 			m_Pool.clear();
 			m_SecondLevelBitmaps.clear();
+			CCT_ASSERT_FALSE("Failed to initialize allocator free lists: {}", e.what());
 			return false;
 		}
 
