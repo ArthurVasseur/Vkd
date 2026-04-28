@@ -905,7 +905,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
-		VKD_CHECK(pCreateInfos || pPipelines || createInfoCount);
+		VKD_CHECK(pCreateInfos && pPipelines && createInfoCount);
 
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
