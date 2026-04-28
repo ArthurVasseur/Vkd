@@ -8,15 +8,40 @@
 
 #pragma once
 
+#include <vector>
+
+#include <Concerto/Core/Types/Types.hpp>
+
 #include <NazaraUtils/TypeList.hpp>
+#include <vulkan/vulkan.h>
 
 namespace vkd
 {
+	using namespace cct;
+
+	class Buffer;
+	class Pipeline;
+	class Framebuffer;
+	class RenderPass;
+
 	struct OpBindVertexBuffer
 	{
 		std::vector<Buffer*> Buffers;
 		std::vector<VkDeviceSize> Offsets;
 		UInt32 FirstBinding;
+	};
+
+	struct OpBeginRenderPass
+	{
+		RenderPass* RenderPassObject;
+		Framebuffer* FramebufferObject;
+		VkRect2D RenderArea;
+		std::vector<VkClearValue> ClearValues;
+		VkSubpassContents Contents;
+	};
+
+	struct OpEndRenderPass
+	{
 	};
 
 	struct OpDraw
@@ -64,5 +89,7 @@ namespace vkd
 		OpDrawIndexed,
 		OpDrawIndirect,
 		OpDrawIndexedIndirect,
-		OpBindPipeline>;
+		OpBindPipeline,
+		OpBeginRenderPass,
+		OpEndRenderPass>;
 } // namespace vkd

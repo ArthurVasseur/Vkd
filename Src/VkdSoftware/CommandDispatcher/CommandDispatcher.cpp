@@ -100,4 +100,14 @@ namespace vkd::software
 	{
 		return m_context->BindPipeline(std::move(op));
 	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpBeginRenderPass op)
+	{
+		return m_context->BeginRenderPass(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpEndRenderPass op)
+	{
+		return m_context->EndRenderPass(std::move(op));
+	}
 } // namespace vkd::software

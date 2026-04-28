@@ -38,6 +38,8 @@ namespace vkd::software
 		VkResult operator()(vkd::OpDrawIndirect op);
 		VkResult operator()(vkd::OpDrawIndexedIndirect op);
 		VkResult operator()(vkd::OpBindPipeline op);
+		VkResult operator()(vkd::OpBeginRenderPass op);
+		VkResult operator()(vkd::OpEndRenderPass op);
 
 		CpuContext* m_context;
 	};

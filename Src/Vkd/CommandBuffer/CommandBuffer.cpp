@@ -222,11 +222,20 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		VKD_CHECK(pRenderPassBegin);
+
+		commandBufferObj->PushBeginRenderPass(*pRenderPassBegin, contents);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdEndRenderPass(VkCommandBuffer commandBuffer)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+
+		commandBufferObj->PushEndRenderPass();
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents)

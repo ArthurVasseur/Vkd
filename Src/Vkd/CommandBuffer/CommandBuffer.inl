@@ -8,7 +8,9 @@
 
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
+#include "Vkd/Framebuffer/Framebuffer.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
+#include "Vkd/RenderPass/RenderPass.hpp"
 
 namespace vkd
 {
@@ -187,6 +189,29 @@ namespace vkd
 			.FirstVertex = firstVertex,
 			.FirstInstance = firstInstance,
 		});
+	}
+
+	inline void CommandBuffer::PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents)
+	{
+		VKD_FROM_HANDLE(RenderPass, renderPassObj, beginInfo.renderPass);
+		VKD_FROM_HANDLE(Framebuffer, framebufferObj, beginInfo.framebuffer);
+
+		std::vector<VkClearValue> clearValues;
+		if (beginInfo.clearValueCount > 0 && beginInfo.pClearValues != nullptr)
+			clearValues.assign(beginInfo.pClearValues, beginInfo.pClearValues + beginInfo.clearValueCount);
+
+		m_ops.emplace_back(OpBeginRenderPass{
+			.RenderPassObject = renderPassObj,
+			.FramebufferObject = framebufferObj,
+			.RenderArea = beginInfo.renderArea,
+			.ClearValues = std::move(clearValues),
+			.Contents = contents,
+		});
+	}
+
+	inline void CommandBuffer::PushEndRenderPass()
+	{
+		m_ops.emplace_back(OpEndRenderPass{});
 	}
 
 	inline VkResult CommandBuffer::MarkSubmitted()
