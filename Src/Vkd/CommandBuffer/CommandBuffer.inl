@@ -219,8 +219,9 @@ namespace vkd
 				return VK_SUCCESS;
 			}
 		}
+		const State previous = m_state;
 		m_state = State::Invalid;
-		CCT_ASSERT_FALSE("Invalid CB state transition {} -> {}", (int)m_state, (int)to);
+		CCT_ASSERT_FALSE("Invalid CB state transition {} -> {}", (int)previous, (int)to);
 		return VK_ERROR_VALIDATION_FAILED_EXT;
 	}
 } // namespace vkd
