@@ -6,6 +6,7 @@
 
 #include "VkdSoftware/Device/Device.hpp"
 
+#include "Vkd/DescriptorSetLayout/DescriptorSetLayout.hpp"
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
@@ -222,6 +223,18 @@ namespace vkd::software
 		if (!layout)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate PipelineLayout");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return layout;
+	}
+
+	Result<vkd::DescriptorSetLayout*, VkResult> SoftwareDevice::CreateDescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* layout = mem::New<vkd::DescriptorSetLayout>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!layout)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate DescriptorSetLayout");
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 

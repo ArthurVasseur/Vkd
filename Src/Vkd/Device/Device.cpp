@@ -12,6 +12,7 @@
 #include "Vkd/BufferView/BufferView.hpp"
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
+#include "Vkd/DescriptorSetLayout/DescriptorSetLayout.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/Framebuffer/Framebuffer.hpp"
 #include "Vkd/Image/Image.hpp"
@@ -1281,14 +1282,40 @@ namespace vkd
 	VkResult Device::CreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout* pSetLayout)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreateDescriptorSetLayout not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pSetLayout);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto layoutResult = deviceObj->CreateDescriptorSetLayout(*pAllocator);
+		if (layoutResult.IsError())
+			return layoutResult.GetError();
+
+		auto* layoutObj = std::move(layoutResult).GetValue();
+		VkResult result = layoutObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, layoutObj);
+			return result;
+		}
+
+		*pSetLayout = VKD_TO_HANDLE(VkDescriptorSetLayout, layoutObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroyDescriptorSetLayout not implemented");
+
+		if (descriptorSetLayout == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(DescriptorSetLayout, layoutObj, descriptorSetLayout);
+
+		mem::Delete(pAllocator ? *pAllocator : layoutObj->GetAllocationCallbacks(), layoutObj);
 	}
 
 	VkResult Device::CreateDescriptorPool(VkDevice device, const VkDescriptorPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDescriptorPool* pDescriptorPool)

@@ -39,6 +39,7 @@ namespace vkd::software
 		Result<vkd::Framebuffer*, VkResult> CreateFramebuffer(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::ShaderModule*, VkResult> CreateShaderModule(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::PipelineLayout*, VkResult> CreatePipelineLayout(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::DescriptorSetLayout*, VkResult> CreateDescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks) override;
 
 	private:
 		ThreadPool m_threadPool;

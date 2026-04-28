@@ -30,6 +30,7 @@ namespace vkd
 	class Framebuffer;
 	class ShaderModule;
 	class PipelineLayout;
+	class DescriptorSetLayout;
 
 	class Device : public ObjectBase
 	{
@@ -153,6 +154,7 @@ namespace vkd
 		virtual Result<Framebuffer*, VkResult> CreateFramebuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<ShaderModule*, VkResult> CreateShaderModule(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<PipelineLayout*, VkResult> CreatePipelineLayout(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<DescriptorSetLayout*, VkResult> CreateDescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks) = 0;
 
 	private:
 		PhysicalDevice* m_owner;
