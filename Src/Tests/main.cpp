@@ -11,6 +11,7 @@
 int main(int argc, char const* const argv[])
 {
 	cct::Logger logger;
+	logger.SetGlobalLevel(cct::LogLevel::Trace);
 	cct::Logger::SetContext(&logger);
 	return Catch::Session().run(argc, argv);
 }
