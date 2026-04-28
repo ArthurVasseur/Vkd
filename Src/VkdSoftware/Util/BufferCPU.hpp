@@ -13,7 +13,7 @@
 
 #include "Vkd/Defines.hpp"
 #include "Vkd/Buffer/Buffer.hpp"
-#include "VkdSoftware/Memory/DeviceMemory.hpp"
+#include "VkdSoftware/DeviceMemory/DeviceMemory.hpp"
 
 namespace vkd::software
 {
