@@ -5,6 +5,7 @@
  */
 
 #include <algorithm>
+#include <limits>
 #include <random>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <VkdUtils/Allocator/Allocator.hpp>
+#include <VkdUtils/System/System.hpp>
 
 using namespace vkd;
 
@@ -710,11 +712,19 @@ TEST_CASE("Allocator - ReallocateInPlace keeps offset aligned", "[allocator][rea
 	REQUIRE(allocator.GetUsed() == 0);
 }
 
-TEST_CASE("Allocator - CTS Bug Reproduction", "[allocator][cts][bug]")
+TEST_CASE("Allocator - Large pool sequential allocations", "[allocator][largepool]")
 {
-	SECTION("8100 bytes then 8192 bytes with alignment 16")
+	SECTION("Mixed similar-size allocations in a multi-gigabyte pool")
 	{
-		Allocator allocator(8ULL * 1024ULL * 1024ULL * 1024ULL);
+		System system;
+		const std::optional<UInt64> availableRam = system.GetAvailableRamBytes();
+		REQUIRE(availableRam.has_value());
+
+		const UInt64 desired = *availableRam * 2 / 3;
+		const UInt64 maxPool = static_cast<UInt64>(std::numeric_limits<std::size_t>::max() / 4);
+		const std::size_t poolSize = static_cast<std::size_t>(std::min(desired, maxPool));
+
+		Allocator allocator(poolSize);
 		REQUIRE(allocator.Init());
 
 		Allocation alloc1;
