@@ -15,9 +15,15 @@
 #include <sys/sysinfo.h>
 #elif defined(CCT_PLATFORM_FREEBSD) || defined(CCT_PLATFORM_MACOS)
 #include <pthread.h>
+#include <unistd.h>
 
 #include <sys/sysctl.h>
 #include <sys/types.h>
+
+#if defined(CCT_PLATFORM_MACOS)
+#include <mach/mach.h>
+#include <mach/vm_statistics.h>
+#endif
 #endif
 
 namespace vkd
@@ -77,6 +83,30 @@ namespace vkd
 				return std::nullopt;
 			}
 			return static_cast<UInt64>(info.freeram) * static_cast<UInt64>(info.mem_unit);
+#elif defined(CCT_PLATFORM_MACOS)
+			mach_port_t host = mach_host_self();
+			vm_size_t pageSize = 0;
+			if (host_page_size(host, &pageSize) != KERN_SUCCESS)
+				return std::nullopt;
+
+			vm_statistics64_data_t vmStats;
+			mach_msg_type_number_t infoCount = HOST_VM_INFO64_COUNT;
+			if (host_statistics64(host, HOST_VM_INFO64, reinterpret_cast<host_info64_t>(&vmStats), &infoCount) != KERN_SUCCESS)
+				return std::nullopt;
+
+			const UInt64 freePages = static_cast<UInt64>(vmStats.free_count) + static_cast<UInt64>(vmStats.inactive_count);
+			return freePages * static_cast<UInt64>(pageSize);
+#elif defined(CCT_PLATFORM_FREEBSD)
+			unsigned int freePages = 0;
+			size_t size = sizeof(freePages);
+			if (sysctlbyname("vm.stats.vm.v_free_count", &freePages, &size, nullptr, 0) != 0)
+				return std::nullopt;
+
+			const long pageSize = sysconf(_SC_PAGESIZE);
+			if (pageSize <= 0)
+				return std::nullopt;
+
+			return static_cast<UInt64>(freePages) * static_cast<UInt64>(pageSize);
 #else
 			return std::nullopt;
 #endif
