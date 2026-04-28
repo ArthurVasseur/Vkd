@@ -632,7 +632,7 @@ namespace vkd
 		out.size = block->size;
 		out.padding = alignmentPadding;
 
-		CCT_ASSERT(out.offset % alignment, "TLSF: returned offset is not aligned");
+		CCT_ASSERT((out.offset % alignment) == 0, "TLSF: returned offset is not aligned");
 
 		return true;
 	}
