@@ -29,6 +29,7 @@ namespace vkd
 	class RenderPass;
 	class Framebuffer;
 	class ShaderModule;
+	class PipelineLayout;
 
 	class Device : public ObjectBase
 	{
@@ -151,6 +152,7 @@ namespace vkd
 		virtual Result<ImageView*, VkResult> CreateImageView(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Framebuffer*, VkResult> CreateFramebuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<ShaderModule*, VkResult> CreateShaderModule(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<PipelineLayout*, VkResult> CreatePipelineLayout(const VkAllocationCallbacks& allocationCallbacks) = 0;
 
 	private:
 		PhysicalDevice* m_owner;

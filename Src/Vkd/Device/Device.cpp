@@ -18,6 +18,7 @@
 #include "Vkd/ImageView/ImageView.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
+#include "Vkd/PipelineLayout/PipelineLayout.hpp"
 #include "Vkd/Queue/Queue.hpp"
 #include "Vkd/RenderPass/RenderPass.hpp"
 #include "Vkd/ShaderModule/ShaderModule.hpp"
@@ -1241,14 +1242,40 @@ namespace vkd
 	VkResult Device::CreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreatePipelineLayout not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pPipelineLayout);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto layoutResult = deviceObj->CreatePipelineLayout(*pAllocator);
+		if (layoutResult.IsError())
+			return layoutResult.GetError();
+
+		auto* layoutObj = std::move(layoutResult).GetValue();
+		VkResult result = layoutObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, layoutObj);
+			return result;
+		}
+
+		*pPipelineLayout = VKD_TO_HANDLE(VkPipelineLayout, layoutObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroyPipelineLayout(VkDevice device, VkPipelineLayout pipelineLayout, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroyPipelineLayout not implemented");
+
+		if (pipelineLayout == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(PipelineLayout, layoutObj, pipelineLayout);
+
+		mem::Delete(pAllocator ? *pAllocator : layoutObj->GetAllocationCallbacks(), layoutObj);
 	}
 
 	VkResult Device::CreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout* pSetLayout)

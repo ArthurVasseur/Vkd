@@ -9,6 +9,7 @@
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
+#include "Vkd/PipelineLayout/PipelineLayout.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/BufferView/BufferView.hpp"
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
@@ -213,5 +214,17 @@ namespace vkd::software
 		}
 
 		return shaderModule;
+	}
+
+	Result<vkd::PipelineLayout*, VkResult> SoftwareDevice::CreatePipelineLayout(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* layout = mem::New<vkd::PipelineLayout>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!layout)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate PipelineLayout");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return layout;
 	}
 } // namespace vkd::software
