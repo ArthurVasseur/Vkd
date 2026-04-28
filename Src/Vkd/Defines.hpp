@@ -155,7 +155,7 @@ namespace vkd
 	template<typename... Types>
 	VkResult Error(VkResult result, const std::format_string<Types...> fmt, Types&&... args)
 	{
-		cct::Logger::Error(fmt, std::forward<Types...>(args)...);
+		cct::Logger::Error(fmt, std::forward<Types>(args)...);
 		if (cct::IsDebuggerAttached())
 			CCT_BREAK_IN_DEBUGGER;
 		return result;
