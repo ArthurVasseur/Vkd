@@ -13,6 +13,8 @@
 #include "Vkd/Device/Device.hpp"
 #include "VkdUtils/Allocator/Allocator.hpp"
 
+#include "See/Executor/Executor.hpp"
+
 namespace vkd::software
 {
 	class SoftwareDevice : public Device
@@ -25,6 +27,7 @@ namespace vkd::software
 
 		[[nodiscard]] ThreadPool& GetThreadPool();
 		[[nodiscard]] Allocator& GetAllocator();
+		[[nodiscard]] see::Executor& GetShaderExecutor();
 
 		DispatchableObjectResult<vkd::Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;
 		Result<vkd::CommandPool*, VkResult> CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks) override;
@@ -44,5 +47,6 @@ namespace vkd::software
 	private:
 		ThreadPool m_threadPool;
 		Allocator m_allocator;
+		see::Executor m_shaderExecutor;
 	};
 } // namespace vkd::software

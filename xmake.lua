@@ -9,6 +9,7 @@ end
 
 add_requires("mimalloc", "nazarautils", "catch2", "volk")
 add_requires("catch2", "nzsl")
+add_requires("spirv-headers", "spirv-tools")
 
 if has_config("debug-checks") then
     add_requires("cpptrace")
@@ -73,9 +74,28 @@ drivers = {
             "Synchronization/Fence",
         },
         Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
-        Deps = {},
+        Deps = { "see" },
     }
 }
+
+target("see")
+    set_languages("c++20")
+    set_kind("static")
+    add_includedirs("Src", { public = true })
+    add_packages("spirv-headers", "spirv-tools", { public = true })
+    add_deps("concerto-core", { public = true })
+    if is_plat("linux", "macosx", "bsd") then
+        add_cxflags("-fPIC")
+    end
+
+    local files = {
+        ".",
+        "Executor",
+    }
+    for _, dir in ipairs(files) do
+        add_files_to_target("Src/See/" .. dir, false)
+    end
+target_end()
 
 target("vkd-Utils")
     set_languages("c++20")
@@ -228,7 +248,7 @@ if has_config("tests") then
         add_includedirs("Src", { public = true })
         add_packages("catch2")
         add_files("Src/Tests/**.cpp")
-        add_deps("vkd-Utils")
+        add_deps("vkd-Utils", "see")
     target_end()
 
     target("vkd-test-app")

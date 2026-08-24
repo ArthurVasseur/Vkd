@@ -65,6 +65,11 @@ namespace vkd::software
 		return m_allocator;
 	}
 
+	see::Executor& SoftwareDevice::GetShaderExecutor()
+	{
+		return m_shaderExecutor;
+	}
+
 	DispatchableObjectResult<vkd::Queue> SoftwareDevice::CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags)
 	{
 		PhysicalDevice* physicalDevice = GetOwner();
