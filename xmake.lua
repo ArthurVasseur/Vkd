@@ -92,6 +92,7 @@ target("see")
         ".",
         "Executor",
         "Spirv",
+        "Ir",
     }
     for _, dir in ipairs(files) do
         add_files_to_target("Src/See/" .. dir, false)
