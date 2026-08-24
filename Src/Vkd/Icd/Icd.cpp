@@ -106,7 +106,7 @@ namespace vkd
 		if (pfn)
 			return pfn;
 #ifdef VKD_DEBUG_CHECKS
-			// cct::Logger::Warning("Could not find '{}' function", pName);
+		// cct::Logger::Warning("Could not find '{}' function", pName);
 #endif
 		return nullptr;
 	}

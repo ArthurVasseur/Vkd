@@ -10,8 +10,9 @@
 
 #include <vector>
 
-#include "See/Executor/Executor.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
+
+#include "See/Executor/Executor.hpp"
 
 namespace vkd
 {
