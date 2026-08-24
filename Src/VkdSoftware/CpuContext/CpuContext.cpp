@@ -6,13 +6,186 @@
 
 #include "VkdSoftware/CpuContext/CpuContext.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <optional>
+#include <unordered_map>
+
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/ImageView/ImageView.hpp"
+#include "VkdSoftware/Device/Device.hpp"
+#include "VkdSoftware/Pipeline/Pipeline.hpp"
 
+#include "See/Exec/Stage.hpp"
 #include <vulkan/utility/vk_format_utils.h>
 
 namespace vkd::software
 {
+	namespace
+	{
+		// Float in [0,1] -> 8-bit unorm.
+		UInt8 FloatToUNorm8(float f)
+		{
+			if (f <= 0.0f)
+				return 0;
+			if (f >= 1.0f)
+				return 255;
+			return static_cast<UInt8>(f * 255.0f + 0.5f);
+		}
+
+		// Build the 4-byte RGBA pattern for the given format.
+		// Returns true if the format is supported by this fast path.
+		bool BuildRgba8ClearPattern(VkFormat format, const VkClearColorValue& color, UInt8 outPattern[4])
+		{
+			switch (format)
+			{
+				case VK_FORMAT_R8G8B8A8_UNORM:
+				case VK_FORMAT_R8G8B8A8_SRGB:
+					outPattern[0] = FloatToUNorm8(color.float32[0]);
+					outPattern[1] = FloatToUNorm8(color.float32[1]);
+					outPattern[2] = FloatToUNorm8(color.float32[2]);
+					outPattern[3] = FloatToUNorm8(color.float32[3]);
+					return true;
+				case VK_FORMAT_B8G8R8A8_UNORM:
+				case VK_FORMAT_B8G8R8A8_SRGB:
+					outPattern[0] = FloatToUNorm8(color.float32[2]);
+					outPattern[1] = FloatToUNorm8(color.float32[1]);
+					outPattern[2] = FloatToUNorm8(color.float32[0]);
+					outPattern[3] = FloatToUNorm8(color.float32[3]);
+					return true;
+				case VK_FORMAT_R8G8B8A8_UINT:
+				case VK_FORMAT_R8G8B8A8_SINT:
+					outPattern[0] = static_cast<UInt8>(color.uint32[0] & 0xFFu);
+					outPattern[1] = static_cast<UInt8>(color.uint32[1] & 0xFFu);
+					outPattern[2] = static_cast<UInt8>(color.uint32[2] & 0xFFu);
+					outPattern[3] = static_cast<UInt8>(color.uint32[3] & 0xFFu);
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		struct ScreenVertex
+		{
+			float m_x;
+			float m_y;
+			see::exec::VertexStageOutput m_output;
+		};
+
+		// 2D cross product of (B-A) and (P-A); sign follows Vulkan's front-face convention directly in framebuffer space.
+		float EdgeFunction(float ax, float ay, float bx, float by, float px, float py)
+		{
+			return (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+		}
+
+		bool IsFrontFacing(float signedArea, VkFrontFace frontFace)
+		{
+			return frontFace == VK_FRONT_FACE_COUNTER_CLOCKWISE ? signedArea > 0.0f : signedArea < 0.0f;
+		}
+
+		bool IsCulled(bool frontFacing, VkCullModeFlags cullMode)
+		{
+			if (frontFacing && (cullMode & VK_CULL_MODE_FRONT_BIT))
+				return true;
+			if (!frontFacing && (cullMode & VK_CULL_MODE_BACK_BIT))
+				return true;
+			return false;
+		}
+
+		see::exec::Value InterpolateLocation(const see::exec::Value& a, const see::exec::Value& b, const see::exec::Value& c, float l0, float l1, float l2)
+		{
+			see::exec::Value result;
+			result.m_scalar = a.m_scalar;
+			result.m_rows = a.m_rows;
+			for (UInt32 i = 0; i < a.m_rows; ++i)
+				result.SetFloat(i, l0 * a.GetFloat(i) + l1 * b.GetFloat(i) + l2 * c.GetFloat(i));
+			return result;
+		}
+
+		void RasterizeTriangle(cct::UByte* pixels, VkFormat format, const VkExtent3D& extent, const VkRect2D& scissor, const ScreenVertex& v0, const ScreenVertex& v1, const ScreenVertex& v2,
+							   const see::ir::Module& fragmentModule, const see::ir::Function& fragmentFunction, VkCullModeFlags cullMode, VkFrontFace frontFace)
+		{
+			VKD_AUTO_PROFILER_SCOPE();
+			const VkDeviceSize pixelSize = vkuFormatElementSize(format);
+			if (pixelSize != 4)
+				return;
+
+			const float area = EdgeFunction(v0.m_x, v0.m_y, v1.m_x, v1.m_y, v2.m_x, v2.m_y);
+			if (area == 0.0f)
+				return;
+
+			if (IsCulled(IsFrontFacing(area, frontFace), cullMode))
+				return;
+
+			const int minX = std::max({static_cast<int>(std::floor(std::min({v0.m_x, v1.m_x, v2.m_x}))), scissor.offset.x, 0});
+			const int minY = std::max({static_cast<int>(std::floor(std::min({v0.m_y, v1.m_y, v2.m_y}))), scissor.offset.y, 0});
+			const int maxX = std::min({static_cast<int>(std::ceil(std::max({v0.m_x, v1.m_x, v2.m_x}))), scissor.offset.x + static_cast<int>(scissor.extent.width), static_cast<int>(extent.width)});
+			const int maxY = std::min({static_cast<int>(std::ceil(std::max({v0.m_y, v1.m_y, v2.m_y}))), scissor.offset.y + static_cast<int>(scissor.extent.height), static_cast<int>(extent.height)});
+
+			const float absArea = std::fabs(area);
+
+			for (int y = minY; y < maxY; ++y)
+			{
+				for (int x = minX; x < maxX; ++x)
+				{
+					const float px = static_cast<float>(x) + 0.5f;
+					const float py = static_cast<float>(y) + 0.5f;
+
+					float w0 = EdgeFunction(v1.m_x, v1.m_y, v2.m_x, v2.m_y, px, py);
+					float w1 = EdgeFunction(v2.m_x, v2.m_y, v0.m_x, v0.m_y, px, py);
+					float w2 = EdgeFunction(v0.m_x, v0.m_y, v1.m_x, v1.m_y, px, py);
+
+					if (area < 0.0f)
+					{
+						w0 = -w0;
+						w1 = -w1;
+						w2 = -w2;
+					}
+
+					if (w0 < 0.0f || w1 < 0.0f || w2 < 0.0f)
+						continue;
+
+					const float l0 = w0 / absArea;
+					const float l1 = w1 / absArea;
+					const float l2 = w2 / absArea;
+
+					std::unordered_map<UInt32, see::exec::Value> interpolated;
+					for (const auto& [location, value] : v0.m_output.m_locations)
+					{
+						auto it1 = v1.m_output.m_locations.find(location);
+						auto it2 = v2.m_output.m_locations.find(location);
+						if (it1 == v1.m_output.m_locations.end() || it2 == v2.m_output.m_locations.end())
+							continue;
+
+						interpolated[location] = InterpolateLocation(value, it1->second, it2->second, l0, l1, l2);
+					}
+
+					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs = see::exec::RunFragmentStage(fragmentModule, fragmentFunction, interpolated);
+					if (!fragmentOutputs)
+						continue;
+
+					auto colorIt = fragmentOutputs->find(0);
+					if (colorIt == fragmentOutputs->end())
+						continue;
+
+					const see::exec::Value& color = colorIt->second;
+					VkClearColorValue clearValue{};
+					clearValue.float32[0] = color.GetFloat(0);
+					clearValue.float32[1] = color.m_rows > 1 ? color.GetFloat(1) : 0.0f;
+					clearValue.float32[2] = color.m_rows > 2 ? color.GetFloat(2) : 0.0f;
+					clearValue.float32[3] = color.m_rows > 3 ? color.GetFloat(3) : 1.0f;
+
+					UInt8 pattern[4];
+					if (!BuildRgba8ClearPattern(format, clearValue, pattern))
+						continue;
+
+					cct::UByte* pixel = pixels + (static_cast<std::size_t>(y) * extent.width + static_cast<std::size_t>(x)) * pixelSize;
+					std::memcpy(pixel, pattern, sizeof(pattern));
+				}
+			}
+		}
+	} // namespace
+
 	CpuContext::CpuContext()
 	{
 	}
@@ -57,6 +230,107 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (!m_boundPipeline || !m_currentRenderPass || !m_currentFramebuffer)
+			return VK_SUCCESS;
+
+		auto* pipeline = static_cast<Pipeline*>(m_boundPipeline);
+		if (pipeline->GetTopology() != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST || pipeline->GetViewports().empty())
+			return VK_SUCCESS;
+
+		auto* device = static_cast<SoftwareDevice*>(pipeline->GetOwner());
+		see::Executor& executor = device->GetShaderExecutor();
+
+		const see::ShaderHandle vertexHandle = pipeline->GetShaderHandle(VK_SHADER_STAGE_VERTEX_BIT);
+		const see::ShaderHandle fragmentHandle = pipeline->GetShaderHandle(VK_SHADER_STAGE_FRAGMENT_BIT);
+		if (vertexHandle == see::InvalidShaderHandle || fragmentHandle == see::InvalidShaderHandle)
+			return VK_SUCCESS;
+
+		const see::ir::Module* vertexModule = executor.GetIrModule(vertexHandle);
+		const see::ir::Function* vertexFunction = executor.GetEntryFunction(vertexHandle);
+		const see::ir::Module* fragmentModule = executor.GetIrModule(fragmentHandle);
+		const see::ir::Function* fragmentFunction = executor.GetEntryFunction(fragmentHandle);
+		if (!vertexModule || !vertexFunction || !fragmentModule || !fragmentFunction)
+			return VK_SUCCESS;
+
+		if (pipeline->GetSubpass() >= m_currentRenderPass->GetSubpasses().size())
+			return VK_SUCCESS;
+
+		const VkSubpassDescription& subpass = m_currentRenderPass->GetSubpasses()[pipeline->GetSubpass()];
+		if (subpass.colorAttachmentCount == 0)
+			return VK_SUCCESS;
+
+		const UInt32 attachmentIndex = subpass.pColorAttachments[0].attachment;
+		if (attachmentIndex >= m_currentFramebuffer->GetAttachments().size())
+			return VK_SUCCESS;
+
+		VKD_FROM_HANDLE(vkd::ImageView, colorView, m_currentFramebuffer->GetAttachments()[attachmentIndex]);
+		VKD_FROM_HANDLE(vkd::Image, colorImage, colorView->GetImage());
+		CCT_ASSERT(colorImage && colorImage->GetMemory(), "Invalid color attachment");
+
+		const VkFormat format = colorImage->GetFormat();
+		const VkExtent3D extent = colorImage->GetExtent();
+		if (vkuFormatElementSize(format) != 4)
+		{
+			cct::Logger::Warning("Draw: unsupported color attachment format {}", static_cast<int>(format));
+			return VK_SUCCESS;
+		}
+
+		const VkDeviceSize imageSize = static_cast<VkDeviceSize>(extent.width) * extent.height * 4;
+		cct::UByte* pixels = nullptr;
+		VkResult mapResult = colorImage->GetMemory()->Map(0, imageSize, reinterpret_cast<void**>(&pixels));
+		if (mapResult != VK_SUCCESS || pixels == nullptr)
+			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
+
+		const VkViewport& viewport = pipeline->GetViewports()[0];
+
+		VkRect2D scissor;
+		if (pipeline->GetScissors().empty())
+			scissor = VkRect2D{{0, 0}, {extent.width, extent.height}};
+		else
+			scissor = pipeline->GetScissors()[0];
+
+		for (UInt32 instance = 0; instance < op.InstanceCount; ++instance)
+		{
+			(void)instance; // no InstanceIndex builtin wired up yet - every instance draws identically
+
+			for (UInt32 base = 0; base + 3 <= op.VertexCount; base += 3)
+			{
+				ScreenVertex screenVertices[3];
+				bool allValid = true;
+
+				for (UInt32 i = 0; i < 3; ++i)
+				{
+					const UInt32 vertexIndex = op.FirstVertex + base + i;
+					std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex);
+					if (!output)
+					{
+						allValid = false;
+						break;
+					}
+
+					const float w = output->m_position.GetFloat(3);
+					if (w == 0.0f)
+					{
+						allValid = false;
+						break;
+					}
+
+					const float ndcX = output->m_position.GetFloat(0) / w;
+					const float ndcY = output->m_position.GetFloat(1) / w;
+
+					screenVertices[i].m_x = viewport.x + (ndcX * 0.5f + 0.5f) * viewport.width;
+					screenVertices[i].m_y = viewport.y + (ndcY * 0.5f + 0.5f) * viewport.height;
+					screenVertices[i].m_output = std::move(*output);
+				}
+
+				if (!allValid)
+					continue;
+
+				RasterizeTriangle(pixels, format, extent, scissor, screenVertices[0], screenVertices[1], screenVertices[2], *fragmentModule, *fragmentFunction, pipeline->GetCullMode(), pipeline->GetFrontFace());
+			}
+		}
+
+		colorImage->GetMemory()->Unmap();
 		return VK_SUCCESS;
 	}
 
@@ -348,51 +622,6 @@ namespace vkd::software
 
 		return VK_SUCCESS;
 	}
-
-	namespace
-	{
-		// Float in [0,1] -> 8-bit unorm.
-		UInt8 FloatToUNorm8(float f)
-		{
-			if (f <= 0.0f)
-				return 0;
-			if (f >= 1.0f)
-				return 255;
-			return static_cast<UInt8>(f * 255.0f + 0.5f);
-		}
-
-		// Build the 4-byte RGBA pattern for the given format.
-		// Returns true if the format is supported by this fast path.
-		bool BuildRgba8ClearPattern(VkFormat format, const VkClearColorValue& color, UInt8 outPattern[4])
-		{
-			switch (format)
-			{
-				case VK_FORMAT_R8G8B8A8_UNORM:
-				case VK_FORMAT_R8G8B8A8_SRGB:
-					outPattern[0] = FloatToUNorm8(color.float32[0]);
-					outPattern[1] = FloatToUNorm8(color.float32[1]);
-					outPattern[2] = FloatToUNorm8(color.float32[2]);
-					outPattern[3] = FloatToUNorm8(color.float32[3]);
-					return true;
-				case VK_FORMAT_B8G8R8A8_UNORM:
-				case VK_FORMAT_B8G8R8A8_SRGB:
-					outPattern[0] = FloatToUNorm8(color.float32[2]);
-					outPattern[1] = FloatToUNorm8(color.float32[1]);
-					outPattern[2] = FloatToUNorm8(color.float32[0]);
-					outPattern[3] = FloatToUNorm8(color.float32[3]);
-					return true;
-				case VK_FORMAT_R8G8B8A8_UINT:
-				case VK_FORMAT_R8G8B8A8_SINT:
-					outPattern[0] = static_cast<UInt8>(color.uint32[0] & 0xFFu);
-					outPattern[1] = static_cast<UInt8>(color.uint32[1] & 0xFFu);
-					outPattern[2] = static_cast<UInt8>(color.uint32[2] & 0xFFu);
-					outPattern[3] = static_cast<UInt8>(color.uint32[3] & 0xFFu);
-					return true;
-				default:
-					return false;
-			}
-		}
-	} // namespace
 
 	VkResult CpuContext::ClearImageWithColor(vkd::Image* image, const VkClearColorValue& color)
 	{
