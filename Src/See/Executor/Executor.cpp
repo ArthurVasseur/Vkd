@@ -6,8 +6,11 @@
 
 #include "See/Executor/Executor.hpp"
 
+#include <algorithm>
+
 #include <Concerto/Core/Logger/Logger.hpp>
 
+#include "See/Spirv/Module.hpp"
 #include <spirv-tools/libspirv.h>
 
 namespace see
@@ -43,13 +46,48 @@ namespace see
 		if (!IsValidSpirv(spirvCode))
 			return InvalidShaderHandle;
 
+		std::optional<spirv::Module> spirvModule = spirv::Parse(spirvCode);
+		if (!spirvModule)
+			return InvalidShaderHandle;
+
+		auto entryPointIt = std::find_if(spirvModule->m_entryPoints.begin(), spirvModule->m_entryPoints.end(), [&entryPoint](const spirv::EntryPoint& candidate)
+										 { return candidate.m_name == entryPoint; });
+		if (entryPointIt == spirvModule->m_entryPoints.end())
+			return InvalidShaderHandle;
+
+		std::optional<ir::Module> irModule = ir::Convert(*spirvModule);
+		if (!irModule)
+			return InvalidShaderHandle;
+
 		const ShaderHandle handle = m_nextHandle++;
-		m_shaders.emplace(handle, RegisteredShader{stage, spirvCode, entryPoint});
+		m_shaders.emplace(handle, RegisteredShader{.m_stage = stage, .m_code = spirvCode, .m_entryPoint = entryPoint, .m_irModule = std::move(*irModule), .m_entryFunctionId = entryPointIt->m_functionId});
 		return handle;
 	}
 
 	void Executor::UnregisterShader(ShaderHandle handle)
 	{
 		m_shaders.erase(handle);
+	}
+
+	const ir::Module* Executor::GetIrModule(ShaderHandle handle) const
+	{
+		auto it = m_shaders.find(handle);
+		if (it == m_shaders.end())
+			return nullptr;
+
+		return &it->second.m_irModule;
+	}
+
+	const ir::Function* Executor::GetEntryFunction(ShaderHandle handle) const
+	{
+		auto it = m_shaders.find(handle);
+		if (it == m_shaders.end())
+			return nullptr;
+
+		for (const ir::Function& function : it->second.m_irModule.m_functions)
+			if (function.m_id == it->second.m_entryFunctionId)
+				return &function;
+
+		return nullptr;
 	}
 } // namespace see

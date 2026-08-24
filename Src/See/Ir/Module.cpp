@@ -250,6 +250,14 @@ namespace see::ir
 	{
 		Module module;
 
+		for (const auto& [id, spirvDecorations] : spirvModule.m_decorations)
+		{
+			std::vector<Decoration>& decorations = module.m_decorations[id];
+			decorations.reserve(spirvDecorations.size());
+			for (const spirv::Decoration& spirvDecoration : spirvDecorations)
+				decorations.push_back(Decoration{.m_kind = spirvDecoration.m_kind, .m_literals = spirvDecoration.m_literals});
+		}
+
 		for (const spirv::Instruction& instruction : spirvModule.m_globalInstructions)
 		{
 			const SpvOp opcode = static_cast<SpvOp>(instruction.m_opcode);

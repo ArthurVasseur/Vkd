@@ -73,3 +73,37 @@ TEST_CASE("See::Executor - accepts and registers a valid SPIR-V module", "[see][
 
 	executor.UnregisterShader(handle);
 }
+
+TEST_CASE("See::Executor - exposes the parsed IR for a registered shader", "[see][executor]")
+{
+	const std::vector<cct::UInt32> code = AssembleMinimalComputeShader();
+	REQUIRE_FALSE(code.empty());
+
+	see::Executor executor;
+	const see::ShaderHandle handle = executor.RegisterShader(see::ShaderStage::Compute, code, "main");
+	REQUIRE(handle != see::InvalidShaderHandle);
+
+	const see::ir::Module* module = executor.GetIrModule(handle);
+	REQUIRE(module != nullptr);
+
+	const see::ir::Function* entryFunction = executor.GetEntryFunction(handle);
+	REQUIRE(entryFunction != nullptr);
+	REQUIRE_FALSE(entryFunction->m_blocks.empty());
+	CHECK(entryFunction->m_blocks[0].m_terminator == see::ir::Terminator::Return);
+}
+
+TEST_CASE("See::Executor - rejects an entry point name that doesn't exist in the module", "[see][executor]")
+{
+	const std::vector<cct::UInt32> code = AssembleMinimalComputeShader();
+	REQUIRE_FALSE(code.empty());
+
+	see::Executor executor;
+	REQUIRE(executor.RegisterShader(see::ShaderStage::Compute, code, "doesNotExist") == see::InvalidShaderHandle);
+}
+
+TEST_CASE("See::Executor - GetIrModule/GetEntryFunction return null for an unknown handle", "[see][executor]")
+{
+	see::Executor executor;
+	CHECK(executor.GetIrModule(see::InvalidShaderHandle) == nullptr);
+	CHECK(executor.GetEntryFunction(see::InvalidShaderHandle) == nullptr);
+}

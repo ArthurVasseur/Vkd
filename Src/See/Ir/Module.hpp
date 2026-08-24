@@ -111,10 +111,17 @@ namespace see::ir
 		cct::UInt32 m_bits = 0; // raw bit pattern, reinterpret via m_type's scalar kind
 	};
 
+	struct Decoration
+	{
+		cct::UInt32 m_kind = 0; // raw SpvDecoration value
+		std::vector<cct::UInt32> m_literals;
+	};
+
 	struct Module
 	{
 		std::unordered_map<cct::UInt32, Type> m_types;
 		std::unordered_map<cct::UInt32, Constant> m_constants;
+		std::unordered_map<cct::UInt32, std::vector<Decoration>> m_decorations;
 		std::vector<Instruction> m_globalInstructions; // mostly OpVariable
 		std::vector<Function> m_functions;
 	};

@@ -13,6 +13,7 @@
 #include <See/Ir/Module.hpp>
 #include <See/Spirv/Module.hpp>
 #include <spirv-tools/libspirv.h>
+#include <spirv/unified1/spirv.h>
 
 namespace
 {
@@ -225,4 +226,35 @@ TEST_CASE("see::ir::Convert - vector/matrix types and select/compare ops", "[see
 	CHECK(block.m_instructions[2].m_op == see::ir::Op::MatrixTimesVector);
 	CHECK(block.m_instructions[3].m_op == see::ir::Op::Select);
 	REQUIRE(block.m_instructions[3].m_args.size() == 3);
+}
+
+TEST_CASE("see::ir::Convert - decorations propagate from the SPIR-V module", "[see][ir]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint Vertex %main \"main\" %pos\n"
+		"OpDecorate %pos BuiltIn Position\n"
+		"%float = OpTypeFloat 32\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%_ptr_Output_v4float = OpTypePointer Output %v4float\n"
+		"%pos = OpVariable %_ptr_Output_v4float Output\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+
+	REQUIRE(module.m_globalInstructions.size() == 1);
+	const cct::UInt32 posId = module.m_globalInstructions[0].m_id;
+
+	auto decoIt = module.m_decorations.find(posId);
+	REQUIRE(decoIt != module.m_decorations.end());
+	REQUIRE(decoIt->second.size() == 1);
+	CHECK(decoIt->second[0].m_kind == SpvDecorationBuiltIn);
+	REQUIRE(decoIt->second[0].m_literals.size() == 1);
+	CHECK(decoIt->second[0].m_literals[0] == SpvBuiltInPosition);
 }
