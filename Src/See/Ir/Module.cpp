@@ -33,6 +33,7 @@ namespace see::ir
 				case SpvOpTypeVector:
 				case SpvOpTypeMatrix:
 				case SpvOpTypePointer:
+				case SpvOpTypeStruct:
 					return true;
 				default:
 					return false;
@@ -67,6 +68,7 @@ namespace see::ir
 				case SpvOpSourceContinued:
 				case SpvOpName:
 				case SpvOpMemberName:
+				case SpvOpMemberDecorate:
 				case SpvOpModuleProcessed:
 				case SpvOpString:
 				case SpvOpLine:
@@ -91,6 +93,8 @@ namespace see::ir
 					return Op::Load;
 				case SpvOpStore:
 					return Op::Store;
+				case SpvOpCopyMemory:
+					return Op::CopyMemory;
 				case SpvOpAccessChain:
 					return Op::AccessChain;
 				case SpvOpCompositeConstruct:
@@ -208,6 +212,9 @@ namespace see::ir
 				case SpvOpTypePointer:
 					if (operands.size() >= 2)
 						module.m_types[id] = Type{.m_kind = TypeKind::Pointer, .m_pointee = operands[1]};
+					break;
+				case SpvOpTypeStruct:
+					module.m_types[id] = Type{.m_kind = TypeKind::Struct, .m_memberTypes = operands};
 					break;
 				default:
 					break;

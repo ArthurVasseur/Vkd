@@ -239,3 +239,65 @@ TEST_CASE("see::exec::Run - matrix times vector", "[see][exec]")
 	CHECK(out.GetFloat(2) == 6.0f);
 	CHECK(out.GetFloat(3) == 8.0f);
 }
+
+TEST_CASE("see::exec::Run - struct-typed function locals (OpCopyMemory, member AccessChain, whole-struct Load/Extract)", "[see][exec]")
+{
+	// Mirrors the pattern real shader compilers emit for struct-typed entry-point I/O:
+	// a Function-storage struct local copied from Input via OpCopyMemory, member access
+	// via AccessChain, and the whole struct re-loaded then split with CompositeExtract.
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%int = OpTypeInt 32 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%v3float = OpTypeVector %float 3\n"
+		"%_ptr_Input_int = OpTypePointer Input %int\n"
+		"%_ptr_Output_v3float = OpTypePointer Output %v3float\n"
+		"%in_var = OpVariable %_ptr_Input_int Input\n"
+		"%out_var = OpVariable %_ptr_Output_v3float Output\n"
+		"%InStruct = OpTypeStruct %int\n"
+		"%OutStruct = OpTypeStruct %v3float\n"
+		"%_ptr_Function_InStruct = OpTypePointer Function %InStruct\n"
+		"%_ptr_Function_OutStruct = OpTypePointer Function %OutStruct\n"
+		"%_ptr_Function_int = OpTypePointer Function %int\n"
+		"%_ptr_Function_v3float = OpTypePointer Function %v3float\n"
+		"%int_0 = OpConstant %int 0\n"
+		"%float_1 = OpConstant %float 1\n"
+		"%float_2 = OpConstant %float 2\n"
+		"%float_3 = OpConstant %float 3\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%localOut = OpVariable %_ptr_Function_OutStruct Function\n"
+		"%localIn = OpVariable %_ptr_Function_InStruct Function\n"
+		"%p1 = OpAccessChain %_ptr_Function_int %localIn %int_0\n"
+		"OpCopyMemory %p1 %in_var\n"
+		"%p2 = OpAccessChain %_ptr_Function_v3float %localOut %int_0\n"
+		"%vec = OpCompositeConstruct %v3float %float_1 %float_2 %float_3\n"
+		"OpStore %p2 %vec\n"
+		"%whole = OpLoad %OutStruct %localOut\n"
+		"%member = OpCompositeExtract %v3float %whole 0\n"
+		"OpStore %out_var %member\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
+
+	see::exec::Value input;
+	input.m_scalar = see::ir::ScalarKind::Int32;
+	input.SetInt32(0, 42);
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}});
+	REQUIRE(result.has_value());
+
+	auto outIt = result->find(outId);
+	REQUIRE(outIt != result->end());
+	CHECK(outIt->second.GetFloat(0) == 1.0f);
+	CHECK(outIt->second.GetFloat(1) == 2.0f);
+	CHECK(outIt->second.GetFloat(2) == 3.0f);
+}

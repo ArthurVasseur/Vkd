@@ -49,7 +49,8 @@ namespace see::exec
 		struct PointerInfo
 		{
 			cct::UInt32 m_baseVariable = 0;
-			std::optional<cct::UInt32> m_component;
+			cct::UInt32 m_wordOffset = 0;
+			cct::UInt32 m_pointeeType = 0; // ir type id of what this pointer currently points to
 		};
 
 		struct RuntimeState
@@ -59,6 +60,36 @@ namespace see::exec
 			std::unordered_map<cct::UInt32, Value> m_ssaValues;
 			std::unordered_map<cct::UInt32, PointerInfo> m_pointers;
 		};
+
+		struct MemberLayout
+		{
+			cct::UInt32 m_offset = 0;
+			cct::UInt32 m_wordCount = 0;
+		};
+
+		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
+
+		// Word offset/count of each member, in declaration order. Members are packed sequentially
+		// (Function/Private-storage locals don't need std140/std430 padding rules).
+		std::optional<std::vector<MemberLayout>> GetStructMemberLayout(const ir::Module& module, const ir::Type& structType)
+		{
+			std::vector<MemberLayout> layout;
+			cct::UInt32 offset = 0;
+			for (cct::UInt32 memberTypeId : structType.m_memberTypes)
+			{
+				std::optional<Value> memberShape = MakeZeroValue(module, memberTypeId);
+				if (!memberShape)
+					return std::nullopt;
+
+				const cct::UInt32 wordCount = memberShape->m_rows * memberShape->m_columns;
+				if (offset + wordCount > 16)
+					return std::nullopt;
+
+				layout.push_back(MemberLayout{.m_offset = offset, .m_wordCount = wordCount});
+				offset += wordCount;
+			}
+			return layout;
+		}
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId)
 		{
@@ -81,6 +112,14 @@ namespace see::exec
 					if (columnIt == module.m_types.end())
 						return std::nullopt;
 					return Value{.m_scalar = type.m_scalar, .m_rows = columnIt->second.m_componentCount, .m_columns = type.m_componentCount};
+				}
+				case ir::TypeKind::Struct:
+				{
+					std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(module, type);
+					if (!layout)
+						return std::nullopt;
+					const cct::UInt32 totalWords = layout->empty() ? 0 : layout->back().m_offset + layout->back().m_wordCount;
+					return Value{.m_rows = totalWords, .m_structType = typeId};
 				}
 				default:
 					return std::nullopt;
@@ -111,7 +150,11 @@ namespace see::exec
 
 		void RegisterVariable(RuntimeState& state, cct::UInt32 id, cct::UInt32 pointerTypeId)
 		{
-			state.m_pointers[id] = PointerInfo{.m_baseVariable = id};
+			cct::UInt32 pointeeType = 0;
+			if (auto typeIt = state.m_module.m_types.find(pointerTypeId); typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Pointer)
+				pointeeType = typeIt->second.m_pointee;
+
+			state.m_pointers[id] = PointerInfo{.m_baseVariable = id, .m_wordOffset = 0, .m_pointeeType = pointeeType};
 			if (state.m_variables.find(id) == state.m_variables.end())
 				if (std::optional<Value> zero = MakeZeroValue(state.m_module, pointerTypeId))
 					state.m_variables[id] = *zero;
@@ -130,16 +173,15 @@ namespace see::exec
 			if (variableIt == state.m_variables.end())
 				return false;
 
-			Value result = variableIt->second;
-			if (pointerIt->second.m_component)
-			{
-				Value component;
-				component.m_scalar = result.m_scalar;
-				component.m_bits[0] = result.m_bits[*pointerIt->second.m_component];
-				result = component;
-			}
+			std::optional<Value> result = MakeZeroValue(state.m_module, pointerIt->second.m_pointeeType);
+			if (!result)
+				return false;
 
-			state.m_ssaValues[instruction.m_id] = result;
+			const cct::UInt32 wordCount = result->m_rows * result->m_columns;
+			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
+				result->m_bits[i] = variableIt->second.m_bits[pointerIt->second.m_wordOffset + i];
+
+			state.m_ssaValues[instruction.m_id] = *result;
 			return true;
 		}
 
@@ -160,10 +202,35 @@ namespace see::exec
 			if (variableIt == state.m_variables.end())
 				return false;
 
-			if (pointerIt->second.m_component)
-				variableIt->second.m_bits[*pointerIt->second.m_component] = value->m_bits[0];
-			else
-				variableIt->second = *value;
+			const cct::UInt32 wordCount = value->m_rows * value->m_columns;
+			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
+				variableIt->second.m_bits[pointerIt->second.m_wordOffset + i] = value->m_bits[i];
+
+			return true;
+		}
+
+		bool ExecuteCopyMemory(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.size() < 2)
+				return false;
+
+			auto targetIt = state.m_pointers.find(instruction.m_args[0]);
+			auto sourceIt = state.m_pointers.find(instruction.m_args[1]);
+			if (targetIt == state.m_pointers.end() || sourceIt == state.m_pointers.end())
+				return false;
+
+			auto targetVarIt = state.m_variables.find(targetIt->second.m_baseVariable);
+			auto sourceVarIt = state.m_variables.find(sourceIt->second.m_baseVariable);
+			if (targetVarIt == state.m_variables.end() || sourceVarIt == state.m_variables.end())
+				return false;
+
+			std::optional<Value> shape = MakeZeroValue(state.m_module, targetIt->second.m_pointeeType);
+			if (!shape)
+				return false;
+
+			const cct::UInt32 wordCount = shape->m_rows * shape->m_columns;
+			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
+				targetVarIt->second.m_bits[targetIt->second.m_wordOffset + i] = sourceVarIt->second.m_bits[sourceIt->second.m_wordOffset + i];
 
 			return true;
 		}
@@ -180,13 +247,25 @@ namespace see::exec
 			PointerInfo info = basePointerIt->second;
 			if (instruction.m_args.size() >= 2)
 			{
-				if (info.m_component)
-					return false;
-
 				std::optional<Value> index = ResolveValue(state, instruction.m_args[1]);
 				if (!index)
 					return false;
-				info.m_component = static_cast<cct::UInt32>(index->GetInt32());
+				const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
+
+				auto typeIt = state.m_module.m_types.find(info.m_pointeeType);
+				if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Struct)
+				{
+					std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(state.m_module, typeIt->second);
+					if (!layout || indexValue >= layout->size())
+						return false;
+					info.m_wordOffset += (*layout)[indexValue].m_offset;
+					info.m_pointeeType = typeIt->second.m_memberTypes[indexValue];
+				}
+				else
+				{
+					// Vector component: one word per index, pointee type unchanged (we don't track scalar element type ids).
+					info.m_wordOffset += indexValue;
+				}
 			}
 
 			state.m_pointers[instruction.m_id] = info;
@@ -199,33 +278,23 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			if (result->m_columns > 1)
+			// Each arg contributes its own word count, concatenated in order - covers scalars-into-vector,
+			// vectors-into-matrix-columns, and mixed scalar/vector args (e.g. vec4 built from a vec3 + a float).
+			const cct::UInt32 totalWords = result->m_rows * result->m_columns;
+			cct::UInt32 writeIndex = 0;
+			for (cct::UInt32 argId : instruction.m_args)
 			{
-				if (instruction.m_args.size() != result->m_columns)
+				std::optional<Value> component = ResolveValue(state, argId);
+				if (!component)
 					return false;
 
-				for (cct::UInt32 column = 0; column < result->m_columns; ++column)
-				{
-					std::optional<Value> columnValue = ResolveValue(state, instruction.m_args[column]);
-					if (!columnValue)
-						return false;
-					for (cct::UInt32 row = 0; row < result->m_rows; ++row)
-						result->m_bits[column * result->m_rows + row] = columnValue->m_bits[row];
-				}
+				const cct::UInt32 componentWords = component->m_rows * component->m_columns;
+				for (cct::UInt32 i = 0; i < componentWords && writeIndex < totalWords; ++i, ++writeIndex)
+					result->m_bits[writeIndex] = component->m_bits[i];
 			}
-			else
-			{
-				if (instruction.m_args.size() != result->m_rows)
-					return false;
 
-				for (cct::UInt32 row = 0; row < result->m_rows; ++row)
-				{
-					std::optional<Value> component = ResolveValue(state, instruction.m_args[row]);
-					if (!component)
-						return false;
-					result->m_bits[row] = component->m_bits[0];
-				}
-			}
+			if (writeIndex != totalWords)
+				return false;
 
 			state.m_ssaValues[instruction.m_id] = *result;
 			return true;
@@ -241,6 +310,29 @@ namespace see::exec
 				return false;
 
 			const cct::UInt32 index = instruction.m_args[1];
+
+			if (composite->m_structType != 0)
+			{
+				auto typeIt = state.m_module.m_types.find(composite->m_structType);
+				if (typeIt == state.m_module.m_types.end())
+					return false;
+
+				std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(state.m_module, typeIt->second);
+				if (!layout || index >= layout->size())
+					return false;
+
+				std::optional<Value> result = MakeZeroValue(state.m_module, typeIt->second.m_memberTypes[index]);
+				if (!result)
+					return false;
+
+				const MemberLayout& member = (*layout)[index];
+				for (cct::UInt32 i = 0; i < member.m_wordCount && i < 16; ++i)
+					result->m_bits[i] = composite->m_bits[member.m_offset + i];
+
+				state.m_ssaValues[instruction.m_id] = *result;
+				return true;
+			}
+
 			if (index >= composite->m_rows * composite->m_columns)
 				return false;
 
@@ -493,6 +585,8 @@ namespace see::exec
 					return ExecuteLoad(state, instruction);
 				case ir::Op::Store:
 					return ExecuteStore(state, instruction);
+				case ir::Op::CopyMemory:
+					return ExecuteCopyMemory(state, instruction);
 				case ir::Op::AccessChain:
 					return ExecuteAccessChain(state, instruction);
 				case ir::Op::CompositeConstruct:

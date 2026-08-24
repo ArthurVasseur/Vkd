@@ -19,8 +19,9 @@ namespace see::exec
 	struct Value
 	{
 		ir::ScalarKind m_scalar = ir::ScalarKind::Float32;
-		cct::UInt32 m_rows = 1; // vector length. 1 for a plain scalar.
-		cct::UInt32 m_columns = 1; // matrix column count. 1 for scalar/vector.
+		cct::UInt32 m_rows = 1; // vector length, or total word count when m_structType != 0. 1 for a plain scalar.
+		cct::UInt32 m_columns = 1; // matrix column count. 1 for scalar/vector/struct.
+		cct::UInt32 m_structType = 0; // non-zero: this is a struct (ir type id), m_bits is its flat word layout.
 		std::array<cct::UInt32, 16> m_bits{};
 
 		[[nodiscard]] float GetFloat(cct::UInt32 index = 0) const;

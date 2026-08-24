@@ -40,18 +40,6 @@ const char* vertexShaderCode = R"(
 [nzsl_version("1.1")]
 module;
 
-const positions = array[vec2[f32]](
-	vec2[f32](0.0, -0.5),
-	vec2[f32](0.5, 0.5),
-	vec2[f32](-0.5, 0.5)
-);
-
-const colors = array[vec3[f32]](
-	vec3[f32](1.0, 0.0, 0.0),
-	vec3[f32](0.0, 1.0, 0.0),
-	vec3[f32](0.0, 0.0, 1.0)
-);
-
 struct VertInput
 {
 	[builtin(vertex_index)] vertexIndex: i32
@@ -67,8 +55,21 @@ struct VertOutput
 fn main(input: VertInput) -> VertOutput
 {
 	let output: VertOutput;
-	output.position = vec4[f32](positions[input.vertexIndex], 0.0, 1.0);
-	output.color = colors[input.vertexIndex];
+	if (input.vertexIndex == 0)
+	{
+		output.position = vec4[f32](0.0, -0.5, 0.0, 1.0);
+		output.color = vec3[f32](1.0, 0.0, 0.0);
+	}
+	else if (input.vertexIndex == 1)
+	{
+		output.position = vec4[f32](0.5, 0.5, 0.0, 1.0);
+		output.color = vec3[f32](0.0, 1.0, 0.0);
+	}
+	else
+	{
+		output.position = vec4[f32](-0.5, 0.5, 0.0, 1.0);
+		output.color = vec3[f32](0.0, 0.0, 1.0);
+	}
 	return output;
 }
 )";

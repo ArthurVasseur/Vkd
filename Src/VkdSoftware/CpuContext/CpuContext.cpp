@@ -72,15 +72,17 @@ namespace vkd::software
 			see::exec::VertexStageOutput m_output;
 		};
 
-		// 2D cross product of (B-A) and (P-A); sign follows Vulkan's front-face convention directly in framebuffer space.
+		// 2D cross product of (B-A) and (P-A).
 		float EdgeFunction(float ax, float ay, float bx, float by, float px, float py)
 		{
 			return (bx - ax) * (py - ay) - (by - ay) * (px - ax);
 		}
 
+		// Framebuffer space is Y-down, which flips the visual CW/CCW sense relative to this formula's
+		// algebraic sign - a positive area here is a visually clockwise triangle, hence the swap below.
 		bool IsFrontFacing(float signedArea, VkFrontFace frontFace)
 		{
-			return frontFace == VK_FRONT_FACE_COUNTER_CLOCKWISE ? signedArea > 0.0f : signedArea < 0.0f;
+			return frontFace == VK_FRONT_FACE_CLOCKWISE ? signedArea > 0.0f : signedArea < 0.0f;
 		}
 
 		bool IsCulled(bool frontFacing, VkCullModeFlags cullMode)

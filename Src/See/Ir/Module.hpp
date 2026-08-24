@@ -34,7 +34,8 @@ namespace see::ir
 		Scalar,
 		Vector,
 		Matrix,
-		Pointer
+		Pointer,
+		Struct
 	};
 
 	struct Type
@@ -43,6 +44,7 @@ namespace see::ir
 		ScalarKind m_scalar = ScalarKind::Float32; // meaningful for Scalar/Vector/Matrix
 		cct::UInt32 m_componentCount = 0; // Vector: component count. Matrix: column count.
 		cct::UInt32 m_pointee = 0; // Pointer: pointee type id. Matrix: column (Vector) type id.
+		std::vector<cct::UInt32> m_memberTypes; // Struct: member type ids, in declaration order.
 	};
 
 	enum class Op
@@ -52,6 +54,7 @@ namespace see::ir
 		Constant,
 		Load,
 		Store,
+		CopyMemory,
 		AccessChain,
 		CompositeConstruct,
 		CompositeExtract,
