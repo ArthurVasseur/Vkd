@@ -57,7 +57,8 @@ namespace see::exec
 	} // namespace
 
 	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
-													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers)
+													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
 		std::unordered_map<cct::UInt32, Value> inputs;
 		if (std::optional<cct::UInt32> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
@@ -68,7 +69,7 @@ namespace see::exec
 			inputs[*vertexIndexVar] = value;
 		}
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages);
 		if (!result)
 			return std::nullopt;
 
@@ -95,7 +96,8 @@ namespace see::exec
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers)
+		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
@@ -105,7 +107,7 @@ namespace see::exec
 				inputs[variableId] = valueIt->second;
 		}
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages);
 		if (!result)
 			return std::nullopt;
 

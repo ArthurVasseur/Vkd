@@ -33,6 +33,7 @@ namespace vkd
 	class DescriptorSetLayout;
 	class DescriptorPool;
 	class DescriptorSet;
+	class Sampler;
 
 	class Device : public ObjectBase
 	{
@@ -158,6 +159,7 @@ namespace vkd
 		virtual Result<PipelineLayout*, VkResult> CreatePipelineLayout(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<DescriptorSetLayout*, VkResult> CreateDescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<DescriptorPool*, VkResult> CreateDescriptorPool(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Sampler*, VkResult> CreateSampler(const VkAllocationCallbacks& allocationCallbacks) = 0;
 
 	private:
 		PhysicalDevice* m_owner;

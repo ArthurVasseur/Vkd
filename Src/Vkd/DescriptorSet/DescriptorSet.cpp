@@ -29,4 +29,26 @@ namespace vkd
 
 		return &it->second[arrayElement];
 	}
+
+	void DescriptorSet::SetImageBinding(UInt32 binding, UInt32 arrayElement, const ImageBinding& info)
+	{
+		AssertValid();
+
+		std::vector<ImageBinding>& bindings = m_imageBindings[binding];
+		if (arrayElement >= bindings.size())
+			bindings.resize(arrayElement + 1);
+
+		bindings[arrayElement] = info;
+	}
+
+	const DescriptorSet::ImageBinding* DescriptorSet::FindImageBinding(UInt32 binding, UInt32 arrayElement) const noexcept
+	{
+		AssertValid();
+
+		auto it = m_imageBindings.find(binding);
+		if (it == m_imageBindings.end() || arrayElement >= it->second.size())
+			return nullptr;
+
+		return &it->second[arrayElement];
+	}
 } // namespace vkd

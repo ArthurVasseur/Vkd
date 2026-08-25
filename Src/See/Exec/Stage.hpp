@@ -25,10 +25,12 @@ namespace see::exec
 	};
 
 	[[nodiscard]] std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
-																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {});
+																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
+																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
 
 	// `locationInputs` is keyed by location number (e.g. interpolated varyings).
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {});
+		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
 } // namespace see::exec

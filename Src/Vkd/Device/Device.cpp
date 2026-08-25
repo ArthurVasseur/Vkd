@@ -24,6 +24,7 @@
 #include "Vkd/PipelineLayout/PipelineLayout.hpp"
 #include "Vkd/Queue/Queue.hpp"
 #include "Vkd/RenderPass/RenderPass.hpp"
+#include "Vkd/Sampler/Sampler.hpp"
 #include "Vkd/ShaderModule/ShaderModule.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 
@@ -1165,14 +1166,40 @@ namespace vkd
 	VkResult Device::CreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSampler* pSampler)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreateSampler not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pSampler);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto samplerResult = deviceObj->CreateSampler(*pAllocator);
+		if (samplerResult.IsError())
+			return samplerResult.GetError();
+
+		auto* samplerObj = std::move(samplerResult).GetValue();
+		VkResult result = samplerObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, samplerObj);
+			return result;
+		}
+
+		*pSampler = VKD_TO_HANDLE(VkSampler, samplerObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroySampler(VkDevice device, VkSampler sampler, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroySampler not implemented");
+
+		if (sampler == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Sampler, samplerObj, sampler);
+
+		mem::Delete(pAllocator ? *pAllocator : samplerObj->GetAllocationCallbacks(), samplerObj);
 	}
 
 	VkResult Device::CreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore)
@@ -1435,22 +1462,38 @@ namespace vkd
 
 			const bool isBufferType = write.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
 									  write.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC || write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-			if (!isBufferType)
+			if (isBufferType)
 			{
-				cct::Logger::Warning("UpdateDescriptorSets: descriptor type {} not supported, write ignored", static_cast<int>(write.descriptorType));
+				if (!write.pBufferInfo)
+					continue;
+
+				for (UInt32 j = 0; j < write.descriptorCount; ++j)
+				{
+					const VkDescriptorBufferInfo& bufferInfo = write.pBufferInfo[j];
+					VKD_FROM_HANDLE(Buffer, bufferObj, bufferInfo.buffer);
+
+					setObj->SetBufferBinding(write.dstBinding, write.dstArrayElement + j, DescriptorSet::BufferBinding{.buffer = bufferObj, .offset = bufferInfo.offset, .range = bufferInfo.range});
+				}
 				continue;
 			}
 
-			if (!write.pBufferInfo)
-				continue;
-
-			for (UInt32 j = 0; j < write.descriptorCount; ++j)
+			if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
 			{
-				const VkDescriptorBufferInfo& bufferInfo = write.pBufferInfo[j];
-				VKD_FROM_HANDLE(Buffer, bufferObj, bufferInfo.buffer);
+				if (!write.pImageInfo)
+					continue;
 
-				setObj->SetBufferBinding(write.dstBinding, write.dstArrayElement + j, DescriptorSet::BufferBinding{.buffer = bufferObj, .offset = bufferInfo.offset, .range = bufferInfo.range});
+				for (UInt32 j = 0; j < write.descriptorCount; ++j)
+				{
+					const VkDescriptorImageInfo& imageInfo = write.pImageInfo[j];
+					VKD_FROM_HANDLE(ImageView, imageViewObj, imageInfo.imageView);
+					VKD_FROM_HANDLE(Sampler, samplerObj, imageInfo.sampler);
+
+					setObj->SetImageBinding(write.dstBinding, write.dstArrayElement + j, DescriptorSet::ImageBinding{.imageView = imageViewObj, .sampler = samplerObj});
+				}
+				continue;
 			}
+
+			cct::Logger::Warning("UpdateDescriptorSets: descriptor type {} not supported, write ignored", static_cast<int>(write.descriptorType));
 		}
 
 		if (descriptorCopyCount > 0)

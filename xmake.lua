@@ -180,6 +180,7 @@ target("vkd")
         "PipelineLayout",
         "Queue",
         "RenderPass",
+        "Sampler",
         "ShaderModule",
         "Synchronization",
         "Synchronization/Fence",

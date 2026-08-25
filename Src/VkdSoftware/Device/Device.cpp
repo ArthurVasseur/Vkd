@@ -12,6 +12,7 @@
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/PipelineLayout/PipelineLayout.hpp"
+#include "Vkd/Sampler/Sampler.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/BufferView/BufferView.hpp"
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
@@ -257,5 +258,17 @@ namespace vkd::software
 		}
 
 		return pool;
+	}
+
+	Result<vkd::Sampler*, VkResult> SoftwareDevice::CreateSampler(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* sampler = mem::New<vkd::Sampler>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!sampler)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Sampler");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return sampler;
 	}
 } // namespace vkd::software
