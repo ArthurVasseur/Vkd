@@ -49,7 +49,8 @@ struct VertInput
 struct VertOutput
 {
 	[builtin(position)] position: vec4[f32],
-	[location(0)] color: vec3[f32]
+	[location(0)] color: vec3[f32],
+	[location(1)] uv: vec2[f32]
 }
 
 [entry(vert)]
@@ -71,6 +72,8 @@ fn main(input: VertInput) -> VertOutput
 		output.position = vec4[f32](-0.5, 0.5, 0.0, 1.0);
 		output.color = vec3[f32](0.0, 0.0, 1.0);
 	}
+	// A 1x1 texture is sampled below, so the exact UV doesn't matter - constant is simplest.
+	output.uv = vec2[f32](0.5, 0.5);
 	return output;
 }
 )";
@@ -87,12 +90,14 @@ struct ColorUbo
 
 external
 {
-	[set(0), binding(0)] colorUbo: uniform[ColorUbo]
+	[set(0), binding(0)] colorUbo: uniform[ColorUbo],
+	[set(0), binding(1)] tex: sampler2D[f32]
 }
 
 struct FragInput
 {
-	[location(0)] color: vec3[f32]
+	[location(0)] color: vec3[f32],
+	[location(1)] uv: vec2[f32]
 }
 
 struct FragOutput
@@ -104,7 +109,7 @@ struct FragOutput
 fn main(input: FragInput) -> FragOutput
 {
 	let output: FragOutput;
-	output.color = vec4[f32](input.color, 1.0) * colorUbo.multiplier;
+	output.color = tex.Sample(input.uv) * colorUbo.multiplier;
 	return output;
 }
 )";
@@ -368,8 +373,72 @@ int main()
 	std::memcpy(uboMapped.value, &uboData, sizeof(ColorUbo));
 	device.unmapMemory(uboMemory);
 
-	vk::DescriptorSetLayoutBinding uboBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment);
-	vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo({}, uboBinding);
+	// 1x1 RGBA8 texture for the fragment shader's tex.Sample() - exercises Sampler + the
+	// DescriptorSet image binding + CpuContext::Draw sampled-image resolution end to end.
+	vk::ImageCreateInfo texImageInfo(
+		{},
+		vk::ImageType::e2D,
+		vk::Format::eR8G8B8A8Unorm,
+		vk::Extent3D(1, 1, 1),
+		1,
+		1,
+		vk::SampleCountFlagBits::e1,
+		vk::ImageTiling::eLinear,
+		vk::ImageUsageFlagBits::eSampled,
+		vk::SharingMode::eExclusive);
+	auto texImageResult = device.createImage(texImageInfo);
+	vk::Image texImage = texImageResult.value;
+
+	auto texMemReqs = device.getImageMemoryRequirements(texImage);
+	uint32_t texMemoryTypeIndex = 0;
+	for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+	{
+		if ((texMemReqs.memoryTypeBits & (1 << i)) &&
+			(memProps.memoryTypes[i].propertyFlags &
+			 (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)))
+		{
+			texMemoryTypeIndex = i;
+			break;
+		}
+	}
+
+	vk::MemoryAllocateInfo texAllocInfo(texMemReqs.size, texMemoryTypeIndex);
+	auto texMemoryResult = device.allocateMemory(texAllocInfo);
+	vk::DeviceMemory texMemory = texMemoryResult.value;
+
+	device.bindImageMemory(texImage, texMemory, 0);
+
+	const uint8_t texelData[4] = {200, 100, 50, 255};
+	auto texMapped = device.mapMemory(texMemory, 0, sizeof(texelData));
+	std::memcpy(texMapped.value, texelData, sizeof(texelData));
+	device.unmapMemory(texMemory);
+
+	vk::ImageViewCreateInfo texViewInfo(
+		{},
+		texImage,
+		vk::ImageViewType::e2D,
+		vk::Format::eR8G8B8A8Unorm,
+		{},
+		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+	auto texViewResult = device.createImageView(texViewInfo);
+	vk::ImageView texImageView = texViewResult.value;
+
+	vk::SamplerCreateInfo samplerInfo(
+		{},
+		vk::Filter::eNearest,
+		vk::Filter::eNearest,
+		vk::SamplerMipmapMode::eNearest,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge);
+	auto samplerResult = device.createSampler(samplerInfo);
+	vk::Sampler sampler = samplerResult.value;
+
+	std::array<vk::DescriptorSetLayoutBinding, 2> descriptorBindings = {
+		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment),
+		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+	};
+	vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo({}, descriptorBindings);
 	auto descriptorSetLayoutResult = device.createDescriptorSetLayout(descriptorSetLayoutInfo);
 	vk::DescriptorSetLayout descriptorSetLayout = descriptorSetLayoutResult.value;
 
@@ -479,8 +548,11 @@ int main()
 	auto pipelineResult = device.createGraphicsPipeline({}, pipelineInfo);
 	vk::Pipeline graphicsPipeline = pipelineResult.value;
 
-	vk::DescriptorPoolSize descriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1);
-	vk::DescriptorPoolCreateInfo descriptorPoolInfo({}, 1, descriptorPoolSize);
+	std::array<vk::DescriptorPoolSize, 2> descriptorPoolSizes = {
+		vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1),
+		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
+	};
+	vk::DescriptorPoolCreateInfo descriptorPoolInfo({}, 1, descriptorPoolSizes);
 	auto descriptorPoolResult = device.createDescriptorPool(descriptorPoolInfo);
 	vk::DescriptorPool descriptorPool = descriptorPoolResult.value;
 
@@ -489,8 +561,12 @@ int main()
 	vk::DescriptorSet descriptorSet = descriptorSetResult.value[0];
 
 	vk::DescriptorBufferInfo uboDescriptorInfo(uboBuffer, 0, sizeof(ColorUbo));
-	vk::WriteDescriptorSet uboWrite(descriptorSet, 0, 0, vk::DescriptorType::eUniformBuffer, {}, uboDescriptorInfo);
-	device.updateDescriptorSets(uboWrite, {});
+	vk::DescriptorImageInfo texDescriptorInfo(sampler, texImageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+	std::array<vk::WriteDescriptorSet, 2> descriptorWrites = {
+		vk::WriteDescriptorSet(descriptorSet, 0, 0, vk::DescriptorType::eUniformBuffer, {}, uboDescriptorInfo),
+		vk::WriteDescriptorSet(descriptorSet, 1, 0, vk::DescriptorType::eCombinedImageSampler, texDescriptorInfo, {}),
+	};
+	device.updateDescriptorSets(descriptorWrites, {});
 
 	vk::CommandPoolCreateInfo poolInfo({}, graphicsQueueFamily);
 	auto poolResult = device.createCommandPool(poolInfo);
@@ -527,31 +603,37 @@ int main()
 		const uint8_t* pixels = static_cast<const uint8_t*>(mappedMemory.value);
 		saveImageToPPM("triangle.ppm", WIDTH, HEIGHT, pixels);
 
+		// Every fragment now reads output.color = tex.Sample(uv) * colorUbo.multiplier, ignoring the
+		// interpolated vertex color entirely - the whole triangle should be a flat (100, 50, 25):
+		// the 1x1 texture's (200, 100, 50, 255) texel halved by the UBO's (0.5, 0.5, 0.5, 1.0). A
+		// broken sampler/descriptor path would read a zeroed image or UBO and render black instead.
 		// Triangle centroid in screen space (vertices at NDC (0,-0.5)/(0.5,0.5)/(-0.5,0.5) map to
-		// (400,150)/(600,450)/(200,450) at 800x600) - barycentric weights are ~1/3 each there, so the
-		// unmultiplied color is a mid-gray (~85 per channel); the UBO's 0.5 multiplier should halve it
-		// to ~42. A broken descriptor set / uniform buffer path would read a zeroed UBO and render black.
+		// (400,150)/(600,450)/(200,450) at 800x600).
 		const size_t centroidIdx = (350 * WIDTH + 400) * 4;
 		const uint8_t r = pixels[centroidIdx + 0];
 		const uint8_t g = pixels[centroidIdx + 1];
 		const uint8_t b = pixels[centroidIdx + 2];
-		cct::Logger::Info("Centroid pixel with UBO multiplier applied: ({}, {}, {})", r, g, b);
+		cct::Logger::Info("Centroid pixel (texture x UBO multiplier): ({}, {}, {})", r, g, b);
 
 		device.unmapMemory(imageMemory);
 
-		if (r < 20 || r > 60 || g < 20 || g > 60 || b < 20 || b > 60)
+		if (r != 100 || g != 50 || b != 25)
 		{
-			cct::Logger::Error("Descriptor set / uniform buffer path did not apply as expected (expected ~42 per channel)");
+			cct::Logger::Error("Descriptor set / sampled image path did not apply as expected (expected (100, 50, 25))");
 			return EXIT_FAILURE;
 		}
 
-		cct::Logger::Info("Descriptor set / uniform buffer path validated end to end!");
+		cct::Logger::Info("Descriptor set / uniform buffer / sampled image path validated end to end!");
 	}
 
 	device.destroyPipeline(graphicsPipeline);
 	device.destroyPipelineLayout(pipelineLayout);
 	device.destroyDescriptorPool(descriptorPool);
 	device.destroyDescriptorSetLayout(descriptorSetLayout);
+	device.destroySampler(sampler);
+	device.destroyImageView(texImageView);
+	device.destroyImage(texImage);
+	device.freeMemory(texMemory);
 	device.destroyBuffer(uboBuffer);
 	device.freeMemory(uboMemory);
 	device.destroyShaderModule(fragShaderModule);
