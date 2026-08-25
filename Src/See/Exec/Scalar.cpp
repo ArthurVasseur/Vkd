@@ -57,9 +57,28 @@ namespace see::exec
 		{
 			const ir::Module& m_module;
 			std::unordered_map<cct::UInt32, Value> m_variables;
+			std::unordered_map<cct::UInt32, ExternalBuffer> m_externalBuffers;
 			std::unordered_map<cct::UInt32, Value> m_ssaValues;
 			std::unordered_map<cct::UInt32, PointerInfo> m_pointers;
 		};
+
+		// `count` contiguous words starting at wordOffset within baseVariable's storage - an external
+		// buffer if it's bound to one (e.g. a uniform block), otherwise the local Value register.
+		// Returns nullptr if the variable is unknown or the range doesn't fit its storage.
+		cct::UInt32* ResolveWords(RuntimeState& state, cct::UInt32 baseVariable, cct::UInt32 wordOffset, cct::UInt32 count)
+		{
+			if (auto externalIt = state.m_externalBuffers.find(baseVariable); externalIt != state.m_externalBuffers.end())
+			{
+				if (wordOffset + count > externalIt->second.m_wordCount)
+					return nullptr;
+				return externalIt->second.m_words + wordOffset;
+			}
+
+			auto variableIt = state.m_variables.find(baseVariable);
+			if (variableIt == state.m_variables.end() || wordOffset + count > variableIt->second.m_bits.size())
+				return nullptr;
+			return variableIt->second.m_bits.data() + wordOffset;
+		}
 
 		struct MemberLayout
 		{
@@ -70,7 +89,10 @@ namespace see::exec
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
 
 		// Word offset/count of each member, in declaration order. Members are packed sequentially
-		// (Function/Private-storage locals don't need std140/std430 padding rules).
+		// (Function/Private-storage locals don't need std140/std430 padding rules). Unbounded on
+		// purpose: a struct backed by an external buffer (e.g. a uniform block) can be far bigger
+		// than the 16-word Value cap - only materializing the *whole* struct as one Value is capped,
+		// in MakeZeroValue below, since individual members are still loaded/stored one at a time.
 		std::optional<std::vector<MemberLayout>> GetStructMemberLayout(const ir::Module& module, const ir::Type& structType)
 		{
 			std::vector<MemberLayout> layout;
@@ -82,9 +104,6 @@ namespace see::exec
 					return std::nullopt;
 
 				const cct::UInt32 wordCount = memberShape->m_rows * memberShape->m_columns;
-				if (offset + wordCount > 16)
-					return std::nullopt;
-
 				layout.push_back(MemberLayout{.m_offset = offset, .m_wordCount = wordCount});
 				offset += wordCount;
 			}
@@ -119,6 +138,11 @@ namespace see::exec
 					if (!layout)
 						return std::nullopt;
 					const cct::UInt32 totalWords = layout->empty() ? 0 : layout->back().m_offset + layout->back().m_wordCount;
+					// A Value can only hold 16 words - fine for small locals (the usual case), but a struct
+					// backed by an external buffer is addressed member-by-member instead of ever being
+					// materialized whole, so this cap doesn't limit external (e.g. uniform block) size.
+					if (totalWords > 16)
+						return std::nullopt;
 					return Value{.m_rows = totalWords, .m_structType = typeId};
 				}
 				default:
@@ -155,7 +179,7 @@ namespace see::exec
 				pointeeType = typeIt->second.m_pointee;
 
 			state.m_pointers[id] = PointerInfo{.m_baseVariable = id, .m_wordOffset = 0, .m_pointeeType = pointeeType};
-			if (state.m_variables.find(id) == state.m_variables.end())
+			if (state.m_externalBuffers.find(id) == state.m_externalBuffers.end() && state.m_variables.find(id) == state.m_variables.end())
 				if (std::optional<Value> zero = MakeZeroValue(state.m_module, pointerTypeId))
 					state.m_variables[id] = *zero;
 		}
@@ -169,17 +193,17 @@ namespace see::exec
 			if (pointerIt == state.m_pointers.end())
 				return false;
 
-			auto variableIt = state.m_variables.find(pointerIt->second.m_baseVariable);
-			if (variableIt == state.m_variables.end())
-				return false;
-
 			std::optional<Value> result = MakeZeroValue(state.m_module, pointerIt->second.m_pointeeType);
 			if (!result)
 				return false;
 
 			const cct::UInt32 wordCount = result->m_rows * result->m_columns;
+			const cct::UInt32* source = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, wordCount);
+			if (!source)
+				return false;
+
 			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
-				result->m_bits[i] = variableIt->second.m_bits[pointerIt->second.m_wordOffset + i];
+				result->m_bits[i] = source[i];
 
 			state.m_ssaValues[instruction.m_id] = *result;
 			return true;
@@ -198,13 +222,13 @@ namespace see::exec
 			if (!value)
 				return false;
 
-			auto variableIt = state.m_variables.find(pointerIt->second.m_baseVariable);
-			if (variableIt == state.m_variables.end())
+			const cct::UInt32 wordCount = value->m_rows * value->m_columns;
+			cct::UInt32* target = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, wordCount);
+			if (!target)
 				return false;
 
-			const cct::UInt32 wordCount = value->m_rows * value->m_columns;
 			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
-				variableIt->second.m_bits[pointerIt->second.m_wordOffset + i] = value->m_bits[i];
+				target[i] = value->m_bits[i];
 
 			return true;
 		}
@@ -219,18 +243,18 @@ namespace see::exec
 			if (targetIt == state.m_pointers.end() || sourceIt == state.m_pointers.end())
 				return false;
 
-			auto targetVarIt = state.m_variables.find(targetIt->second.m_baseVariable);
-			auto sourceVarIt = state.m_variables.find(sourceIt->second.m_baseVariable);
-			if (targetVarIt == state.m_variables.end() || sourceVarIt == state.m_variables.end())
-				return false;
-
 			std::optional<Value> shape = MakeZeroValue(state.m_module, targetIt->second.m_pointeeType);
 			if (!shape)
 				return false;
 
 			const cct::UInt32 wordCount = shape->m_rows * shape->m_columns;
+			cct::UInt32* target = ResolveWords(state, targetIt->second.m_baseVariable, targetIt->second.m_wordOffset, wordCount);
+			const cct::UInt32* source = ResolveWords(state, sourceIt->second.m_baseVariable, sourceIt->second.m_wordOffset, wordCount);
+			if (!target || !source)
+				return false;
+
 			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
-				targetVarIt->second.m_bits[targetIt->second.m_wordOffset + i] = sourceVarIt->second.m_bits[sourceIt->second.m_wordOffset + i];
+				target[i] = source[i];
 
 			return true;
 		}
@@ -629,12 +653,13 @@ namespace see::exec
 		}
 	} // namespace
 
-	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs)
+	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
+															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers)
 	{
 		if (function.m_blocks.empty())
 			return std::nullopt;
 
-		RuntimeState state{.m_module = module, .m_variables = std::move(inputs)};
+		RuntimeState state{.m_module = module, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)

@@ -301,3 +301,67 @@ TEST_CASE("see::exec::Run - struct-typed function locals (OpCopyMemory, member A
 	CHECK(outIt->second.GetFloat(1) == 2.0f);
 	CHECK(outIt->second.GetFloat(2) == 3.0f);
 }
+
+TEST_CASE("see::exec::Run - uniform block bigger than 16 words via an external buffer", "[see][exec]")
+{
+	// A Value tops out at 16 words, but a uniform block backed by an external buffer (a mapped
+	// VkBuffer, in the real caller) isn't - this struct is 17 words (1 float + 1 mat4) and is never
+	// materialized whole, only member-by-member through AccessChain, so the cap doesn't apply to it.
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%mat4v4float = OpTypeMatrix %v4float 4\n"
+		"%int = OpTypeInt 32 1\n"
+		"%Ubo = OpTypeStruct %float %mat4v4float\n"
+		"%_ptr_Uniform_Ubo = OpTypePointer Uniform %Ubo\n"
+		"%_ptr_Uniform_float = OpTypePointer Uniform %float\n"
+		"%_ptr_Uniform_mat4v4float = OpTypePointer Uniform %mat4v4float\n"
+		"%_ptr_Output_float = OpTypePointer Output %float\n"
+		"%_ptr_Output_mat4v4float = OpTypePointer Output %mat4v4float\n"
+		"%ubo = OpVariable %_ptr_Uniform_Ubo Uniform\n"
+		"%outScalar = OpVariable %_ptr_Output_float Output\n"
+		"%outMatrix = OpVariable %_ptr_Output_mat4v4float Output\n"
+		"%int_0 = OpConstant %int 0\n"
+		"%int_1 = OpConstant %int 1\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%p0 = OpAccessChain %_ptr_Uniform_float %ubo %int_0\n"
+		"%v0 = OpLoad %float %p0\n"
+		"OpStore %outScalar %v0\n"
+		"%p1 = OpAccessChain %_ptr_Uniform_mat4v4float %ubo %int_1\n"
+		"%v1 = OpLoad %mat4v4float %p1\n"
+		"OpStore %outMatrix %v1\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 uboId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outScalarId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outMatrixId = module.m_globalInstructions[2].m_id;
+
+	std::array<cct::UInt32, 17> uboWords{};
+	const float scalarValue = 7.0f;
+	std::memcpy(&uboWords[0], &scalarValue, sizeof(float));
+	for (cct::UInt32 i = 0; i < 4; ++i)
+	{
+		const float diagonal = static_cast<float>(i + 1);
+		std::memcpy(&uboWords[1 + i * 4 + i], &diagonal, sizeof(float));
+	}
+
+	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {}, externalBuffers);
+	REQUIRE(result.has_value());
+
+	CHECK(result->find(outScalarId)->second.GetFloat() == 7.0f);
+
+	const see::exec::Value& matrix = result->find(outMatrixId)->second;
+	for (cct::UInt32 i = 0; i < 4; ++i)
+		CHECK(matrix.GetFloat(i * 4 + i) == static_cast<float>(i + 1));
+}
