@@ -163,6 +163,8 @@ target("vkd")
         "Buffer",
         "CommandBuffer",
         "CommandPool",
+        "DescriptorPool",
+        "DescriptorSet",
         "DescriptorSetLayout",
         "Device",
         "DeviceMemory",

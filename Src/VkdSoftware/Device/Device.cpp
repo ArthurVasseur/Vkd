@@ -6,6 +6,7 @@
 
 #include "VkdSoftware/Device/Device.hpp"
 
+#include "Vkd/DescriptorPool/DescriptorPool.hpp"
 #include "Vkd/DescriptorSetLayout/DescriptorSetLayout.hpp"
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Memory/Memory.hpp"
@@ -244,5 +245,17 @@ namespace vkd::software
 		}
 
 		return layout;
+	}
+
+	Result<vkd::DescriptorPool*, VkResult> SoftwareDevice::CreateDescriptorPool(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* pool = mem::New<vkd::DescriptorPool>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		if (!pool)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate DescriptorPool");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return pool;
 	}
 } // namespace vkd::software

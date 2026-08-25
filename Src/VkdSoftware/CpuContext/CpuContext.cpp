@@ -11,12 +11,15 @@
 #include <optional>
 #include <unordered_map>
 
+#include "Vkd/Buffer/Buffer.hpp"
+#include "Vkd/DescriptorSet/DescriptorSet.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/ImageView/ImageView.hpp"
 #include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
 
 #include "See/Exec/Stage.hpp"
+#include <spirv/unified1/spirv.h>
 #include <vulkan/utility/vk_format_utils.h>
 
 namespace vkd::software
@@ -111,8 +114,62 @@ namespace vkd::software
 			return result;
 		}
 
+		// Finds every Uniform/StorageBuffer Variable in `module` (via its DescriptorSet/Binding decorations),
+		// resolves it against the currently bound descriptor sets, and maps the backing buffer memory so
+		// see::exec can read it directly. Mapped DeviceMemory objects are appended to `outMappedMemories`
+		// for the caller to Unmap once the draw call is done with them.
+		std::unordered_map<UInt32, see::exec::ExternalBuffer> ResolveUniformBuffers(const see::ir::Module& module, const std::vector<vkd::DescriptorSet*>& boundSets, std::vector<vkd::DeviceMemory*>& outMappedMemories)
+		{
+			std::unordered_map<UInt32, see::exec::ExternalBuffer> result;
+
+			for (const see::ir::Instruction& global : module.m_globalInstructions)
+			{
+				if (global.m_op != see::ir::Op::Variable || global.m_args.empty())
+					continue;
+
+				const auto storageClass = static_cast<SpvStorageClass>(global.m_args[0]);
+				if (storageClass != SpvStorageClassUniform && storageClass != SpvStorageClassStorageBuffer)
+					continue;
+
+				auto decorationsIt = module.m_decorations.find(global.m_id);
+				if (decorationsIt == module.m_decorations.end())
+					continue;
+
+				std::optional<UInt32> descriptorSet;
+				std::optional<UInt32> binding;
+				for (const see::ir::Decoration& decoration : decorationsIt->second)
+				{
+					if (decoration.m_kind == SpvDecorationDescriptorSet && !decoration.m_literals.empty())
+						descriptorSet = decoration.m_literals[0];
+					else if (decoration.m_kind == SpvDecorationBinding && !decoration.m_literals.empty())
+						binding = decoration.m_literals[0];
+				}
+
+				if (!descriptorSet || !binding || *descriptorSet >= boundSets.size() || !boundSets[*descriptorSet])
+					continue;
+
+				const vkd::DescriptorSet::BufferBinding* bufferBinding = boundSets[*descriptorSet]->FindBufferBinding(*binding);
+				if (!bufferBinding || !bufferBinding->buffer || !bufferBinding->buffer->GetMemory())
+					continue;
+
+				vkd::Buffer* buffer = bufferBinding->buffer;
+				const VkDeviceSize byteSize = bufferBinding->range == VK_WHOLE_SIZE ? (buffer->GetSize() - bufferBinding->offset) : bufferBinding->range;
+				const VkDeviceSize absoluteOffset = buffer->GetMemoryOffset() + bufferBinding->offset;
+
+				void* mapped = nullptr;
+				if (buffer->GetMemory()->Map(absoluteOffset, byteSize, &mapped) != VK_SUCCESS || !mapped)
+					continue;
+
+				outMappedMemories.push_back(buffer->GetMemory());
+				result[global.m_id] = see::exec::ExternalBuffer{reinterpret_cast<UInt32*>(mapped), static_cast<UInt32>(byteSize / sizeof(UInt32))};
+			}
+
+			return result;
+		}
+
 		void RasterizeTriangle(cct::UByte* pixels, VkFormat format, const VkExtent3D& extent, const VkRect2D& scissor, const ScreenVertex& v0, const ScreenVertex& v1, const ScreenVertex& v2,
-							   const see::ir::Module& fragmentModule, const see::ir::Function& fragmentFunction, VkCullModeFlags cullMode, VkFrontFace frontFace)
+							   const see::ir::Module& fragmentModule, const see::ir::Function& fragmentFunction, VkCullModeFlags cullMode, VkFrontFace frontFace,
+							   const std::unordered_map<UInt32, see::exec::ExternalBuffer>& fragmentUniforms)
 		{
 			VKD_AUTO_PROFILER_SCOPE();
 			const VkDeviceSize pixelSize = vkuFormatElementSize(format);
@@ -169,7 +226,7 @@ namespace vkd::software
 						interpolated[location] = InterpolateLocation(value, it1->second, it2->second, l0, l1, l2);
 					}
 
-					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs = see::exec::RunFragmentStage(fragmentModule, fragmentFunction, interpolated);
+					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs = see::exec::RunFragmentStage(fragmentModule, fragmentFunction, interpolated, fragmentUniforms);
 					if (!fragmentOutputs)
 						continue;
 
@@ -231,6 +288,20 @@ namespace vkd::software
 			m_boundVertexBuffers[binding] = op.Buffers[i];
 			m_vertexBufferOffsets[binding] = op.Offsets[i];
 		}
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::BindDescriptorSets(OpBindDescriptorSets op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		const UInt32 maxSet = op.FirstSet + static_cast<UInt32>(op.DescriptorSets.size());
+		if (maxSet > m_boundDescriptorSets.size())
+			m_boundDescriptorSets.resize(maxSet, nullptr);
+
+		for (size_t i = 0; i < op.DescriptorSets.size(); ++i)
+			m_boundDescriptorSets[op.FirstSet + i] = op.DescriptorSets[i];
 
 		return VK_SUCCESS;
 	}
@@ -298,6 +369,10 @@ namespace vkd::software
 		else
 			scissor = pipeline->GetScissors()[0];
 
+		std::vector<vkd::DeviceMemory*> mappedUniformMemories;
+		const std::unordered_map<UInt32, see::exec::ExternalBuffer> vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, mappedUniformMemories);
+		const std::unordered_map<UInt32, see::exec::ExternalBuffer> fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, mappedUniformMemories);
+
 		for (UInt32 instance = 0; instance < op.InstanceCount; ++instance)
 		{
 			(void)instance; // no InstanceIndex builtin wired up yet - every instance draws identically
@@ -310,7 +385,7 @@ namespace vkd::software
 				for (UInt32 i = 0; i < 3; ++i)
 				{
 					const UInt32 vertexIndex = op.FirstVertex + base + i;
-					std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex);
+					std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, vertexUniforms);
 					if (!output)
 					{
 						allValid = false;
@@ -335,9 +410,12 @@ namespace vkd::software
 				if (!allValid)
 					continue;
 
-				RasterizeTriangle(pixels, format, extent, scissor, screenVertices[0], screenVertices[1], screenVertices[2], *fragmentModule, *fragmentFunction, pipeline->GetCullMode(), pipeline->GetFrontFace());
+				RasterizeTriangle(pixels, format, extent, scissor, screenVertices[0], screenVertices[1], screenVertices[2], *fragmentModule, *fragmentFunction, pipeline->GetCullMode(), pipeline->GetFrontFace(), fragmentUniforms);
 			}
 		}
+
+		for (vkd::DeviceMemory* memory : mappedUniformMemories)
+			memory->Unmap();
 
 		colorImage->GetMemory()->Unmap();
 		return VK_SUCCESS;

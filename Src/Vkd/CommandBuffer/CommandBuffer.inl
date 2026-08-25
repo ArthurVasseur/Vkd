@@ -8,6 +8,7 @@
 
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
+#include "Vkd/DescriptorSet/DescriptorSet.hpp"
 #include "Vkd/Framebuffer/Framebuffer.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/RenderPass/RenderPass.hpp"
@@ -178,6 +179,24 @@ namespace vkd
 			.Buffers = std::move(buffers),
 			.Offsets = std::move(offsets),
 			.FirstBinding = firstBinding,
+		});
+	}
+
+	inline void CommandBuffer::PushBindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, UInt32 firstSet, std::span<const VkDescriptorSet> pDescriptorSets)
+	{
+		std::vector<DescriptorSet*> descriptorSets;
+		descriptorSets.resize(pDescriptorSets.size());
+
+		for (std::size_t i = 0; i < pDescriptorSets.size(); ++i)
+		{
+			VKD_FROM_HANDLE(DescriptorSet, descriptorSetObject, pDescriptorSets[i]);
+			descriptorSets[i] = descriptorSetObject;
+		}
+
+		m_ops.emplace_back(OpBindDescriptorSets{
+			.BindPoint = pipelineBindPoint,
+			.FirstSet = firstSet,
+			.DescriptorSets = std::move(descriptorSets),
 		});
 	}
 

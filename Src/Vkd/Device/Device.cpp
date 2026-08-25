@@ -12,6 +12,8 @@
 #include "Vkd/BufferView/BufferView.hpp"
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
+#include "Vkd/DescriptorPool/DescriptorPool.hpp"
+#include "Vkd/DescriptorSet/DescriptorSet.hpp"
 #include "Vkd/DescriptorSetLayout/DescriptorSetLayout.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/Framebuffer/Framebuffer.hpp"
@@ -1321,41 +1323,138 @@ namespace vkd
 	VkResult Device::CreateDescriptorPool(VkDevice device, const VkDescriptorPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDescriptorPool* pDescriptorPool)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreateDescriptorPool not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pDescriptorPool);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto poolResult = deviceObj->CreateDescriptorPool(*pAllocator);
+		if (poolResult.IsError())
+			return poolResult.GetError();
+
+		auto* poolObj = std::move(poolResult).GetValue();
+		VkResult result = poolObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, poolObj);
+			return result;
+		}
+
+		*pDescriptorPool = VKD_TO_HANDLE(VkDescriptorPool, poolObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroyDescriptorPool not implemented");
+
+		if (descriptorPool == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(DescriptorPool, poolObj, descriptorPool);
+
+		poolObj->Reset(poolObj->GetAllocationCallbacks()); // sets are always allocated with the pool's own callbacks, regardless of what's passed here
+		mem::Delete(pAllocator ? *pAllocator : poolObj->GetAllocationCallbacks(), poolObj);
 	}
 
 	VkResult Device::ResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorPoolResetFlags flags)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkResetDescriptorPool not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(DescriptorPool, poolObj, descriptorPool);
+
+		poolObj->Reset(poolObj->GetAllocationCallbacks());
+		return VK_SUCCESS;
 	}
 
 	VkResult Device::AllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo, VkDescriptorSet* pDescriptorSets)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkAllocateDescriptorSets not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pAllocateInfo && pDescriptorSets);
+
+		VKD_FROM_HANDLE(DescriptorPool, poolObj, pAllocateInfo->descriptorPool);
+		const VkAllocationCallbacks& allocationCallbacks = poolObj->GetAllocationCallbacks();
+
+		std::vector<DescriptorSet*> allocated;
+		allocated.reserve(pAllocateInfo->descriptorSetCount);
+
+		for (UInt32 i = 0; i < pAllocateInfo->descriptorSetCount; ++i)
+		{
+			VKD_FROM_HANDLE(DescriptorSetLayout, layoutObj, pAllocateInfo->pSetLayouts[i]);
+
+			auto setResult = poolObj->AllocateSet(*layoutObj, allocationCallbacks);
+			if (setResult.IsError())
+			{
+				for (DescriptorSet* set : allocated)
+					poolObj->FreeSet(set, allocationCallbacks);
+				return setResult.GetError();
+			}
+
+			DescriptorSet* setObj = std::move(setResult).GetValue();
+			allocated.push_back(setObj);
+			pDescriptorSets[i] = VKD_TO_HANDLE(VkDescriptorSet, setObj);
+		}
+
+		return VK_SUCCESS;
 	}
 
 	VkResult Device::FreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount, const VkDescriptorSet* pDescriptorSets)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkFreeDescriptorSets not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(DescriptorPool, poolObj, descriptorPool);
+
+		const VkAllocationCallbacks& allocationCallbacks = poolObj->GetAllocationCallbacks();
+		for (UInt32 i = 0; i < descriptorSetCount; ++i)
+		{
+			if (pDescriptorSets[i] == VK_NULL_HANDLE)
+				continue;
+
+			VKD_FROM_HANDLE(DescriptorSet, setObj, pDescriptorSets[i]);
+			poolObj->FreeSet(setObj, allocationCallbacks);
+		}
+
+		return VK_SUCCESS;
 	}
 
 	void Device::UpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount, const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount, const VkCopyDescriptorSet* pDescriptorCopies)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkUpdateDescriptorSets not implemented");
+
+		for (UInt32 i = 0; i < descriptorWriteCount; ++i)
+		{
+			const VkWriteDescriptorSet& write = pDescriptorWrites[i];
+			VKD_FROM_HANDLE(DescriptorSet, setObj, write.dstSet);
+
+			const bool isBufferType = write.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
+									  write.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC || write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+			if (!isBufferType)
+			{
+				cct::Logger::Warning("UpdateDescriptorSets: descriptor type {} not supported, write ignored", static_cast<int>(write.descriptorType));
+				continue;
+			}
+
+			if (!write.pBufferInfo)
+				continue;
+
+			for (UInt32 j = 0; j < write.descriptorCount; ++j)
+			{
+				const VkDescriptorBufferInfo& bufferInfo = write.pBufferInfo[j];
+				VKD_FROM_HANDLE(Buffer, bufferObj, bufferInfo.buffer);
+
+				setObj->SetBufferBinding(write.dstBinding, write.dstArrayElement + j, DescriptorSet::BufferBinding{.buffer = bufferObj, .offset = bufferInfo.offset, .range = bufferInfo.range});
+			}
+		}
+
+		if (descriptorCopyCount > 0)
+			cct::Logger::Warning("UpdateDescriptorSets: descriptor set copies are not supported, ignored");
 	}
 
 	VkResult Device::CreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache)

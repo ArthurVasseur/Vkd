@@ -23,12 +23,20 @@ namespace vkd
 	class Pipeline;
 	class Framebuffer;
 	class RenderPass;
+	class DescriptorSet;
 
 	struct OpBindVertexBuffer
 	{
 		std::vector<Buffer*> Buffers;
 		std::vector<VkDeviceSize> Offsets;
 		UInt32 FirstBinding;
+	};
+
+	struct OpBindDescriptorSets
+	{
+		VkPipelineBindPoint BindPoint;
+		UInt32 FirstSet;
+		std::vector<DescriptorSet*> DescriptorSets;
 	};
 
 	struct OpBeginRenderPass
@@ -85,6 +93,7 @@ namespace vkd
 
 	using Op = Nz::TypeList<
 		OpBindVertexBuffer,
+		OpBindDescriptorSets,
 		OpDraw,
 		OpDrawIndexed,
 		OpDrawIndirect,

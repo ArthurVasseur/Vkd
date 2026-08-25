@@ -158,3 +158,52 @@ TEST_CASE("see::exec::RunFragmentStage - seeds Location inputs and reads Locatio
 	CHECK(colorIt->second.GetFloat(2) == 0.6f);
 	CHECK(colorIt->second.GetFloat(3) == 1.0f);
 }
+
+TEST_CASE("see::exec::RunFragmentStage - reads a uniform block through an external buffer", "[see][stage]")
+{
+	// Mirrors what CpuContext::Draw does for a real UBO: the variable is Uniform-storage, decorated
+	// DescriptorSet/Binding, and its content lives outside the interpreter (a mapped VkBuffer in the
+	// real caller, a plain word array here) rather than in a local register.
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint Fragment %main \"main\" %outColor\n"
+		"OpExecutionMode %main OriginUpperLeft\n"
+		"OpDecorate %ubo DescriptorSet 0\n"
+		"OpDecorate %ubo Binding 0\n"
+		"OpDecorate %outColor Location 0\n"
+		"%float = OpTypeFloat 32\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%_ptr_Uniform_v4float = OpTypePointer Uniform %v4float\n"
+		"%_ptr_Output_v4float = OpTypePointer Output %v4float\n"
+		"%ubo = OpVariable %_ptr_Uniform_v4float Uniform\n"
+		"%outColor = OpVariable %_ptr_Output_v4float Output\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%c = OpLoad %v4float %ubo\n"
+		"OpStore %outColor %c\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	REQUIRE(module.m_functions.size() == 1);
+	const cct::UInt32 uboId = module.m_globalInstructions[0].m_id;
+
+	std::array<cct::UInt32, 4> uboWords{};
+	const float channels[4] = {0.1f, 0.2f, 0.3f, 0.4f};
+	std::memcpy(uboWords.data(), channels, sizeof(channels));
+
+	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], {}, externalBuffers);
+	REQUIRE(outputs.has_value());
+
+	auto colorIt = outputs->find(0);
+	REQUIRE(colorIt != outputs->end());
+	CHECK(colorIt->second.GetFloat(0) == 0.1f);
+	CHECK(colorIt->second.GetFloat(1) == 0.2f);
+	CHECK(colorIt->second.GetFloat(2) == 0.3f);
+	CHECK(colorIt->second.GetFloat(3) == 0.4f);
+}

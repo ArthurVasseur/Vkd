@@ -129,7 +129,13 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t firstSet, uint32_t descriptorSetCount, const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount, const uint32_t* pDynamicOffsets)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdBindDescriptorSets: not implemented, descriptor sets are ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+
+		if (dynamicOffsetCount > 0)
+			cct::Logger::Warning("CmdBindDescriptorSets: dynamic descriptor offsets are not supported, ignored");
+
+		commandBufferObj->PushBindDescriptorSets(pipelineBindPoint, firstSet, std::span(pDescriptorSets, descriptorSetCount));
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* pValues)

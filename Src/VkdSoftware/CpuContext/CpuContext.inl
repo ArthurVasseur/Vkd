@@ -15,5 +15,6 @@ namespace vkd::software
 		m_boundPipeline = nullptr;
 		m_boundVertexBuffers.clear();
 		m_vertexBufferOffsets.clear();
+		m_boundDescriptorSets.clear();
 	}
 } // namespace vkd::software

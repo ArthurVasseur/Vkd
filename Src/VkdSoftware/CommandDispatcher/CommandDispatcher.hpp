@@ -33,6 +33,7 @@ namespace vkd::software
 		VkResult operator()(vkd::Image::OpCopy op);
 		VkResult operator()(vkd::Image::OpClearColorImage op);
 		VkResult operator()(vkd::OpBindVertexBuffer op);
+		VkResult operator()(vkd::OpBindDescriptorSets op);
 		VkResult operator()(vkd::OpDraw op);
 		VkResult operator()(vkd::OpDrawIndexed op);
 		VkResult operator()(vkd::OpDrawIndirect op);
