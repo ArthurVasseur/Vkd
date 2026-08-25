@@ -60,6 +60,13 @@ namespace vkd::software
 					outPattern[2] = static_cast<UInt8>(color.uint32[2] & 0xFFu);
 					outPattern[3] = static_cast<UInt8>(color.uint32[3] & 0xFFu);
 					return true;
+				case VK_FORMAT_B8G8R8A8_UINT:
+				case VK_FORMAT_B8G8R8A8_SINT:
+					outPattern[0] = static_cast<UInt8>(color.uint32[2] & 0xFFu);
+					outPattern[1] = static_cast<UInt8>(color.uint32[1] & 0xFFu);
+					outPattern[2] = static_cast<UInt8>(color.uint32[0] & 0xFFu);
+					outPattern[3] = static_cast<UInt8>(color.uint32[3] & 0xFFu);
+					return true;
 				default:
 					return false;
 			}

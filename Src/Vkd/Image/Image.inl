@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "Vkd/Device/Device.hpp"
 #include "Vkd/Image/Image.hpp"
 
@@ -53,10 +55,18 @@ namespace vkd
 
 	inline void Image::GetMemoryRequirements(VkMemoryRequirements& memoryRequirements) const
 	{
-		VkDeviceSize pixelSize = vkuFormatElementSize(m_format);
-		VkDeviceSize imageSize = static_cast<VkDeviceSize>(m_extent.width) * m_extent.height * m_extent.depth * pixelSize;
+		const VkDeviceSize pixelSize = vkuFormatElementSize(m_format);
 
-		memoryRequirements.size = imageSize;
+		VkDeviceSize mipChainSize = 0;
+		for (UInt32 level = 0; level < m_mipLevels; ++level)
+		{
+			const VkDeviceSize mipWidth = std::max<VkDeviceSize>(m_extent.width >> level, 1);
+			const VkDeviceSize mipHeight = std::max<VkDeviceSize>(m_extent.height >> level, 1);
+			const VkDeviceSize mipDepth = std::max<VkDeviceSize>(m_extent.depth >> level, 1);
+			mipChainSize += mipWidth * mipHeight * mipDepth * pixelSize;
+		}
+
+		memoryRequirements.size = mipChainSize * m_arrayLayers;
 		memoryRequirements.alignment = 256;
 		memoryRequirements.memoryTypeBits = 0xFFFFFFFF;
 	}

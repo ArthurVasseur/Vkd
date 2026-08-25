@@ -123,21 +123,26 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, VkIndexType indexType)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdBindIndexBuffer: not implemented, indexed draws are unsupported");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t firstSet, uint32_t descriptorSetCount, const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount, const uint32_t* pDynamicOffsets)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdBindDescriptorSets: not implemented, descriptor sets are ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* pValues)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdPushConstants: not implemented, push constants are ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		// Intentional no-op: the software backend has no notion of image layout (memory is
+		// always a linear host-visible blob), so there is nothing to transition here yet.
 	}
 
 	void CommandBuffer::CmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
@@ -152,71 +157,85 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdDrawIndexed: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdDrawIndirect: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdDrawIndexedIndirect: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdDispatch(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdDispatch: not implemented, compute dispatch is ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdDispatchIndirect: not implemented, compute dispatch is ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetViewport(VkCommandBuffer commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetViewport: not implemented, dynamic viewport state is ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetScissor(VkCommandBuffer commandBuffer, uint32_t firstScissor, uint32_t scissorCount, const VkRect2D* pScissors)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetScissor: not implemented, dynamic scissor state is ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetLineWidth(VkCommandBuffer commandBuffer, float lineWidth)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetLineWidth: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetDepthBias(VkCommandBuffer commandBuffer, float depthBiasConstantFactor, float depthBiasClamp, float depthBiasSlopeFactor)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetDepthBias: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetBlendConstants(VkCommandBuffer commandBuffer, const float blendConstants[4])
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetBlendConstants: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetDepthBounds(VkCommandBuffer commandBuffer, float minDepthBounds, float maxDepthBounds)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetDepthBounds: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetStencilCompareMask(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, uint32_t compareMask)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetStencilCompareMask: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetStencilWriteMask(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, uint32_t writeMask)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetStencilWriteMask: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetStencilReference(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, uint32_t reference)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdSetStencilReference: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents)
@@ -241,10 +260,12 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdNextSubpass: not implemented, ignored");
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount, const VkCommandBuffer* pCommandBuffers)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdExecuteCommands: not implemented, secondary command buffers are ignored");
 	}
 } // namespace vkd
