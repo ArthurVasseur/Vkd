@@ -14,6 +14,7 @@
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -78,6 +79,17 @@ const char* fragmentShaderCode = R"(
 [nzsl_version("1.1")]
 module;
 
+[layout(std140)]
+struct ColorUbo
+{
+	multiplier: vec4[f32]
+}
+
+external
+{
+	[set(0), binding(0)] colorUbo: uniform[ColorUbo]
+}
+
 struct FragInput
 {
 	[location(0)] color: vec3[f32]
@@ -92,7 +104,7 @@ struct FragOutput
 fn main(input: FragInput) -> FragOutput
 {
 	let output: FragOutput;
-	output.color = vec4[f32](input.color, 1.0);
+	output.color = vec4[f32](input.color, 1.0) * colorUbo.multiplier;
 	return output;
 }
 )";
@@ -321,6 +333,46 @@ int main()
 	auto framebufferResult = device.createFramebuffer(framebufferInfo);
 	vk::Framebuffer framebuffer = framebufferResult.value;
 
+	// Uniform buffer for the fragment shader's colorUbo.multiplier - exercises the descriptor
+	// pool/set + CpuContext::Draw uniform-buffer resolution path end to end.
+	struct ColorUbo
+	{
+		float multiplier[4];
+	};
+
+	vk::BufferCreateInfo uboBufferInfo({}, sizeof(ColorUbo), vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive);
+	auto uboBufferResult = device.createBuffer(uboBufferInfo);
+	vk::Buffer uboBuffer = uboBufferResult.value;
+
+	auto uboMemReqs = device.getBufferMemoryRequirements(uboBuffer);
+	uint32_t uboMemoryTypeIndex = 0;
+	for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+	{
+		if ((uboMemReqs.memoryTypeBits & (1 << i)) &&
+			(memProps.memoryTypes[i].propertyFlags &
+			 (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)))
+		{
+			uboMemoryTypeIndex = i;
+			break;
+		}
+	}
+
+	vk::MemoryAllocateInfo uboAllocInfo(uboMemReqs.size, uboMemoryTypeIndex);
+	auto uboMemoryResult = device.allocateMemory(uboAllocInfo);
+	vk::DeviceMemory uboMemory = uboMemoryResult.value;
+
+	device.bindBufferMemory(uboBuffer, uboMemory, 0);
+
+	auto uboMapped = device.mapMemory(uboMemory, 0, sizeof(ColorUbo));
+	const ColorUbo uboData{{0.5f, 0.5f, 0.5f, 1.0f}}; // halves RGB - a broken UBO path would read zero and render black instead
+	std::memcpy(uboMapped.value, &uboData, sizeof(ColorUbo));
+	device.unmapMemory(uboMemory);
+
+	vk::DescriptorSetLayoutBinding uboBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment);
+	vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutInfo({}, uboBinding);
+	auto descriptorSetLayoutResult = device.createDescriptorSetLayout(descriptorSetLayoutInfo);
+	vk::DescriptorSetLayout descriptorSetLayout = descriptorSetLayoutResult.value;
+
 	cct::Logger::Info("Compiling vertex shader...");
 	auto vertSpirv = compileShaderToSPIRV(vertexShaderCode);
 	if (vertSpirv.empty())
@@ -404,7 +456,7 @@ int main()
 	vk::PipelineColorBlendStateCreateInfo colorBlending(
 		{}, VK_FALSE, vk::LogicOp::eCopy, colorBlendAttachment);
 
-	vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+	vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, descriptorSetLayout);
 	auto layoutResult = device.createPipelineLayout(pipelineLayoutInfo);
 	vk::PipelineLayout pipelineLayout = layoutResult.value;
 
@@ -427,6 +479,19 @@ int main()
 	auto pipelineResult = device.createGraphicsPipeline({}, pipelineInfo);
 	vk::Pipeline graphicsPipeline = pipelineResult.value;
 
+	vk::DescriptorPoolSize descriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1);
+	vk::DescriptorPoolCreateInfo descriptorPoolInfo({}, 1, descriptorPoolSize);
+	auto descriptorPoolResult = device.createDescriptorPool(descriptorPoolInfo);
+	vk::DescriptorPool descriptorPool = descriptorPoolResult.value;
+
+	vk::DescriptorSetAllocateInfo descriptorSetAllocInfo(descriptorPool, descriptorSetLayout);
+	auto descriptorSetResult = device.allocateDescriptorSets(descriptorSetAllocInfo);
+	vk::DescriptorSet descriptorSet = descriptorSetResult.value[0];
+
+	vk::DescriptorBufferInfo uboDescriptorInfo(uboBuffer, 0, sizeof(ColorUbo));
+	vk::WriteDescriptorSet uboWrite(descriptorSet, 0, 0, vk::DescriptorType::eUniformBuffer, {}, uboDescriptorInfo);
+	device.updateDescriptorSets(uboWrite, {});
+
 	vk::CommandPoolCreateInfo poolInfo({}, graphicsQueueFamily);
 	auto poolResult = device.createCommandPool(poolInfo);
 	vk::CommandPool commandPool = poolResult.value;
@@ -444,6 +509,7 @@ int main()
 
 	commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 	commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+	commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, descriptorSet, {});
 	commandBuffer.draw(3, 1, 0, 0);
 	commandBuffer.endRenderPass();
 
@@ -458,12 +524,36 @@ int main()
 	auto mappedMemory = device.mapMemory(imageMemory, 0, memReqs.size);
 	if (mappedMemory.result == vk::Result::eSuccess)
 	{
-		saveImageToPPM("triangle.ppm", WIDTH, HEIGHT, static_cast<const uint8_t*>(mappedMemory.value));
+		const uint8_t* pixels = static_cast<const uint8_t*>(mappedMemory.value);
+		saveImageToPPM("triangle.ppm", WIDTH, HEIGHT, pixels);
+
+		// Triangle centroid in screen space (vertices at NDC (0,-0.5)/(0.5,0.5)/(-0.5,0.5) map to
+		// (400,150)/(600,450)/(200,450) at 800x600) - barycentric weights are ~1/3 each there, so the
+		// unmultiplied color is a mid-gray (~85 per channel); the UBO's 0.5 multiplier should halve it
+		// to ~42. A broken descriptor set / uniform buffer path would read a zeroed UBO and render black.
+		const size_t centroidIdx = (350 * WIDTH + 400) * 4;
+		const uint8_t r = pixels[centroidIdx + 0];
+		const uint8_t g = pixels[centroidIdx + 1];
+		const uint8_t b = pixels[centroidIdx + 2];
+		cct::Logger::Info("Centroid pixel with UBO multiplier applied: ({}, {}, {})", r, g, b);
+
 		device.unmapMemory(imageMemory);
+
+		if (r < 20 || r > 60 || g < 20 || g > 60 || b < 20 || b > 60)
+		{
+			cct::Logger::Error("Descriptor set / uniform buffer path did not apply as expected (expected ~42 per channel)");
+			return EXIT_FAILURE;
+		}
+
+		cct::Logger::Info("Descriptor set / uniform buffer path validated end to end!");
 	}
 
 	device.destroyPipeline(graphicsPipeline);
 	device.destroyPipelineLayout(pipelineLayout);
+	device.destroyDescriptorPool(descriptorPool);
+	device.destroyDescriptorSetLayout(descriptorSetLayout);
+	device.destroyBuffer(uboBuffer);
+	device.freeMemory(uboMemory);
 	device.destroyShaderModule(fragShaderModule);
 	device.destroyShaderModule(vertShaderModule);
 	device.destroyFramebuffer(framebuffer);
