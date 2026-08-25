@@ -22,6 +22,7 @@ namespace see::exec
 		cct::UInt32 m_rows = 1; // vector length, or total word count when m_structType != 0. 1 for a plain scalar.
 		cct::UInt32 m_columns = 1; // matrix column count. 1 for scalar/vector/struct.
 		cct::UInt32 m_structType = 0; // non-zero: this is a struct (ir type id), m_bits is its flat word layout.
+		cct::UInt32 m_imageVariable = 0; // non-zero: this is an (optionally sampled) image handle, naming the UniformConstant variable it was loaded from.
 		std::array<cct::UInt32, 16> m_bits{};
 
 		[[nodiscard]] float GetFloat(cct::UInt32 index = 0) const;
@@ -41,7 +42,17 @@ namespace see::exec
 		cct::UInt32 m_wordCount = 0;
 	};
 
+	// A 2D RGBA8 texture the interpreter can sample from (nearest-neighbor, no mip/LOD). Backs a
+	// UniformConstant sampled-image variable, addressed the same way ExternalBuffer addresses a buffer.
+	struct ExternalImage
+	{
+		const cct::UInt8* m_texels = nullptr; // row-major, 4 bytes/texel
+		cct::UInt32 m_width = 0;
+		cct::UInt32 m_height = 0;
+	};
+
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {});
+		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
 } // namespace see::exec

@@ -34,6 +34,8 @@ namespace see::ir
 				case SpvOpTypeMatrix:
 				case SpvOpTypePointer:
 				case SpvOpTypeStruct:
+				case SpvOpTypeImage:
+				case SpvOpTypeSampledImage:
 					return true;
 				default:
 					return false;
@@ -146,6 +148,9 @@ namespace see::ir
 					return Op::CompareGreaterEqual;
 				case SpvOpSelect:
 					return Op::Select;
+				case SpvOpImageSampleImplicitLod:
+				case SpvOpImageSampleExplicitLod:
+					return Op::ImageSample;
 				default:
 					return Op::Unsupported;
 			}
@@ -215,6 +220,13 @@ namespace see::ir
 					break;
 				case SpvOpTypeStruct:
 					module.m_types[id] = Type{.m_kind = TypeKind::Struct, .m_memberTypes = operands};
+					break;
+				case SpvOpTypeImage:
+					module.m_types[id] = Type{.m_kind = TypeKind::Image};
+					break;
+				case SpvOpTypeSampledImage:
+					if (!operands.empty())
+						module.m_types[id] = Type{.m_kind = TypeKind::SampledImage, .m_pointee = operands[0]};
 					break;
 				default:
 					break;

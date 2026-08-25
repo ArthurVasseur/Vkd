@@ -35,7 +35,9 @@ namespace see::ir
 		Vector,
 		Matrix,
 		Pointer,
-		Struct
+		Struct,
+		Image,
+		SampledImage
 	};
 
 	struct Type
@@ -43,7 +45,7 @@ namespace see::ir
 		TypeKind m_kind = TypeKind::Void;
 		ScalarKind m_scalar = ScalarKind::Float32; // meaningful for Scalar/Vector/Matrix
 		cct::UInt32 m_componentCount = 0; // Vector: component count. Matrix: column count.
-		cct::UInt32 m_pointee = 0; // Pointer: pointee type id. Matrix: column (Vector) type id.
+		cct::UInt32 m_pointee = 0; // Pointer: pointee type id. Matrix: column (Vector) type id. SampledImage: image type id.
 		std::vector<cct::UInt32> m_memberTypes; // Struct: member type ids, in declaration order.
 	};
 
@@ -72,7 +74,8 @@ namespace see::ir
 		CompareLessEqual,
 		CompareGreater,
 		CompareGreaterEqual,
-		Select
+		Select,
+		ImageSample
 	};
 
 	struct Instruction

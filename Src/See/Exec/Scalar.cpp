@@ -6,6 +6,7 @@
 
 #include "See/Exec/Scalar.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 namespace see::exec
@@ -58,6 +59,7 @@ namespace see::exec
 			const ir::Module& m_module;
 			std::unordered_map<cct::UInt32, Value> m_variables;
 			std::unordered_map<cct::UInt32, ExternalBuffer> m_externalBuffers;
+			std::unordered_map<cct::UInt32, ExternalImage> m_externalImages;
 			std::unordered_map<cct::UInt32, Value> m_ssaValues;
 			std::unordered_map<cct::UInt32, PointerInfo> m_pointers;
 		};
@@ -192,6 +194,16 @@ namespace see::exec
 			auto pointerIt = state.m_pointers.find(instruction.m_args[0]);
 			if (pointerIt == state.m_pointers.end())
 				return false;
+
+			// (Sampled) images aren't word-addressable data - loading one just produces a handle
+			// naming the variable it came from, for a later ImageSample to resolve against the
+			// bound ExternalImage.
+			if (auto typeIt = state.m_module.m_types.find(pointerIt->second.m_pointeeType);
+				typeIt != state.m_module.m_types.end() && (typeIt->second.m_kind == ir::TypeKind::Image || typeIt->second.m_kind == ir::TypeKind::SampledImage))
+			{
+				state.m_ssaValues[instruction.m_id] = Value{.m_imageVariable = pointerIt->second.m_baseVariable};
+				return true;
+			}
 
 			std::optional<Value> result = MakeZeroValue(state.m_module, pointerIt->second.m_pointeeType);
 			if (!result)
@@ -598,6 +610,41 @@ namespace see::exec
 			return true;
 		}
 
+		bool ExecuteImageSample(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.size() < 2)
+				return false;
+
+			std::optional<Value> imageHandle = ResolveValue(state, instruction.m_args[0]);
+			std::optional<Value> coord = ResolveValue(state, instruction.m_args[1]);
+			if (!imageHandle || !coord || imageHandle->m_imageVariable == 0)
+				return false;
+
+			auto imageIt = state.m_externalImages.find(imageHandle->m_imageVariable);
+			if (imageIt == state.m_externalImages.end())
+				return false;
+
+			const ExternalImage& image = imageIt->second;
+			if (!image.m_texels || image.m_width == 0 || image.m_height == 0)
+				return false;
+
+			// Nearest-neighbor, clamped to the edge, LOD 0 only - no mip chain / filtering yet.
+			const float u = std::clamp(coord->GetFloat(0), 0.0f, 0.999999f);
+			const float v = coord->m_rows > 1 ? std::clamp(coord->GetFloat(1), 0.0f, 0.999999f) : 0.0f;
+			const cct::UInt32 x = std::min(static_cast<cct::UInt32>(u * static_cast<float>(image.m_width)), image.m_width - 1);
+			const cct::UInt32 y = std::min(static_cast<cct::UInt32>(v * static_cast<float>(image.m_height)), image.m_height - 1);
+
+			const cct::UInt8* texel = image.m_texels + (static_cast<std::size_t>(y) * image.m_width + x) * 4;
+
+			Value result;
+			result.m_rows = 4;
+			for (cct::UInt32 i = 0; i < 4; ++i)
+				result.SetFloat(i, static_cast<float>(texel[i]) / 255.0f);
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
 		bool ExecuteInstruction(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			switch (instruction.m_op)
@@ -639,6 +686,8 @@ namespace see::exec
 					return ExecuteCompare(state, instruction);
 				case ir::Op::Select:
 					return ExecuteSelect(state, instruction);
+				case ir::Op::ImageSample:
+					return ExecuteImageSample(state, instruction);
 				default:
 					return false;
 			}
@@ -654,12 +703,13 @@ namespace see::exec
 	} // namespace
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers)
+															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
 		if (function.m_blocks.empty())
 			return std::nullopt;
 
-		RuntimeState state{.m_module = module, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers};
+		RuntimeState state{.m_module = module, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)

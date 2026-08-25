@@ -365,3 +365,64 @@ TEST_CASE("see::exec::Run - uniform block bigger than 16 words via an external b
 	for (cct::UInt32 i = 0; i < 4; ++i)
 		CHECK(matrix.GetFloat(i * 4 + i) == static_cast<float>(i + 1));
 }
+
+TEST_CASE("see::exec::Run - nearest-neighbor image sampling through an external image", "[see][exec]")
+{
+	// Mirrors the real pattern (verified via spirv-dis against NZSL's sampler2D[f32].Sample()
+	// codegen): a combined image/sampler loaded from a UniformConstant variable, then sampled
+	// with OpImageSampleImplicitLod.
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"OpDecorate %tex DescriptorSet 0\n"
+		"OpDecorate %tex Binding 0\n"
+		"%float = OpTypeFloat 32\n"
+		"%v2float = OpTypeVector %float 2\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%image = OpTypeImage %float 2D 0 0 0 1 Unknown\n"
+		"%sampledImage = OpTypeSampledImage %image\n"
+		"%_ptr_UniformConstant_sampledImage = OpTypePointer UniformConstant %sampledImage\n"
+		"%_ptr_Private_v2float = OpTypePointer Private %v2float\n"
+		"%_ptr_Private_v4float = OpTypePointer Private %v4float\n"
+		"%tex = OpVariable %_ptr_UniformConstant_sampledImage UniformConstant\n"
+		"%uv = OpVariable %_ptr_Private_v2float Private\n"
+		"%outColor = OpVariable %_ptr_Private_v4float Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%img = OpLoad %sampledImage %tex\n"
+		"%coord = OpLoad %v2float %uv\n"
+		"%sampled = OpImageSampleImplicitLod %v4float %img %coord\n"
+		"OpStore %outColor %sampled\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 texId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 uvId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outColorId = module.m_globalInstructions[2].m_id;
+
+	// A 2x2 RGBA8 texture, a distinct color per texel so nearest-neighbor picking the wrong one is obvious.
+	std::array<cct::UInt8, 2 * 2 * 4> texels = {
+		255, 0, 0, 255, 0, 255, 0, 255,
+		0, 0, 255, 255, 255, 255, 0, 255};
+
+	see::exec::Value uv;
+	uv.m_rows = 2;
+	uv.SetFloat(0, 0.9f); // right column
+	uv.SetFloat(1, 0.9f); // bottom row -> bottom-right texel (255, 255, 0, 255)
+
+	std::unordered_map<cct::UInt32, see::exec::ExternalImage> externalImages{{texId, see::exec::ExternalImage{texels.data(), 2, 2}}};
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{uvId, uv}}, {}, externalImages);
+	REQUIRE(result.has_value());
+
+	const see::exec::Value& color = result->find(outColorId)->second;
+	CHECK(color.GetFloat(0) == 1.0f);
+	CHECK(color.GetFloat(1) == 1.0f);
+	CHECK(color.GetFloat(2) == 0.0f);
+	CHECK(color.GetFloat(3) == 1.0f);
+}
