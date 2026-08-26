@@ -626,6 +626,78 @@ int main()
 		cct::Logger::Info("Descriptor set / uniform buffer / sampled image path validated end to end!");
 	}
 
+	// Clearing an image whose format isn't 4 bytes/pixel exercises CpuContext's generalized pixel
+	// packing (PackColor/IsSupportedColorFormat) instead of the old RGBA8/BGRA8-only fast path.
+	// R32G32B32A32_SFLOAT (16 bytes/pixel) packs via a plain memcpy with no quantization, so the
+	// clear color should round-trip through memory exactly.
+	{
+		vk::ImageCreateInfo wideFormatImageInfo(
+			{},
+			vk::ImageType::e2D,
+			vk::Format::eR32G32B32A32Sfloat,
+			vk::Extent3D(1, 1, 1),
+			1,
+			1,
+			vk::SampleCountFlagBits::e1,
+			vk::ImageTiling::eLinear,
+			vk::ImageUsageFlagBits::eTransferDst,
+			vk::SharingMode::eExclusive);
+		auto wideFormatImageResult = device.createImage(wideFormatImageInfo);
+		vk::Image wideFormatImage = wideFormatImageResult.value;
+
+		auto wideFormatMemReqs = device.getImageMemoryRequirements(wideFormatImage);
+		uint32_t wideFormatMemoryTypeIndex = 0;
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+		{
+			if ((wideFormatMemReqs.memoryTypeBits & (1 << i)) &&
+				(memProps.memoryTypes[i].propertyFlags &
+				 (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)))
+			{
+				wideFormatMemoryTypeIndex = i;
+				break;
+			}
+		}
+
+		vk::MemoryAllocateInfo wideFormatAllocInfo(wideFormatMemReqs.size, wideFormatMemoryTypeIndex);
+		auto wideFormatMemoryResult = device.allocateMemory(wideFormatAllocInfo);
+		vk::DeviceMemory wideFormatMemory = wideFormatMemoryResult.value;
+		device.bindImageMemory(wideFormatImage, wideFormatMemory, 0);
+
+		vk::CommandBufferAllocateInfo clearCmdAllocInfo(commandPool, vk::CommandBufferLevel::ePrimary, 1);
+		vk::CommandBuffer clearCommandBuffer = device.allocateCommandBuffers(clearCmdAllocInfo).value[0];
+		clearCommandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+		const vk::ClearColorValue wideFormatClearValue(std::array<float, 4>{0.25f, 0.75f, 1.0f, 0.5f});
+		vk::ImageSubresourceRange wideFormatRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1);
+		clearCommandBuffer.clearColorImage(wideFormatImage, vk::ImageLayout::eGeneral, wideFormatClearValue, wideFormatRange);
+		clearCommandBuffer.end();
+
+		vk::SubmitInfo clearSubmitInfo({}, {}, clearCommandBuffer);
+		queue.submit(clearSubmitInfo);
+		queue.waitIdle();
+
+		auto wideFormatMapped = device.mapMemory(wideFormatMemory, 0, wideFormatMemReqs.size);
+		const float* wideFormatTexel = static_cast<const float*>(wideFormatMapped.value);
+		cct::Logger::Info("128-bit clear (R32G32B32A32_SFLOAT): ({}, {}, {}, {})",
+						  wideFormatTexel[0], wideFormatTexel[1], wideFormatTexel[2], wideFormatTexel[3]);
+
+		const bool wideFormatOk = wideFormatTexel[0] == 0.25f && wideFormatTexel[1] == 0.75f &&
+								  wideFormatTexel[2] == 1.0f && wideFormatTexel[3] == 0.5f;
+		device.unmapMemory(wideFormatMemory);
+
+		if (!wideFormatOk)
+		{
+			cct::Logger::Error("Non-RGBA8 pixel format clear did not round-trip exactly (expected (0.25, 0.75, 1.0, 0.5))");
+			return EXIT_FAILURE;
+		}
+
+		cct::Logger::Info("Arbitrary pixel size (128-bit float format) clear validated end to end!");
+
+		device.freeCommandBuffers(commandPool, clearCommandBuffer);
+		device.destroyImage(wideFormatImage);
+		device.freeMemory(wideFormatMemory);
+	}
+
 	device.destroyPipeline(graphicsPipeline);
 	device.destroyPipelineLayout(pipelineLayout);
 	device.destroyDescriptorPool(descriptorPool);

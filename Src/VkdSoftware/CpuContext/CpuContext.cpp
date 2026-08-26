@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <unordered_map>
 
@@ -26,52 +27,130 @@ namespace vkd::software
 {
 	namespace
 	{
-		// Float in [0,1] -> 8-bit unorm.
-		UInt8 FloatToUNorm8(float f)
+		// R/G/B/A -> index into VkClearColorValue's per-channel arrays, or -1 for a non-color component.
+		int ComponentChannelIndex(VKU_FORMAT_COMPONENT_TYPE type)
 		{
-			if (f <= 0.0f)
-				return 0;
-			if (f >= 1.0f)
-				return 255;
-			return static_cast<UInt8>(f * 255.0f + 0.5f);
+			switch (type)
+			{
+				case VKU_FORMAT_COMPONENT_TYPE_R:
+					return 0;
+				case VKU_FORMAT_COMPONENT_TYPE_G:
+					return 1;
+				case VKU_FORMAT_COMPONENT_TYPE_B:
+					return 2;
+				case VKU_FORMAT_COMPONENT_TYPE_A:
+					return 3;
+				default:
+					return -1;
+			}
 		}
 
-		// Build the 4-byte RGBA pattern for the given format.
-		// Returns true if the format is supported by this fast path.
-		bool BuildRgba8ClearPattern(VkFormat format, const VkClearColorValue& color, UInt8 outPattern[4])
+		// IEEE 754 binary32 -> binary16, round-to-nearest, subnormals flushed to zero.
+		UInt16 FloatToHalf(float value)
 		{
-			switch (format)
+			UInt32 bits;
+			std::memcpy(&bits, &value, sizeof(bits));
+
+			const UInt32 sign = (bits >> 16) & 0x8000u;
+			const Int32 exponent = static_cast<Int32>((bits >> 23) & 0xFFu) - 127 + 15;
+			const UInt32 mantissa = bits & 0x7FFFFFu;
+
+			if (exponent <= 0)
+				return static_cast<UInt16>(sign);
+			if (exponent >= 0x1F)
+				return static_cast<UInt16>(sign | 0x7C00u);
+
+			return static_cast<UInt16>(sign | (static_cast<UInt32>(exponent) << 10) | (mantissa >> 13));
+		}
+
+		UInt64 UnsignedMaxForBits(UInt32 bits)
+		{
+			return bits >= 64 ? ~UInt64{0} : (UInt64{1} << bits) - 1;
+		}
+
+		Int64 SignedMaxForBits(UInt32 bits)
+		{
+			return bits >= 64 ? std::numeric_limits<Int64>::max() : (Int64{1} << (bits - 1)) - 1;
+		}
+
+		Int64 SignedMinForBits(UInt32 bits)
+		{
+			return bits >= 64 ? std::numeric_limits<Int64>::min() : -(Int64{1} << (bits - 1));
+		}
+
+		// False for compressed/multiplane/depth-stencil formats and sub-byte-packed layouts (e.g. R5G6B5), which PackColor can't express.
+		bool IsSupportedColorFormat(VkFormat format)
+		{
+			if (vkuFormatIsCompressed(format) || vkuFormatIsMultiplane(format) || vkuFormatIsDepthOrStencil(format))
+				return false;
+
+			if (!vkuFormatIsUNORM(format) && !vkuFormatIsSRGB(format) && !vkuFormatIsSNORM(format) &&
+				!vkuFormatIsUINT(format) && !vkuFormatIsSINT(format) && !vkuFormatIsSFLOAT(format))
+				return false;
+
+			const VKU_FORMAT_INFO info = vkuGetFormatInfo(format);
+			for (UInt32 i = 0; i < info.component_count; ++i)
 			{
-				case VK_FORMAT_R8G8B8A8_UNORM:
-				case VK_FORMAT_R8G8B8A8_SRGB:
-					outPattern[0] = FloatToUNorm8(color.float32[0]);
-					outPattern[1] = FloatToUNorm8(color.float32[1]);
-					outPattern[2] = FloatToUNorm8(color.float32[2]);
-					outPattern[3] = FloatToUNorm8(color.float32[3]);
-					return true;
-				case VK_FORMAT_B8G8R8A8_UNORM:
-				case VK_FORMAT_B8G8R8A8_SRGB:
-					outPattern[0] = FloatToUNorm8(color.float32[2]);
-					outPattern[1] = FloatToUNorm8(color.float32[1]);
-					outPattern[2] = FloatToUNorm8(color.float32[0]);
-					outPattern[3] = FloatToUNorm8(color.float32[3]);
-					return true;
-				case VK_FORMAT_R8G8B8A8_UINT:
-				case VK_FORMAT_R8G8B8A8_SINT:
-					outPattern[0] = static_cast<UInt8>(color.uint32[0] & 0xFFu);
-					outPattern[1] = static_cast<UInt8>(color.uint32[1] & 0xFFu);
-					outPattern[2] = static_cast<UInt8>(color.uint32[2] & 0xFFu);
-					outPattern[3] = static_cast<UInt8>(color.uint32[3] & 0xFFu);
-					return true;
-				case VK_FORMAT_B8G8R8A8_UINT:
-				case VK_FORMAT_B8G8R8A8_SINT:
-					outPattern[0] = static_cast<UInt8>(color.uint32[2] & 0xFFu);
-					outPattern[1] = static_cast<UInt8>(color.uint32[1] & 0xFFu);
-					outPattern[2] = static_cast<UInt8>(color.uint32[0] & 0xFFu);
-					outPattern[3] = static_cast<UInt8>(color.uint32[3] & 0xFFu);
-					return true;
-				default:
+				if (info.components[i].size % 8 != 0)
 					return false;
+				if (ComponentChannelIndex(info.components[i].type) < 0)
+					return false;
+			}
+
+			return true;
+		}
+
+		// Writes vkuFormatElementSize(format) bytes to outBytes; caller must have checked IsSupportedColorFormat(format) first.
+		void PackColor(VkFormat format, const VkClearColorValue& color, UInt8* outBytes)
+		{
+			const bool isSfloat = vkuFormatIsSFLOAT(format);
+			const bool isUnorm = vkuFormatIsUNORM(format) || vkuFormatIsSRGB(format);
+			const bool isSnorm = vkuFormatIsSNORM(format);
+			const bool isUint = vkuFormatIsUINT(format);
+
+			const VKU_FORMAT_INFO info = vkuGetFormatInfo(format);
+
+			std::size_t byteOffset = 0;
+			for (UInt32 i = 0; i < info.component_count; ++i)
+			{
+				const UInt32 bits = info.components[i].size;
+				const UInt32 bytes = bits / 8;
+				const int channel = ComponentChannelIndex(info.components[i].type);
+
+				if (isSfloat)
+				{
+					if (bytes == 4)
+						std::memcpy(outBytes + byteOffset, &color.float32[channel], 4);
+					else
+					{
+						const UInt16 half = FloatToHalf(color.float32[channel]);
+						std::memcpy(outBytes + byteOffset, &half, 2);
+					}
+				}
+				else if (isUnorm)
+				{
+					const float clamped = std::clamp(color.float32[channel], 0.0f, 1.0f);
+					const UInt64 quantized = static_cast<UInt64>(clamped * static_cast<float>(UnsignedMaxForBits(bits)) + 0.5f);
+					std::memcpy(outBytes + byteOffset, &quantized, bytes);
+				}
+				else if (isSnorm)
+				{
+					const float clamped = std::clamp(color.float32[channel], -1.0f, 1.0f);
+					const Int64 quantized = static_cast<Int64>(clamped * static_cast<float>(SignedMaxForBits(bits)));
+					std::memcpy(outBytes + byteOffset, &quantized, bytes);
+				}
+				else if (isUint)
+				{
+					const UInt64 value = std::min(static_cast<UInt64>(color.uint32[channel]), UnsignedMaxForBits(bits));
+					std::memcpy(outBytes + byteOffset, &value, bytes);
+				}
+				else
+				{
+					const Int64 value = std::clamp(static_cast<Int64>(color.int32[channel]), SignedMinForBits(bits), SignedMaxForBits(bits));
+					std::memcpy(outBytes + byteOffset, &value, bytes);
+				}
+
+				byteOffset += bytes;
 			}
 		}
 
@@ -227,7 +306,7 @@ namespace vkd::software
 		{
 			VKD_AUTO_PROFILER_SCOPE();
 			const VkDeviceSize pixelSize = vkuFormatElementSize(format);
-			if (pixelSize != 4)
+			if (!IsSupportedColorFormat(format))
 				return;
 
 			const float area = EdgeFunction(v0.m_x, v0.m_y, v1.m_x, v1.m_y, v2.m_x, v2.m_y);
@@ -307,12 +386,11 @@ namespace vkd::software
 					clearValue.float32[2] = color.m_rows > 2 ? color.GetFloat(2) : 0.0f;
 					clearValue.float32[3] = color.m_rows > 3 ? color.GetFloat(3) : 1.0f;
 
-					UInt8 pattern[4];
-					if (!BuildRgba8ClearPattern(format, clearValue, pattern))
-						continue;
+					UInt8 pattern[32];
+					PackColor(format, clearValue, pattern);
 
 					cct::UByte* pixel = pixels + (static_cast<std::size_t>(y) * extent.width + static_cast<std::size_t>(x)) * pixelSize;
-					std::memcpy(pixel, pattern, sizeof(pattern));
+					std::memcpy(pixel, pattern, pixelSize);
 				}
 			}
 		}
@@ -796,8 +874,10 @@ namespace vkd::software
 		if (mapResult != VK_SUCCESS || data == nullptr)
 			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
 
-		UInt8 pattern[4] = {0, 0, 0, 0};
-		const bool supported = pixelSize == 4 && BuildRgba8ClearPattern(format, color, pattern);
+		UInt8 pattern[32] = {};
+		const bool supported = IsSupportedColorFormat(format);
+		if (supported)
+			PackColor(format, color, pattern);
 
 		const int minX = area ? std::max(area->offset.x, 0) : 0;
 		const int minY = area ? std::max(area->offset.y, 0) : 0;
@@ -807,23 +887,19 @@ namespace vkd::software
 
 		if (supported)
 		{
-			UInt32 clearWord;
-			std::memcpy(&clearWord, pattern, sizeof(clearWord));
-
 			if (coversWholeImage)
 			{
-				UInt32* data32 = reinterpret_cast<UInt32*>(data);
-				const std::size_t wordCount = static_cast<std::size_t>(imageSize / sizeof(UInt32));
-				for (std::size_t i = 0; i < wordCount; ++i)
-					data32[i] = clearWord;
+				const std::size_t pixelCount = static_cast<std::size_t>(imageSize / pixelSize);
+				for (std::size_t i = 0; i < pixelCount; ++i)
+					std::memcpy(data + i * pixelSize, pattern, pixelSize);
 			}
 			else
 			{
 				for (int y = minY; y < maxY; ++y)
 				{
-					UInt32* row = reinterpret_cast<UInt32*>(data + static_cast<std::size_t>(y) * extent.width * pixelSize);
+					cct::UByte* row = data + static_cast<std::size_t>(y) * extent.width * pixelSize;
 					for (int x = minX; x < maxX; ++x)
-						row[x] = clearWord;
+						std::memcpy(row + static_cast<std::size_t>(x) * pixelSize, pattern, pixelSize);
 				}
 			}
 		}
