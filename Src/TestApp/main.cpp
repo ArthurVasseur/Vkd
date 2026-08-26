@@ -525,7 +525,8 @@ int main()
 	vk::PipelineColorBlendStateCreateInfo colorBlending(
 		{}, VK_FALSE, vk::LogicOp::eCopy, colorBlendAttachment);
 
-	vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, descriptorSetLayout);
+	std::array<vk::DescriptorSetLayout, 1> pipelineLayoutSetLayouts = {descriptorSetLayout};
+	vk::PipelineLayoutCreateInfo pipelineLayoutInfo({}, pipelineLayoutSetLayouts);
 	auto layoutResult = device.createPipelineLayout(pipelineLayoutInfo);
 	vk::PipelineLayout pipelineLayout = layoutResult.value;
 
@@ -556,7 +557,8 @@ int main()
 	auto descriptorPoolResult = device.createDescriptorPool(descriptorPoolInfo);
 	vk::DescriptorPool descriptorPool = descriptorPoolResult.value;
 
-	vk::DescriptorSetAllocateInfo descriptorSetAllocInfo(descriptorPool, descriptorSetLayout);
+	std::array<vk::DescriptorSetLayout, 1> descriptorSetAllocLayouts = {descriptorSetLayout};
+	vk::DescriptorSetAllocateInfo descriptorSetAllocInfo(descriptorPool, descriptorSetAllocLayouts);
 	auto descriptorSetResult = device.allocateDescriptorSets(descriptorSetAllocInfo);
 	vk::DescriptorSet descriptorSet = descriptorSetResult.value[0];
 
