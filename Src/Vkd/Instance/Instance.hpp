@@ -27,6 +27,7 @@ namespace vkd
 		VKD_DISPATCHABLE_HANDLE(Instance)
 
 		Instance();
+		~Instance() override;
 
 		VkResult Create(const VkAllocationCallbacks& allocationCallbacks);
 

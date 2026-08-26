@@ -27,6 +27,12 @@ namespace vkd
 	{
 	}
 
+	Instance::~Instance()
+	{
+		if (cct::Logger::GetContext() == &m_logger)
+			cct::Logger::SetContext(nullptr);
+	}
+
 	VkResult Instance::Create(const VkAllocationCallbacks& allocationCallbacks)
 	{
 		SetAllocationCallbacks(allocationCallbacks);
