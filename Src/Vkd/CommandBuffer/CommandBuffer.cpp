@@ -274,4 +274,10 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 		cct::Logger::Warning("CmdExecuteCommands: not implemented, secondary command buffers are ignored");
 	}
+
+	void VKAPI_CALL CommandBuffer::CmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageBlit* pRegions, VkFilter filter)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		cct::Logger::Warning("CmdBlitImage: not implemented, ignored");
+	}
 } // namespace vkd

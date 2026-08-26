@@ -5,8 +5,11 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <string>
 #include <thread>
+#include <utility>
 
 #include "Vkd/Buffer/Buffer.hpp"
 #include "Vkd/BufferView/BufferView.hpp"
@@ -210,6 +213,53 @@ namespace vkd
 		mem::DeleteDispatchable(dispatchable);
 	}
 
+	namespace
+	{
+		std::vector<std::string>& UnknownFunctionNames()
+		{
+			static std::vector<std::string> names;
+			return names;
+		}
+
+		template<std::size_t Index>
+		void VKAPI_PTR UnknownFunctionTrap()
+		{
+			auto& names = UnknownFunctionNames();
+			cct::Logger::Warning("{}: not implemented, ignored", Index < names.size() ? names[Index] : "?");
+		}
+
+		using UnknownTrapFn = void(VKAPI_PTR*)();
+
+		template<std::size_t... Indices>
+		std::array<UnknownTrapFn, sizeof...(Indices)> MakeUnknownTrapTable(std::index_sequence<Indices...>)
+		{
+			return {{&UnknownFunctionTrap<Indices>...}};
+		}
+
+		constexpr std::size_t MaxUnknownFunctions = 1024;
+
+		// A function this driver never registered is still core/mandatory as far as a spec-conforming
+		// caller is concerned, so it may be called unconditionally - handing back nullptr here would
+		// segfault the caller on that first call instead of just not doing anything.
+		PFN_vkVoidFunction TrapUnknownFunction(const char* pName)
+		{
+			static const std::array<UnknownTrapFn, MaxUnknownFunctions> table = MakeUnknownTrapTable(std::make_index_sequence<MaxUnknownFunctions>{});
+
+			auto& names = UnknownFunctionNames();
+			for (std::size_t i = 0; i < names.size(); ++i)
+			{
+				if (names[i] == pName)
+					return reinterpret_cast<PFN_vkVoidFunction>(table[i]);
+			}
+
+			if (names.size() >= MaxUnknownFunctions)
+				return nullptr;
+
+			names.emplace_back(pName);
+			return reinterpret_cast<PFN_vkVoidFunction>(table[names.size() - 1]);
+		}
+	} // namespace
+
 	PFN_vkVoidFunction Device::GetDeviceProcAddr(VkDevice pDevice, const char* pName)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
@@ -303,6 +353,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdUpdateBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyImage);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBlitImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBufferToImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyImageToBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdClearColorImage);
@@ -333,9 +384,9 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdExecuteCommands);
 
 #undef VKD_ENTRYPOINT_LOOKUP
-		// cct::Logger::Warning("Could not find '{}' function", pName);
+		cct::Logger::Warning("Could not find '{}' function", pName);
 
-		return nullptr;
+		return TrapUnknownFunction(pName);
 	}
 
 	void Device::GetDeviceQueue(VkDevice pDevice, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue)
