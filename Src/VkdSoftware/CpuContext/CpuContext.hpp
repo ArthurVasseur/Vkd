@@ -45,9 +45,8 @@ namespace vkd::software
 		inline void Reset();
 
 	private:
-		// Fills every pixel of `image` with `color`. Currently only R8G8B8A8-class
-		// formats are correctly packed; other formats fall back to a 32-bit splat.
-		static VkResult ClearImageWithColor(vkd::Image* image, const VkClearColorValue& color);
+		// Restricted to `area` if given (clamped to the image bounds); nullptr clears the whole image.
+		static VkResult ClearImageWithColor(vkd::Image* image, const VkClearColorValue& color, const VkRect2D* area = nullptr);
 
 		vkd::Pipeline* m_boundPipeline = nullptr;
 		std::vector<Buffer*> m_boundVertexBuffers;

@@ -137,6 +137,57 @@ TEST_CASE("see::exec::RunVertexStage - finds BuiltIn/Location variables via deco
 	}
 }
 
+TEST_CASE("see::exec::RunVertexStage - seeds BuiltIn InstanceIndex", "[see][stage]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint Vertex %main \"main\" %iidx %outPos\n"
+		"OpDecorate %iidx BuiltIn InstanceIndex\n"
+		"OpDecorate %outPos BuiltIn Position\n"
+		"%int = OpTypeInt 32 1\n"
+		"%bool = OpTypeBool\n"
+		"%float = OpTypeFloat 32\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%_ptr_Input_int = OpTypePointer Input %int\n"
+		"%_ptr_Output_v4float = OpTypePointer Output %v4float\n"
+		"%iidx = OpVariable %_ptr_Input_int Input\n"
+		"%outPos = OpVariable %_ptr_Output_v4float Output\n"
+		"%izero = OpConstant %int 0\n"
+		"%c0 = OpConstant %float 0\n"
+		"%c1 = OpConstant %float 1\n"
+		"%cNeg1 = OpConstant %float -1\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%i = OpLoad %int %iidx\n"
+		"%isZero = OpIEqual %bool %i %izero\n"
+		"%posA = OpCompositeConstruct %v4float %c1 %c0 %c0 %c1\n"
+		"%posB = OpCompositeConstruct %v4float %cNeg1 %c0 %c0 %c1\n"
+		"%pos = OpSelect %v4float %isZero %posA %posB\n"
+		"OpStore %outPos %pos\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	REQUIRE(module.m_functions.size() == 1);
+
+	SECTION("instance 0 takes the positive-x branch")
+	{
+		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 0);
+		REQUIRE(output.has_value());
+		CHECK(output->m_position.GetFloat(0) == 1.0f);
+	}
+
+	SECTION("instance 1 takes the negative-x branch")
+	{
+		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 1);
+		REQUIRE(output.has_value());
+		CHECK(output->m_position.GetFloat(0) == -1.0f);
+	}
+}
+
 TEST_CASE("see::exec::RunFragmentStage - seeds Location inputs and reads Location outputs", "[see][stage]")
 {
 	const see::ir::Module module = ParseAndConvert(FragmentSource);

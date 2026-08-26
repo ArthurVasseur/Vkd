@@ -56,7 +56,7 @@ namespace see::exec
 		}
 	} // namespace
 
-	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
+	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
@@ -67,6 +67,14 @@ namespace see::exec
 			value.m_scalar = ir::ScalarKind::Int32;
 			value.SetInt32(0, static_cast<cct::Int32>(vertexIndex));
 			inputs[*vertexIndexVar] = value;
+		}
+
+		if (std::optional<cct::UInt32> instanceIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInInstanceIndex))
+		{
+			Value value;
+			value.m_scalar = ir::ScalarKind::Int32;
+			value.SetInt32(0, static_cast<cct::Int32>(instanceIndex));
+			inputs[*instanceIndexVar] = value;
 		}
 
 		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages);

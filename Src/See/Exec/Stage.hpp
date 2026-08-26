@@ -25,6 +25,7 @@ namespace see::exec
 	};
 
 	[[nodiscard]] std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
+																  cct::UInt32 instanceIndex = 0,
 																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
 																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
 

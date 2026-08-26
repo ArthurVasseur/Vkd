@@ -79,6 +79,7 @@ namespace vkd::software
 		{
 			float m_x;
 			float m_y;
+			float m_invW; // 1/w (clip-space), for perspective-correct attribute interpolation
 			see::exec::VertexStageOutput m_output;
 		};
 
@@ -268,6 +269,18 @@ namespace vkd::software
 					const float l1 = w1 / absArea;
 					const float l2 = w2 / absArea;
 
+					// Perspective-correct: screen-space barycentric weights interpolate attributes
+					// linearly in screen space, which is only correct when w is constant across the
+					// triangle. Re-weighting by 1/w and renormalizing corrects for that; it's a no-op
+					// when all three w match (e.g. w=1 everywhere, as when there's no projection).
+					const float pw0 = l0 * v0.m_invW;
+					const float pw1 = l1 * v1.m_invW;
+					const float pw2 = l2 * v2.m_invW;
+					const float invPwSum = 1.0f / (pw0 + pw1 + pw2);
+					const float pl0 = pw0 * invPwSum;
+					const float pl1 = pw1 * invPwSum;
+					const float pl2 = pw2 * invPwSum;
+
 					std::unordered_map<UInt32, see::exec::Value> interpolated;
 					for (const auto& [location, value] : v0.m_output.m_locations)
 					{
@@ -276,7 +289,7 @@ namespace vkd::software
 						if (it1 == v1.m_output.m_locations.end() || it2 == v2.m_output.m_locations.end())
 							continue;
 
-						interpolated[location] = InterpolateLocation(value, it1->second, it2->second, l0, l1, l2);
+						interpolated[location] = InterpolateLocation(value, it1->second, it2->second, pl0, pl1, pl2);
 					}
 
 					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs = see::exec::RunFragmentStage(fragmentModule, fragmentFunction, interpolated, fragmentUniforms, fragmentImages);
@@ -430,7 +443,7 @@ namespace vkd::software
 
 		for (UInt32 instance = 0; instance < op.InstanceCount; ++instance)
 		{
-			(void)instance; // no InstanceIndex builtin wired up yet - every instance draws identically
+			const UInt32 instanceIndex = op.FirstInstance + instance;
 
 			for (UInt32 base = 0; base + 3 <= op.VertexCount; base += 3)
 			{
@@ -440,7 +453,7 @@ namespace vkd::software
 				for (UInt32 i = 0; i < 3; ++i)
 				{
 					const UInt32 vertexIndex = op.FirstVertex + base + i;
-					std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, vertexUniforms, vertexImages);
+					std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexUniforms, vertexImages);
 					if (!output)
 					{
 						allValid = false;
@@ -459,6 +472,7 @@ namespace vkd::software
 
 					screenVertices[i].m_x = viewport.x + (ndcX * 0.5f + 0.5f) * viewport.width;
 					screenVertices[i].m_y = viewport.y + (ndcY * 0.5f + 0.5f) * viewport.height;
+					screenVertices[i].m_invW = 1.0f / w;
 					screenVertices[i].m_output = std::move(*output);
 				}
 
@@ -743,7 +757,7 @@ namespace vkd::software
 			VKD_FROM_HANDLE(vkd::ImageView, viewObj, views[i]);
 			VKD_FROM_HANDLE(vkd::Image, imageObj, viewObj->GetImage());
 
-			VkResult result = ClearImageWithColor(imageObj, op.ClearValues[i].color);
+			VkResult result = ClearImageWithColor(imageObj, op.ClearValues[i].color, &op.RenderArea);
 			if (result != VK_SUCCESS)
 				return result;
 		}
@@ -765,7 +779,7 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
-	VkResult CpuContext::ClearImageWithColor(vkd::Image* image, const VkClearColorValue& color)
+	VkResult CpuContext::ClearImageWithColor(vkd::Image* image, const VkClearColorValue& color, const VkRect2D* area)
 	{
 		CCT_ASSERT(image && image->GetMemory(), "Invalid image / memory");
 
@@ -785,19 +799,45 @@ namespace vkd::software
 		UInt8 pattern[4] = {0, 0, 0, 0};
 		const bool supported = pixelSize == 4 && BuildRgba8ClearPattern(format, color, pattern);
 
+		const int minX = area ? std::max(area->offset.x, 0) : 0;
+		const int minY = area ? std::max(area->offset.y, 0) : 0;
+		const int maxX = area ? std::min(area->offset.x + static_cast<int>(area->extent.width), static_cast<int>(extent.width)) : static_cast<int>(extent.width);
+		const int maxY = area ? std::min(area->offset.y + static_cast<int>(area->extent.height), static_cast<int>(extent.height)) : static_cast<int>(extent.height);
+		const bool coversWholeImage = minX == 0 && minY == 0 && maxX == static_cast<int>(extent.width) && maxY == static_cast<int>(extent.height);
+
 		if (supported)
 		{
 			UInt32 clearWord;
 			std::memcpy(&clearWord, pattern, sizeof(clearWord));
-			UInt32* data32 = reinterpret_cast<UInt32*>(data);
-			const std::size_t wordCount = static_cast<std::size_t>(imageSize / sizeof(UInt32));
-			for (std::size_t i = 0; i < wordCount; ++i)
-				data32[i] = clearWord;
+
+			if (coversWholeImage)
+			{
+				UInt32* data32 = reinterpret_cast<UInt32*>(data);
+				const std::size_t wordCount = static_cast<std::size_t>(imageSize / sizeof(UInt32));
+				for (std::size_t i = 0; i < wordCount; ++i)
+					data32[i] = clearWord;
+			}
+			else
+			{
+				for (int y = minY; y < maxY; ++y)
+				{
+					UInt32* row = reinterpret_cast<UInt32*>(data + static_cast<std::size_t>(y) * extent.width * pixelSize);
+					for (int x = minX; x < maxX; ++x)
+						row[x] = clearWord;
+				}
+			}
 		}
 		else
 		{
 			cct::Logger::Warning("ClearImageWithColor: unsupported format {}, zeroing memory", static_cast<int>(format));
-			std::memset(data, 0, static_cast<std::size_t>(imageSize));
+
+			if (coversWholeImage)
+				std::memset(data, 0, static_cast<std::size_t>(imageSize));
+			else
+			{
+				for (int y = minY; y < maxY; ++y)
+					std::memset(data + (static_cast<std::size_t>(y) * extent.width + minX) * pixelSize, 0, static_cast<std::size_t>(maxX - minX) * pixelSize);
+			}
 		}
 
 		image->GetMemory()->Unmap();
