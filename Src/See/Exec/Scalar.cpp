@@ -377,6 +377,50 @@ namespace see::exec
 			return true;
 		}
 
+		bool ExecuteVectorExtractDynamic(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.size() < 2)
+				return false;
+
+			std::optional<Value> vector = ResolveValue(state, instruction.m_args[0]);
+			std::optional<Value> index = ResolveValue(state, instruction.m_args[1]);
+			if (!vector || !index)
+				return false;
+
+			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
+			if (indexValue >= vector->m_rows * vector->m_columns)
+				return false;
+
+			Value result;
+			result.m_scalar = vector->m_scalar;
+			result.m_bits[0] = vector->m_bits[indexValue];
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
+		bool ExecuteVectorInsertDynamic(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.size() < 3)
+				return false;
+
+			std::optional<Value> vector = ResolveValue(state, instruction.m_args[0]);
+			std::optional<Value> component = ResolveValue(state, instruction.m_args[1]);
+			std::optional<Value> index = ResolveValue(state, instruction.m_args[2]);
+			if (!vector || !component || !index)
+				return false;
+
+			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
+			if (indexValue >= vector->m_rows * vector->m_columns)
+				return false;
+
+			Value result = *vector;
+			result.m_bits[indexValue] = component->m_bits[0];
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
 		bool ExecuteArithmetic(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			if (instruction.m_args.size() < 2)
@@ -661,6 +705,10 @@ namespace see::exec
 					return ExecuteCompositeConstruct(state, instruction);
 				case ir::Op::CompositeExtract:
 					return ExecuteCompositeExtract(state, instruction);
+				case ir::Op::VectorExtractDynamic:
+					return ExecuteVectorExtractDynamic(state, instruction);
+				case ir::Op::VectorInsertDynamic:
+					return ExecuteVectorInsertDynamic(state, instruction);
 				case ir::Op::Add:
 				case ir::Op::Sub:
 				case ir::Op::Mul:

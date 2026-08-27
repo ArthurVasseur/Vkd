@@ -103,6 +103,10 @@ namespace see::ir
 					return Op::CompositeConstruct;
 				case SpvOpCompositeExtract:
 					return Op::CompositeExtract;
+				case SpvOpVectorExtractDynamic:
+					return Op::VectorExtractDynamic;
+				case SpvOpVectorInsertDynamic:
+					return Op::VectorInsertDynamic;
 				case SpvOpFAdd:
 				case SpvOpIAdd:
 					return Op::Add;

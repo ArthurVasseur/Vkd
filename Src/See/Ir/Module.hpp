@@ -60,6 +60,8 @@ namespace see::ir
 		AccessChain,
 		CompositeConstruct,
 		CompositeExtract,
+		VectorExtractDynamic,
+		VectorInsertDynamic,
 		Add,
 		Sub,
 		Mul,
