@@ -128,6 +128,50 @@ TEST_CASE("see::exec::Run - scalar arithmetic", "[see][exec]")
 	CHECK(outIt->second.GetFloat() == 14.0f); // (3 + 4) * 2
 }
 
+TEST_CASE("see::exec::Run - OpFunctionCall passes arguments and returns a value", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%float_fn = OpTypeFunction %float %float\n"
+		"%_ptr_Private_float = OpTypePointer Private %float\n"
+		"%in = OpVariable %_ptr_Private_float Private\n"
+		"%out = OpVariable %_ptr_Private_float Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%v = OpLoad %float %in\n"
+		"%r = OpFunctionCall %float %double %v\n"
+		"OpStore %out %r\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n"
+		"%double = OpFunction %float None %float_fn\n"
+		"%param = OpFunctionParameter %float\n"
+		"%label = OpLabel\n"
+		"%sum = OpFAdd %float %param %param\n"
+		"OpReturnValue %sum\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
+
+	see::exec::Value input;
+	input.SetFloat(0, 3.0f);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{inId, input}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	auto outIt = result->find(outId);
+	REQUIRE(outIt != result->end());
+	CHECK(outIt->second.GetFloat() == 6.0f);
+}
+
 TEST_CASE("see::exec::Run - conditional branch picks the right block", "[see][exec]")
 {
 	static constexpr const char* Source =

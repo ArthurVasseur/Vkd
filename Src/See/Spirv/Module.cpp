@@ -170,6 +170,15 @@ namespace see::spirv
 				return SPV_SUCCESS;
 			}
 
+			if (opcode == SpvOpFunctionParameter)
+			{
+				if (!state.m_currentFunction)
+					return SPV_ERROR_INVALID_BINARY;
+
+				state.m_currentFunction->m_parameters.push_back(instruction->result_id);
+				return SPV_SUCCESS;
+			}
+
 			if (opcode == SpvOpFunctionEnd)
 			{
 				state.m_currentFunction = nullptr;

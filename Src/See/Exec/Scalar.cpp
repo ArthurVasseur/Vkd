@@ -91,6 +91,7 @@ namespace see::exec
 		};
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
+		bool ExecuteFunctionCall(RuntimeState& state, const ir::Instruction& instruction);
 
 		std::optional<std::vector<MemberLayout>> GetStructMemberLayout(const ir::Module& module, const ir::Type& structType, cct::UInt32 structTypeId)
 		{
@@ -684,6 +685,8 @@ namespace see::exec
 					return ExecuteSelect(state, instruction);
 				case ir::Op::ImageSample:
 					return ExecuteImageSample(state, instruction);
+				case ir::Op::FunctionCall:
+					return ExecuteFunctionCall(state, instruction);
 				default:
 					return false;
 			}
@@ -695,6 +698,94 @@ namespace see::exec
 				if (block.m_label == label)
 					return &block;
 			return nullptr;
+		}
+
+		const ir::Function* FindFunction(const ir::Module& module, cct::UInt32 id)
+		{
+			for (const ir::Function& function : module.m_functions)
+				if (function.m_id == id)
+					return &function;
+			return nullptr;
+		}
+
+		struct BlockWalkOutcome
+		{
+			bool m_success = false;
+			std::optional<Value> m_returnValue; // set only when the function returned via OpReturnValue
+		};
+
+		BlockWalkOutcome RunBlocks(RuntimeState& state, const ir::Function& function)
+		{
+			if (function.m_blocks.empty())
+				return {};
+
+			const ir::BasicBlock* block = &function.m_blocks[0];
+			while (block)
+			{
+				for (const ir::Instruction& instruction : block->m_instructions)
+					if (!ExecuteInstruction(state, instruction))
+						return {};
+
+				switch (block->m_terminator)
+				{
+					case ir::Terminator::Return:
+						return BlockWalkOutcome{.m_success = true};
+					case ir::Terminator::ReturnValue:
+					{
+						std::optional<Value> value = ResolveValue(state, block->m_terminatorOperand);
+						if (!value)
+							return {};
+						return BlockWalkOutcome{.m_success = true, .m_returnValue = value};
+					}
+					case ir::Terminator::Branch:
+						if (block->m_branchTargets.empty())
+							return {};
+						block = FindBlock(function, block->m_branchTargets[0]);
+						break;
+					case ir::Terminator::BranchConditional:
+					{
+						std::optional<Value> condition = ResolveValue(state, block->m_terminatorOperand);
+						if (!condition || block->m_branchTargets.size() < 2)
+							return {};
+						block = FindBlock(function, condition->GetBool() ? block->m_branchTargets[0] : block->m_branchTargets[1]);
+						break;
+					}
+					default:
+						return {};
+				}
+
+				if (!block)
+					return {};
+			}
+
+			return {};
+		}
+
+		bool ExecuteFunctionCall(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			const ir::Function* callee = FindFunction(state.m_module, instruction.m_args[0]);
+			if (!callee || instruction.m_args.size() - 1 != callee->m_parameters.size())
+				return false;
+
+			for (std::size_t i = 0; i < callee->m_parameters.size(); ++i)
+			{
+				std::optional<Value> argument = ResolveValue(state, instruction.m_args[i + 1]);
+				if (!argument)
+					return false;
+				state.m_ssaValues[callee->m_parameters[i]] = *argument;
+			}
+
+			BlockWalkOutcome outcome = RunBlocks(state, *callee);
+			if (!outcome.m_success)
+				return false;
+
+			if (outcome.m_returnValue)
+				state.m_ssaValues[instruction.m_id] = *outcome.m_returnValue;
+
+			return true;
 		}
 	} // namespace
 
@@ -726,47 +817,14 @@ namespace see::exec
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
-		if (function.m_blocks.empty())
-			return std::nullopt;
-
 		RuntimeState state{.m_module = module, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)
 				RegisterVariable(state, global.m_id, global.m_type);
 
-		const ir::BasicBlock* block = &function.m_blocks[0];
-		while (block)
-		{
-			for (const ir::Instruction& instruction : block->m_instructions)
-				if (!ExecuteInstruction(state, instruction))
-					return std::nullopt;
-
-			switch (block->m_terminator)
-			{
-				case ir::Terminator::Return:
-				case ir::Terminator::ReturnValue:
-					return state.m_variables;
-				case ir::Terminator::Branch:
-					if (block->m_branchTargets.empty())
-						return std::nullopt;
-					block = FindBlock(function, block->m_branchTargets[0]);
-					break;
-				case ir::Terminator::BranchConditional:
-				{
-					std::optional<Value> condition = ResolveValue(state, block->m_terminatorOperand);
-					if (!condition || block->m_branchTargets.size() < 2)
-						return std::nullopt;
-					block = FindBlock(function, condition->GetBool() ? block->m_branchTargets[0] : block->m_branchTargets[1]);
-					break;
-				}
-				default:
-					return std::nullopt;
-			}
-
-			if (!block)
-				return std::nullopt;
-		}
+		if (!RunBlocks(state, function).m_success)
+			return std::nullopt;
 
 		return state.m_variables;
 	}

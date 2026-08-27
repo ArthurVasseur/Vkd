@@ -50,6 +50,7 @@ namespace see::spirv
 	{
 		cct::UInt32 m_id;
 		cct::UInt32 m_resultType;
+		std::vector<cct::UInt32> m_parameters;
 		std::vector<BasicBlock> m_blocks;
 	};
 

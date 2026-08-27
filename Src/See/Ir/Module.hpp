@@ -75,7 +75,8 @@ namespace see::ir
 		CompareGreater,
 		CompareGreaterEqual,
 		Select,
-		ImageSample
+		ImageSample,
+		FunctionCall
 	};
 
 	struct Instruction
@@ -108,6 +109,7 @@ namespace see::ir
 	struct Function
 	{
 		cct::UInt32 m_id = 0;
+		std::vector<cct::UInt32> m_parameters;
 		std::vector<BasicBlock> m_blocks;
 	};
 

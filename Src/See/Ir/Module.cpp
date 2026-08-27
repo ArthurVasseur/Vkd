@@ -151,6 +151,8 @@ namespace see::ir
 				case SpvOpImageSampleImplicitLod:
 				case SpvOpImageSampleExplicitLod:
 					return Op::ImageSample;
+				case SpvOpFunctionCall:
+					return Op::FunctionCall;
 				default:
 					return Op::Unsupported;
 			}
@@ -302,6 +304,7 @@ namespace see::ir
 		{
 			Function function;
 			function.m_id = spirvFunction.m_id;
+			function.m_parameters = spirvFunction.m_parameters;
 			function.m_blocks.reserve(spirvFunction.m_blocks.size());
 
 			for (const spirv::BasicBlock& spirvBlock : spirvFunction.m_blocks)
