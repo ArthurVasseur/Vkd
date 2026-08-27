@@ -62,7 +62,7 @@ if has_config("cts") then
                 os.cd(bin_dir)
 
                 local ret = os.execv(deqp_vk.program, {
-                        "--deqp-archive-dir=" .. output_dir,
+                        "--deqp-archive-dir=" .. bin_dir,
                         "--deqp-shadercache-filename=" .. path.join(output_dir, "vk-cts-shadercache.bin"),
                         "--deqp-log-filename=" .. path.join(output_dir, "vk-cts-log.txt"),
                         "--deqp-caselist-file=" .. path.join(os.projectdir(), "vk-default.txt"),
