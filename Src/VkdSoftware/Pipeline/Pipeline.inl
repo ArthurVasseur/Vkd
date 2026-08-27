@@ -44,6 +44,16 @@ namespace vkd::software
 		return m_scissors;
 	}
 
+	inline bool Pipeline::IsViewportDynamic() const
+	{
+		return m_viewportDynamic;
+	}
+
+	inline bool Pipeline::IsScissorDynamic() const
+	{
+		return m_scissorDynamic;
+	}
+
 	inline VkCullModeFlags Pipeline::GetCullMode() const
 	{
 		return m_cullMode;

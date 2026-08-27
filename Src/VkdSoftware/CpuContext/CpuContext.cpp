@@ -450,6 +450,34 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
+	VkResult CpuContext::SetViewport(OpSetViewport op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		const UInt32 maxViewport = op.FirstViewport + static_cast<UInt32>(op.Viewports.size());
+		if (maxViewport > m_dynamicViewports.size())
+			m_dynamicViewports.resize(maxViewport);
+
+		for (size_t i = 0; i < op.Viewports.size(); ++i)
+			m_dynamicViewports[op.FirstViewport + i] = op.Viewports[i];
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::SetScissor(OpSetScissor op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		const UInt32 maxScissor = op.FirstScissor + static_cast<UInt32>(op.Scissors.size());
+		if (maxScissor > m_dynamicScissors.size())
+			m_dynamicScissors.resize(maxScissor);
+
+		for (size_t i = 0; i < op.Scissors.size(); ++i)
+			m_dynamicScissors[op.FirstScissor + i] = op.Scissors[i];
+
+		return VK_SUCCESS;
+	}
+
 	VkResult CpuContext::Draw(vkd::OpDraw op)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
@@ -458,7 +486,11 @@ namespace vkd::software
 			return VK_SUCCESS;
 
 		auto* pipeline = static_cast<Pipeline*>(m_boundPipeline);
-		if (pipeline->GetTopology() != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST || pipeline->GetViewports().empty())
+		if (pipeline->GetTopology() != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+			return VK_SUCCESS;
+
+		const bool viewportDynamic = pipeline->IsViewportDynamic();
+		if (viewportDynamic ? m_dynamicViewports.empty() : pipeline->GetViewports().empty())
 			return VK_SUCCESS;
 
 		auto* device = static_cast<SoftwareDevice*>(pipeline->GetOwner());
@@ -505,10 +537,16 @@ namespace vkd::software
 		if (mapResult != VK_SUCCESS || pixels == nullptr)
 			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
 
-		const VkViewport& viewport = pipeline->GetViewports()[0];
+		const VkViewport& viewport = viewportDynamic ? m_dynamicViewports[0] : pipeline->GetViewports()[0];
 
 		VkRect2D scissor;
-		if (pipeline->GetScissors().empty())
+		if (pipeline->IsScissorDynamic())
+		{
+			if (m_dynamicScissors.empty())
+				return VK_SUCCESS;
+			scissor = m_dynamicScissors[0];
+		}
+		else if (pipeline->GetScissors().empty())
 			scissor = VkRect2D{{0, 0}, {extent.width, extent.height}};
 		else
 			scissor = pipeline->GetScissors()[0];

@@ -210,6 +210,22 @@ namespace vkd
 		});
 	}
 
+	inline void CommandBuffer::PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport)
+	{
+		m_ops.emplace_back(OpSetViewport{
+			.Viewports = std::vector<VkViewport>(pViewports.begin(), pViewports.end()),
+			.FirstViewport = firstViewport,
+		});
+	}
+
+	inline void CommandBuffer::PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor)
+	{
+		m_ops.emplace_back(OpSetScissor{
+			.Scissors = std::vector<VkRect2D>(pScissors.begin(), pScissors.end()),
+			.FirstScissor = firstScissor,
+		});
+	}
+
 	inline void CommandBuffer::PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents)
 	{
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, beginInfo.renderPass);

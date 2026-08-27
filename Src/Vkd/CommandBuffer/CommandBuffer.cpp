@@ -193,13 +193,17 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdSetViewport(VkCommandBuffer commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetViewport: not implemented, dynamic viewport state is ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetViewport(std::span(pViewports, viewportCount), firstViewport);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetScissor(VkCommandBuffer commandBuffer, uint32_t firstScissor, uint32_t scissorCount, const VkRect2D* pScissors)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetScissor: not implemented, dynamic scissor state is ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetScissor(std::span(pScissors, scissorCount), firstScissor);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetLineWidth(VkCommandBuffer commandBuffer, float lineWidth)

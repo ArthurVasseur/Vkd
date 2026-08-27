@@ -78,6 +78,18 @@ namespace vkd::software
 				m_scissors.assign(state.pScissors, state.pScissors + state.scissorCount);
 		}
 
+		if (info.pDynamicState)
+		{
+			const VkPipelineDynamicStateCreateInfo& state = *info.pDynamicState;
+			for (cct::UInt32 i = 0; i < state.dynamicStateCount; ++i)
+			{
+				if (state.pDynamicStates[i] == VK_DYNAMIC_STATE_VIEWPORT)
+					m_viewportDynamic = true;
+				else if (state.pDynamicStates[i] == VK_DYNAMIC_STATE_SCISSOR)
+					m_scissorDynamic = true;
+			}
+		}
+
 		if (info.pRasterizationState)
 		{
 			m_cullMode = info.pRasterizationState->cullMode;

@@ -30,6 +30,8 @@ namespace vkd::software
 		VkResult BindPipeline(OpBindPipeline op);
 		VkResult BindVertexBuffer(OpBindVertexBuffer buffer);
 		VkResult BindDescriptorSets(OpBindDescriptorSets op);
+		VkResult SetViewport(OpSetViewport op);
+		VkResult SetScissor(OpSetScissor op);
 		VkResult Draw(vkd::OpDraw op);
 		VkResult CopyBuffer(vkd::Buffer::OpCopy op);
 		VkResult CopyBuffer2(vkd::Buffer::OpCopy2 op);
@@ -52,6 +54,8 @@ namespace vkd::software
 		std::vector<Buffer*> m_boundVertexBuffers;
 		std::vector<VkDeviceSize> m_vertexBufferOffsets;
 		std::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
+		std::vector<VkViewport> m_dynamicViewports;
+		std::vector<VkRect2D> m_dynamicScissors;
 
 		vkd::RenderPass* m_currentRenderPass = nullptr;
 		vkd::Framebuffer* m_currentFramebuffer = nullptr;

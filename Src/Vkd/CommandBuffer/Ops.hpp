@@ -91,6 +91,18 @@ namespace vkd
 		Pipeline* PipelineObject;
 	};
 
+	struct OpSetViewport
+	{
+		std::vector<VkViewport> Viewports;
+		UInt32 FirstViewport;
+	};
+
+	struct OpSetScissor
+	{
+		std::vector<VkRect2D> Scissors;
+		UInt32 FirstScissor;
+	};
+
 	using Op = Nz::TypeList<
 		OpBindVertexBuffer,
 		OpBindDescriptorSets,
@@ -99,6 +111,8 @@ namespace vkd
 		OpDrawIndirect,
 		OpDrawIndexedIndirect,
 		OpBindPipeline,
+		OpSetViewport,
+		OpSetScissor,
 		OpBeginRenderPass,
 		OpEndRenderPass>;
 } // namespace vkd

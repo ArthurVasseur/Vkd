@@ -47,6 +47,8 @@ namespace vkd::software
 
 		[[nodiscard]] inline const std::vector<VkViewport>& GetViewports() const;
 		[[nodiscard]] inline const std::vector<VkRect2D>& GetScissors() const;
+		[[nodiscard]] inline bool IsViewportDynamic() const;
+		[[nodiscard]] inline bool IsScissorDynamic() const;
 
 		[[nodiscard]] inline VkCullModeFlags GetCullMode() const;
 		[[nodiscard]] inline VkFrontFace GetFrontFace() const;
@@ -73,6 +75,8 @@ namespace vkd::software
 
 		std::vector<VkViewport> m_viewports;
 		std::vector<VkRect2D> m_scissors;
+		bool m_viewportDynamic = false;
+		bool m_scissorDynamic = false;
 
 		VkCullModeFlags m_cullMode = VK_CULL_MODE_NONE;
 		VkFrontFace m_frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;

@@ -106,6 +106,16 @@ namespace vkd::software
 		return m_context->BindPipeline(std::move(op));
 	}
 
+	VkResult CommandDispatcher::operator()(vkd::OpSetViewport op)
+	{
+		return m_context->SetViewport(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpSetScissor op)
+	{
+		return m_context->SetScissor(std::move(op));
+	}
+
 	VkResult CommandDispatcher::operator()(vkd::OpBeginRenderPass op)
 	{
 		return m_context->BeginRenderPass(std::move(op));
