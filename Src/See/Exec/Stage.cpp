@@ -17,20 +17,35 @@ namespace see::exec
 			return variable.m_args.empty() ? 0 : variable.m_args[0];
 		}
 
-		std::optional<cct::UInt32> FindBuiltinVariable(const ir::Module& module, SpvStorageClass storageClass, SpvBuiltIn builtin)
+		struct BuiltinLocation
+		{
+			cct::UInt32 m_variable = 0;
+			std::optional<cct::UInt32> m_member;
+		};
+
+		std::optional<BuiltinLocation> FindBuiltinVariable(const ir::Module& module, SpvStorageClass storageClass, SpvBuiltIn builtin)
 		{
 			for (const ir::Instruction& global : module.m_globalInstructions)
 			{
 				if (global.m_op != ir::Op::Variable || GetStorageClass(global) != static_cast<cct::UInt32>(storageClass))
 					continue;
 
-				auto decorationsIt = module.m_decorations.find(global.m_id);
-				if (decorationsIt == module.m_decorations.end())
+				if (auto decorationsIt = module.m_decorations.find(global.m_id); decorationsIt != module.m_decorations.end())
+					for (const ir::Decoration& decoration : decorationsIt->second)
+						if (decoration.m_kind == SpvDecorationBuiltIn && !decoration.m_literals.empty() && decoration.m_literals[0] == static_cast<cct::UInt32>(builtin))
+							return BuiltinLocation{.m_variable = global.m_id};
+
+				auto pointerTypeIt = module.m_types.find(global.m_type);
+				if (pointerTypeIt == module.m_types.end() || pointerTypeIt->second.m_kind != ir::TypeKind::Pointer)
 					continue;
 
-				for (const ir::Decoration& decoration : decorationsIt->second)
+				auto memberDecorationsIt = module.m_memberDecorations.find(pointerTypeIt->second.m_pointee);
+				if (memberDecorationsIt == module.m_memberDecorations.end())
+					continue;
+
+				for (const ir::MemberDecoration& decoration : memberDecorationsIt->second)
 					if (decoration.m_kind == SpvDecorationBuiltIn && !decoration.m_literals.empty() && decoration.m_literals[0] == static_cast<cct::UInt32>(builtin))
-						return global.m_id;
+						return BuiltinLocation{.m_variable = global.m_id, .m_member = decoration.m_member};
 			}
 			return std::nullopt;
 		}
@@ -61,36 +76,44 @@ namespace see::exec
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
 		std::unordered_map<cct::UInt32, Value> inputs;
-		if (std::optional<cct::UInt32> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
+		if (std::optional<BuiltinLocation> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
 		{
 			Value value;
 			value.m_scalar = ir::ScalarKind::Int32;
 			value.SetInt32(0, static_cast<cct::Int32>(vertexIndex));
-			inputs[*vertexIndexVar] = value;
+			inputs[vertexIndexVar->m_variable] = value;
 		}
 
-		if (std::optional<cct::UInt32> instanceIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInInstanceIndex))
+		if (std::optional<BuiltinLocation> instanceIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInInstanceIndex))
 		{
 			Value value;
 			value.m_scalar = ir::ScalarKind::Int32;
 			value.SetInt32(0, static_cast<cct::Int32>(instanceIndex));
-			inputs[*instanceIndexVar] = value;
+			inputs[instanceIndexVar->m_variable] = value;
 		}
 
 		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages);
 		if (!result)
 			return std::nullopt;
 
-		std::optional<cct::UInt32> positionVar = FindBuiltinVariable(module, SpvStorageClassOutput, SpvBuiltInPosition);
+		std::optional<BuiltinLocation> positionVar = FindBuiltinVariable(module, SpvStorageClassOutput, SpvBuiltInPosition);
 		if (!positionVar)
 			return std::nullopt;
 
-		auto positionIt = result->find(*positionVar);
+		auto positionIt = result->find(positionVar->m_variable);
 		if (positionIt == result->end())
 			return std::nullopt;
 
 		VertexStageOutput output;
-		output.m_position = positionIt->second;
+		if (positionVar->m_member)
+		{
+			std::optional<Value> member = ExtractStructMember(module, positionIt->second, *positionVar->m_member);
+			if (!member)
+				return std::nullopt;
+			output.m_position = *member;
+		}
+		else
+			output.m_position = positionIt->second;
 
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassOutput))
 		{

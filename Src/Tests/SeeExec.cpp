@@ -366,6 +366,54 @@ TEST_CASE("see::exec::Run - uniform block bigger than 16 words via an external b
 		CHECK(matrix.GetFloat(i * 4 + i) == static_cast<float>(i + 1));
 }
 
+TEST_CASE("see::exec::Run - external buffer struct member offset from OpMemberDecorate", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"OpDecorate %Block BufferBlock\n"
+		"OpMemberDecorate %Block 0 Offset 0\n"
+		"OpMemberDecorate %Block 1 Offset 16\n"
+		"%float = OpTypeFloat 32\n"
+		"%v3float = OpTypeVector %float 3\n"
+		"%Block = OpTypeStruct %v3float %float\n"
+		"%_ptr_Uniform_Block = OpTypePointer Uniform %Block\n"
+		"%_ptr_Uniform_float = OpTypePointer Uniform %float\n"
+		"%_ptr_Output_float = OpTypePointer Output %float\n"
+		"%block = OpVariable %_ptr_Uniform_Block Uniform\n"
+		"%out = OpVariable %_ptr_Output_float Output\n"
+		"%int = OpTypeInt 32 1\n"
+		"%int_1 = OpConstant %int 1\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%p = OpAccessChain %_ptr_Uniform_float %block %int_1\n"
+		"%v = OpLoad %float %p\n"
+		"OpStore %out %v\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 blockId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
+
+	std::array<cct::UInt32, 5> blockWords{};
+	const float decoy = 99.0f;
+	const float real = 22.0f;
+	std::memcpy(&blockWords[3], &decoy, sizeof(float));
+	std::memcpy(&blockWords[4], &real, sizeof(float));
+
+	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{blockId, see::exec::ExternalBuffer{blockWords.data(), static_cast<cct::UInt32>(blockWords.size())}}};
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {}, externalBuffers);
+	REQUIRE(result.has_value());
+
+	CHECK(result->find(outId)->second.GetFloat() == 22.0f);
+}
+
 TEST_CASE("see::exec::Run - nearest-neighbor image sampling through an external image", "[see][exec]")
 {
 	// Mirrors the real pattern (verified via spirv-dis against NZSL's sampler2D[f32].Sample()

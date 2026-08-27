@@ -51,6 +51,8 @@ namespace see::exec
 		cct::UInt32 m_height = 0;
 	};
 
+	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex);
+
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},

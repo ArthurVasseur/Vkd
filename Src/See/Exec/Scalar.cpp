@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <cstring>
 
+#include <spirv/unified1/spirv.h>
+
 namespace see::exec
 {
 	float Value::GetFloat(cct::UInt32 index) const
@@ -90,24 +92,35 @@ namespace see::exec
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
 
-		// Word offset/count of each member, in declaration order. Members are packed sequentially
-		// (Function/Private-storage locals don't need std140/std430 padding rules). Unbounded on
-		// purpose: a struct backed by an external buffer (e.g. a uniform block) can be far bigger
-		// than the 16-word Value cap - only materializing the *whole* struct as one Value is capped,
-		// in MakeZeroValue below, since individual members are still loaded/stored one at a time.
-		std::optional<std::vector<MemberLayout>> GetStructMemberLayout(const ir::Module& module, const ir::Type& structType)
+		std::optional<std::vector<MemberLayout>> GetStructMemberLayout(const ir::Module& module, const ir::Type& structType, cct::UInt32 structTypeId)
 		{
+			const std::vector<ir::MemberDecoration>* memberDecorations = nullptr;
+			if (auto it = module.m_memberDecorations.find(structTypeId); it != module.m_memberDecorations.end())
+				memberDecorations = &it->second;
+
 			std::vector<MemberLayout> layout;
-			cct::UInt32 offset = 0;
-			for (cct::UInt32 memberTypeId : structType.m_memberTypes)
+			cct::UInt32 packedOffset = 0;
+			for (cct::UInt32 memberIndex = 0; memberIndex < structType.m_memberTypes.size(); ++memberIndex)
 			{
-				std::optional<Value> memberShape = MakeZeroValue(module, memberTypeId);
-				if (!memberShape)
+				std::optional<Value> memberShape = MakeZeroValue(module, structType.m_memberTypes[memberIndex]);
+				const cct::UInt32 wordCount = memberShape ? memberShape->m_rows * memberShape->m_columns : 0;
+
+				cct::UInt32 offset = packedOffset;
+				bool hasExplicitOffset = false;
+				if (memberDecorations)
+					for (const ir::MemberDecoration& decoration : *memberDecorations)
+						if (decoration.m_member == memberIndex && decoration.m_kind == SpvDecorationOffset && !decoration.m_literals.empty())
+						{
+							offset = decoration.m_literals[0] / 4; // byte offset -> word offset
+							hasExplicitOffset = true;
+							break;
+						}
+
+				if (!memberShape && !hasExplicitOffset)
 					return std::nullopt;
 
-				const cct::UInt32 wordCount = memberShape->m_rows * memberShape->m_columns;
 				layout.push_back(MemberLayout{.m_offset = offset, .m_wordCount = wordCount});
-				offset += wordCount;
+				packedOffset = offset + wordCount;
 			}
 			return layout;
 		}
@@ -136,7 +149,7 @@ namespace see::exec
 				}
 				case ir::TypeKind::Struct:
 				{
-					std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(module, type);
+					std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(module, type, typeId);
 					if (!layout)
 						return std::nullopt;
 					const cct::UInt32 totalWords = layout->empty() ? 0 : layout->back().m_offset + layout->back().m_wordCount;
@@ -291,7 +304,7 @@ namespace see::exec
 				auto typeIt = state.m_module.m_types.find(info.m_pointeeType);
 				if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Struct)
 				{
-					std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(state.m_module, typeIt->second);
+					std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(state.m_module, typeIt->second, info.m_pointeeType);
 					if (!layout || indexValue >= layout->size())
 						return false;
 					info.m_wordOffset += (*layout)[indexValue].m_offset;
@@ -349,21 +362,9 @@ namespace see::exec
 
 			if (composite->m_structType != 0)
 			{
-				auto typeIt = state.m_module.m_types.find(composite->m_structType);
-				if (typeIt == state.m_module.m_types.end())
-					return false;
-
-				std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(state.m_module, typeIt->second);
-				if (!layout || index >= layout->size())
-					return false;
-
-				std::optional<Value> result = MakeZeroValue(state.m_module, typeIt->second.m_memberTypes[index]);
+				std::optional<Value> result = ExtractStructMember(state.m_module, *composite, index);
 				if (!result)
 					return false;
-
-				const MemberLayout& member = (*layout)[index];
-				for (cct::UInt32 i = 0; i < member.m_wordCount && i < 16; ++i)
-					result->m_bits[i] = composite->m_bits[member.m_offset + i];
 
 				state.m_ssaValues[instruction.m_id] = *result;
 				return true;
@@ -701,6 +702,30 @@ namespace see::exec
 			return nullptr;
 		}
 	} // namespace
+
+	std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex)
+	{
+		if (composite.m_structType == 0)
+			return std::nullopt;
+
+		auto typeIt = module.m_types.find(composite.m_structType);
+		if (typeIt == module.m_types.end())
+			return std::nullopt;
+
+		std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(module, typeIt->second, composite.m_structType);
+		if (!layout || memberIndex >= layout->size())
+			return std::nullopt;
+
+		std::optional<Value> result = MakeZeroValue(module, typeIt->second.m_memberTypes[memberIndex]);
+		if (!result)
+			return std::nullopt;
+
+		const MemberLayout& member = (*layout)[memberIndex];
+		for (cct::UInt32 i = 0; i < member.m_wordCount && i < 16; ++i)
+			result->m_bits[i] = composite.m_bits[member.m_offset + i];
+
+		return result;
+	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,

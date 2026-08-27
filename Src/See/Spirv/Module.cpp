@@ -113,6 +113,22 @@ namespace see::spirv
 			module.m_decorations[target].push_back(std::move(decoration));
 		}
 
+		void HandleMemberDecorate(Module& module, const spv_parsed_instruction_t& instruction)
+		{
+			if (instruction.num_operands < 3)
+				return;
+
+			const cct::UInt32 structType = instruction.words[instruction.operands[0].offset];
+
+			MemberDecoration decoration;
+			decoration.m_member = instruction.words[instruction.operands[1].offset];
+			decoration.m_kind = instruction.words[instruction.operands[2].offset];
+			for (cct::UInt16 i = 3; i < instruction.num_operands; ++i)
+				decoration.m_literals.push_back(instruction.words[instruction.operands[i].offset]);
+
+			module.m_memberDecorations[structType].push_back(std::move(decoration));
+		}
+
 		Instruction ToInstruction(const spv_parsed_instruction_t& instruction)
 		{
 			Instruction result;
@@ -137,6 +153,12 @@ namespace see::spirv
 			if (opcode == SpvOpDecorate)
 			{
 				HandleDecorate(state.m_module, *instruction);
+				return SPV_SUCCESS;
+			}
+
+			if (opcode == SpvOpMemberDecorate)
+			{
+				HandleMemberDecorate(state.m_module, *instruction);
 				return SPV_SUCCESS;
 			}
 

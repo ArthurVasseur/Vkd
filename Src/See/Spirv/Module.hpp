@@ -59,6 +59,13 @@ namespace see::spirv
 		std::vector<cct::UInt32> m_literals;
 	};
 
+	struct MemberDecoration
+	{
+		cct::UInt32 m_member;
+		cct::UInt32 m_kind;
+		std::vector<cct::UInt32> m_literals;
+	};
+
 	struct EntryPoint
 	{
 		cct::UInt32 m_executionModel;
@@ -73,6 +80,7 @@ namespace see::spirv
 		std::vector<Function> m_functions;
 		std::vector<EntryPoint> m_entryPoints;
 		std::unordered_map<cct::UInt32, std::vector<Decoration>> m_decorations;
+		std::unordered_map<cct::UInt32, std::vector<MemberDecoration>> m_memberDecorations; // keyed by struct type id
 	};
 
 	// Returns nullopt if the binary fails to parse (invalid SPIR-V).

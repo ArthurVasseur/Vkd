@@ -123,11 +123,19 @@ namespace see::ir
 		std::vector<cct::UInt32> m_literals;
 	};
 
+	struct MemberDecoration
+	{
+		cct::UInt32 m_member = 0;
+		cct::UInt32 m_kind = 0; // raw SpvDecoration value
+		std::vector<cct::UInt32> m_literals;
+	};
+
 	struct Module
 	{
 		std::unordered_map<cct::UInt32, Type> m_types;
 		std::unordered_map<cct::UInt32, Constant> m_constants;
 		std::unordered_map<cct::UInt32, std::vector<Decoration>> m_decorations;
+		std::unordered_map<cct::UInt32, std::vector<MemberDecoration>> m_memberDecorations; // keyed by struct type id
 		std::vector<Instruction> m_globalInstructions; // mostly OpVariable
 		std::vector<Function> m_functions;
 	};

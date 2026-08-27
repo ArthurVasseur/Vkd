@@ -277,6 +277,15 @@ namespace see::ir
 				decorations.push_back(Decoration{.m_kind = spirvDecoration.m_kind, .m_literals = spirvDecoration.m_literals});
 		}
 
+		for (const auto& [structTypeId, spirvMemberDecorations] : spirvModule.m_memberDecorations)
+		{
+			std::vector<MemberDecoration>& memberDecorations = module.m_memberDecorations[structTypeId];
+			memberDecorations.reserve(spirvMemberDecorations.size());
+			for (const spirv::MemberDecoration& spirvDecoration : spirvMemberDecorations)
+				memberDecorations.push_back(
+					MemberDecoration{.m_member = spirvDecoration.m_member, .m_kind = spirvDecoration.m_kind, .m_literals = spirvDecoration.m_literals});
+		}
+
 		for (const spirv::Instruction& instruction : spirvModule.m_globalInstructions)
 		{
 			const SpvOp opcode = static_cast<SpvOp>(instruction.m_opcode);
