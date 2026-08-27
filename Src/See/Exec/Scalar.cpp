@@ -106,18 +106,13 @@ namespace see::exec
 				const cct::UInt32 wordCount = memberShape ? memberShape->m_rows * memberShape->m_columns : 0;
 
 				cct::UInt32 offset = packedOffset;
-				bool hasExplicitOffset = false;
 				if (memberDecorations)
 					for (const ir::MemberDecoration& decoration : *memberDecorations)
 						if (decoration.m_member == memberIndex && decoration.m_kind == SpvDecorationOffset && !decoration.m_literals.empty())
 						{
 							offset = decoration.m_literals[0] / 4; // byte offset -> word offset
-							hasExplicitOffset = true;
 							break;
 						}
-
-				if (!memberShape && !hasExplicitOffset)
-					return std::nullopt;
 
 				layout.push_back(MemberLayout{.m_offset = offset, .m_wordCount = wordCount});
 				packedOffset = offset + wordCount;

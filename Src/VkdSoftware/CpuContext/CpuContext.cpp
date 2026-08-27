@@ -182,6 +182,142 @@ namespace vkd::software
 			return result;
 		}
 
+		see::exec::Value UnpackVertexAttribute(VkFormat format, const UInt8* bytes)
+		{
+			see::exec::Value result;
+
+			if (vkuFormatIsCompressed(format) || vkuFormatIsMultiplane(format) || vkuFormatIsDepthOrStencil(format))
+				return result;
+
+			const bool isSfloat = vkuFormatIsSFLOAT(format);
+			const bool isUnorm = vkuFormatIsUNORM(format) || vkuFormatIsSRGB(format);
+			const bool isSnorm = vkuFormatIsSNORM(format);
+			const bool isUint = vkuFormatIsUINT(format);
+			const bool isSint = vkuFormatIsSINT(format);
+			if (!isSfloat && !isUnorm && !isSnorm && !isUint && !isSint)
+				return result;
+
+			result.m_scalar = isUint || isSint ? see::ir::ScalarKind::Int32 : see::ir::ScalarKind::Float32;
+
+			const VKU_FORMAT_INFO info = vkuGetFormatInfo(format);
+			result.m_rows = std::min<UInt32>(info.component_count, 4);
+
+			std::size_t byteOffset = 0;
+			for (UInt32 i = 0; i < result.m_rows; ++i)
+			{
+				const UInt32 bits = info.components[i].size;
+				const UInt32 byteCount = bits / 8;
+
+				if (isSfloat)
+				{
+					if (byteCount == 4)
+					{
+						float value;
+						std::memcpy(&value, bytes + byteOffset, 4);
+						result.SetFloat(i, value);
+					}
+					else
+					{
+						UInt16 half = 0;
+						std::memcpy(&half, bytes + byteOffset, 2);
+						result.SetFloat(i, HalfToFloat(half));
+					}
+				}
+				else if (isUnorm)
+				{
+					UInt64 raw = 0;
+					std::memcpy(&raw, bytes + byteOffset, byteCount);
+					result.SetFloat(i, static_cast<float>(raw) / static_cast<float>(UnsignedMaxForBits(bits)));
+				}
+				else if (isSnorm)
+				{
+					Int64 raw = 0;
+					std::memcpy(&raw, bytes + byteOffset, byteCount);
+					const UInt32 shift = 64 - bits;
+					raw = (raw << shift) >> shift; // sign-extend
+					result.SetFloat(i, std::max(static_cast<float>(raw) / static_cast<float>(SignedMaxForBits(bits)), -1.0f));
+				}
+				else if (isUint)
+				{
+					UInt64 raw = 0;
+					std::memcpy(&raw, bytes + byteOffset, byteCount);
+					result.SetInt32(i, static_cast<Int32>(raw));
+				}
+				else
+				{
+					Int64 raw = 0;
+					std::memcpy(&raw, bytes + byteOffset, byteCount);
+					const UInt32 shift = 64 - bits;
+					raw = (raw << shift) >> shift; // sign-extend
+					result.SetInt32(i, static_cast<Int32>(raw));
+				}
+
+				byteOffset += byteCount;
+			}
+
+			return result;
+		}
+
+		struct MappedVertexBuffer
+		{
+			const UInt8* m_base = nullptr;
+			VkDeviceSize m_size = 0;
+		};
+
+		std::vector<MappedVertexBuffer> MapVertexBuffers(const std::vector<Buffer*>& boundVertexBuffers, const std::vector<VkDeviceSize>& vertexBufferOffsets,
+														 std::vector<vkd::DeviceMemory*>& outMappedMemories)
+		{
+			std::vector<MappedVertexBuffer> result(boundVertexBuffers.size());
+			for (std::size_t binding = 0; binding < boundVertexBuffers.size(); ++binding)
+			{
+				vkd::Buffer* buffer = boundVertexBuffers[binding];
+				if (!buffer || !buffer->GetMemory())
+					continue;
+
+				const VkDeviceSize offset = binding < vertexBufferOffsets.size() ? vertexBufferOffsets[binding] : 0;
+				const VkDeviceSize size = buffer->GetSize() - offset;
+				const VkDeviceSize absoluteOffset = buffer->GetMemoryOffset() + offset;
+
+				void* mapped = nullptr;
+				if (buffer->GetMemory()->Map(absoluteOffset, size, &mapped) != VK_SUCCESS || !mapped)
+					continue;
+
+				outMappedMemories.push_back(buffer->GetMemory());
+				result[binding] = MappedVertexBuffer{reinterpret_cast<const UInt8*>(mapped), size};
+			}
+			return result;
+		}
+
+		std::unordered_map<UInt32, see::exec::Value> FetchVertexAttributes(const Pipeline& pipeline, const std::vector<MappedVertexBuffer>& mappedVertexBuffers,
+																		   UInt32 vertexIndex, UInt32 instance)
+		{
+			std::unordered_map<UInt32, see::exec::Value> result;
+
+			for (const VkVertexInputAttributeDescription& attribute : pipeline.GetVertexAttributes())
+			{
+				const auto& bindings = pipeline.GetVertexBindings();
+				const auto bindingIt = std::find_if(bindings.begin(), bindings.end(),
+													[&](const VkVertexInputBindingDescription& binding)
+													{ return binding.binding == attribute.binding; });
+				if (bindingIt == bindings.end() || attribute.binding >= mappedVertexBuffers.size())
+					continue;
+
+				const MappedVertexBuffer& mapped = mappedVertexBuffers[attribute.binding];
+				if (!mapped.m_base)
+					continue;
+
+				const UInt32 elementIndex = bindingIt->inputRate == VK_VERTEX_INPUT_RATE_INSTANCE ? instance : vertexIndex;
+				const VkDeviceSize elementOffset = static_cast<VkDeviceSize>(elementIndex) * bindingIt->stride + attribute.offset;
+				const VkDeviceSize attributeSize = vkuFormatElementSize(attribute.format);
+				if (elementOffset + attributeSize > mapped.m_size)
+					continue;
+
+				result[attribute.location] = UnpackVertexAttribute(attribute.format, mapped.m_base + elementOffset);
+			}
+
+			return result;
+		}
+
 		void RasterizeTriangle(cct::UByte* pixels, VkFormat format, const VkExtent3D& extent, const VkRect2D& scissor, const ScreenVertex& v0, const ScreenVertex& v1, const ScreenVertex& v2,
 							   const see::ir::Module& fragmentModule, const see::ir::Function& fragmentFunction, VkCullModeFlags cullMode, VkFrontFace frontFace,
 							   const std::unordered_map<UInt32, see::exec::ExternalBuffer>& fragmentUniforms,
@@ -564,11 +700,12 @@ namespace vkd::software
 		else
 			scissor = pipeline->GetScissors()[0];
 
-		vkd::vector<vkd::DeviceMemory*> mappedUniformMemories(CommandAllocator<vkd::DeviceMemory*>(*m_allocationCallbacks));
-		const std::unordered_map<UInt32, see::exec::ExternalBuffer> vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, m_dynamicOffsets, mappedUniformMemories);
-		const std::unordered_map<UInt32, see::exec::ExternalBuffer> fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, m_dynamicOffsets, mappedUniformMemories);
-		const std::unordered_map<UInt32, see::exec::ExternalImage> vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedUniformMemories);
-		const std::unordered_map<UInt32, see::exec::ExternalImage> fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedUniformMemories);
+		std::vector<vkd::DeviceMemory*> mappedMemories;
+		const std::unordered_map<UInt32, see::exec::ExternalBuffer> vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, mappedMemories);
+		const std::unordered_map<UInt32, see::exec::ExternalBuffer> fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, mappedMemories);
+		const std::unordered_map<UInt32, see::exec::ExternalImage> vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedMemories);
+		const std::unordered_map<UInt32, see::exec::ExternalImage> fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedMemories);
+		const std::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories);
 
 		for (UInt32 instance = 0; instance < op.InstanceCount; ++instance)
 		{
@@ -582,7 +719,9 @@ namespace vkd::software
 				for (UInt32 i = 0; i < 3; ++i)
 				{
 					const UInt32 vertexIndex = op.FirstVertex + base + i;
-					std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexUniforms, vertexImages);
+					const std::unordered_map<UInt32, see::exec::Value> vertexAttributes = FetchVertexAttributes(*pipeline, mappedVertexBuffers, vertexIndex, instance);
+					std::optional<see::exec::VertexStageOutput> output =
+						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages);
 					if (!output)
 					{
 						allValid = false;
@@ -612,7 +751,7 @@ namespace vkd::software
 			}
 		}
 
-		for (vkd::DeviceMemory* memory : mappedUniformMemories)
+		for (vkd::DeviceMemory* memory : mappedMemories)
 			memory->Unmap();
 
 		colorImage->GetMemory()->Unmap();

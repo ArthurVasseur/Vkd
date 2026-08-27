@@ -72,10 +72,18 @@ namespace see::exec
 	} // namespace
 
 	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
+													const std::unordered_map<cct::UInt32, Value>& locationInputs,
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
 		std::unordered_map<cct::UInt32, Value> inputs;
+		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
+		{
+			auto valueIt = locationInputs.find(location);
+			if (valueIt != locationInputs.end())
+				inputs[variableId] = valueIt->second;
+		}
+
 		if (std::optional<BuiltinLocation> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
 		{
 			Value value;
