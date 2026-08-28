@@ -350,6 +350,14 @@ namespace see::exec
 					info.m_wordOffset += indexValue * stride;
 					info.m_pointeeType = typeIt->second.m_pointee;
 				}
+				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Matrix)
+				{
+					auto columnIt = state.m_module.m_types.find(typeIt->second.m_pointee);
+					if (columnIt == state.m_module.m_types.end())
+						return false;
+					info.m_wordOffset += indexValue * columnIt->second.m_componentCount;
+					info.m_pointeeType = typeIt->second.m_pointee;
+				}
 				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Vector)
 				{
 					info.m_wordOffset += indexValue;
@@ -875,6 +883,17 @@ namespace see::exec
 			std::optional<Value> whenFalse = ResolveValue(state, instruction.m_args[2]);
 			if (!condition || !whenTrue || !whenFalse)
 				return false;
+
+			// A vector condition selects component-wise (e.g. glslang's uvec3(bvec3) conversion);
+			// a scalar condition picks one operand whole, whatever its shape.
+			if (condition->m_rows * condition->m_columns > 1)
+			{
+				Value result = *whenTrue;
+				for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+					result.m_bits[i] = condition->GetBool(i) ? whenTrue->m_bits[i] : whenFalse->m_bits[i];
+				state.m_ssaValues[instruction.m_id] = result;
+				return true;
+			}
 
 			state.m_ssaValues[instruction.m_id] = condition->GetBool() ? *whenTrue : *whenFalse;
 			return true;

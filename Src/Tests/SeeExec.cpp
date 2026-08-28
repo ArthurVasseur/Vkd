@@ -1136,3 +1136,98 @@ TEST_CASE("see::exec::Run - OpVectorTimesScalar and OpFUnordNotEqual", "[see][ex
 	CHECK(scaled.GetFloat(2) == 1.5f);
 	CHECK(result->find(outCompareId)->second.GetBool()); // 3.0 != 2.0
 }
+
+TEST_CASE("see::exec::Run - OpSelect with a vector condition selects component-wise", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%bool = OpTypeBool\n"
+		"%bool3 = OpTypeVector %bool 3\n"
+		"%uint = OpTypeInt 32 0\n"
+		"%uint3 = OpTypeVector %uint 3\n"
+		"%_ptr_Private_bool3 = OpTypePointer Private %bool3\n"
+		"%_ptr_Private_uint3 = OpTypePointer Private %uint3\n"
+		"%cond = OpVariable %_ptr_Private_bool3 Private\n"
+		"%out = OpVariable %_ptr_Private_uint3 Private\n"
+		"%zero = OpConstant %uint 0\n"
+		"%one = OpConstant %uint 1\n"
+		"%ones = OpConstantComposite %uint3 %one %one %one\n"
+		"%zeros = OpConstantComposite %uint3 %zero %zero %zero\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%c = OpLoad %bool3 %cond\n"
+		"%sel = OpSelect %uint3 %c %ones %zeros\n"
+		"OpStore %out %sel\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 condId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
+
+	see::exec::Value cond;
+	cond.m_scalar = see::ir::ScalarKind::Bool;
+	cond.m_rows = 3;
+	cond.SetBool(0, true);
+	cond.SetBool(1, false);
+	cond.SetBool(2, true);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{condId, cond}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	const see::exec::Value& out = result->find(outId)->second;
+	CHECK(out.GetInt32(0) == 1);
+	CHECK(out.GetInt32(1) == 0);
+	CHECK(out.GetInt32(2) == 1);
+}
+
+TEST_CASE("see::exec::Run - OpAccessChain indexes a matrix by column then component", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%float3 = OpTypeVector %float 3\n"
+		"%mat3 = OpTypeMatrix %float3 3\n"
+		"%_ptr_Private_mat3 = OpTypePointer Private %mat3\n"
+		"%_ptr_Private_float = OpTypePointer Private %float\n"
+		"%m = OpVariable %_ptr_Private_mat3 Private\n"
+		"%out = OpVariable %_ptr_Private_float Private\n"
+		"%int = OpTypeInt 32 1\n"
+		"%c2 = OpConstant %int 2\n"
+		"%c0 = OpConstant %int 0\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%p = OpAccessChain %_ptr_Private_float %m %c2 %c0\n"
+		"%v = OpLoad %float %p\n"
+		"OpStore %out %v\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 mId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
+
+	see::exec::Value m;
+	m.m_rows = 3;
+	m.m_columns = 3;
+	for (cct::UInt32 i = 0; i < 9; ++i)
+		m.SetFloat(i, static_cast<float>(i));
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{mId, m}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	// Column 2, component 0 = word 2*3+0 = 6
+	CHECK(result->find(outId)->second.GetFloat() == 6.0f);
+}
