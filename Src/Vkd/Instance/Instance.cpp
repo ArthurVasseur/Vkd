@@ -6,21 +6,12 @@
 
 #include "Vkd/Instance/Instance.hpp"
 
-#include <mimalloc.h>
-
 #include "Vkd/Icd/Icd.hpp"
+#include "Vkd/Memory/AllocationCallbacks.hpp"
 #include "VkdSoftware/PhysicalDevice/PhysicalDevice.hpp"
 
 namespace vkd
 {
-	VkAllocationCallbacks Instance::s_allocationCallbacks = {
-		.pUserData = nullptr,
-		.pfnAllocation = AllocationFunction,
-		.pfnReallocation = ReallocationFunction,
-		.pfnFree = FreeFunction,
-		.pfnInternalAllocation = nullptr,
-		.pfnInternalFree = nullptr};
-
 	Instance::Instance() :
 		ObjectBase(ObjectType),
 		m_physicalDevicesAlreadyEnumerated(false)
@@ -89,7 +80,7 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		if (!pAllocator)
-			pAllocator = &s_allocationCallbacks;
+			pAllocator = &mem::GetDefaultAllocationCallbacks();
 
 		auto* instance = mem::NewDispatchable<Instance>(*pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
 		if (!instance)
@@ -182,41 +173,6 @@ namespace vkd
 	std::span<DispatchableObject<PhysicalDevice>*> Instance::GetPhysicalDevices()
 	{
 		return m_physicalDevices;
-	}
-
-	void* VKAPI_PTR Instance::AllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
-	{
-		VKD_AUTO_PROFILER_SCOPE();
-
-		void* alloc = mi_malloc_aligned(size, alignment);
-		if (!alloc)
-		{
-			CCT_ASSERT_FALSE("Could not allocate memory: size={}, alignment={}", size, alignment);
-			return nullptr;
-		}
-
-		return alloc;
-	}
-
-	void* VKAPI_PTR Instance::ReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
-	{
-		VKD_AUTO_PROFILER_SCOPE();
-
-		void* alloc = mi_realloc_aligned(pOriginal, size, alignment);
-		if (!alloc)
-		{
-			CCT_ASSERT_FALSE("Could not allocate memory: size={}, alignment={}", size, alignment);
-			return nullptr;
-		}
-
-		return alloc;
-	}
-
-	void VKAPI_PTR Instance::FreeFunction(void* pUserData, void* pMemory)
-	{
-		VKD_AUTO_PROFILER_SCOPE();
-
-		mi_free(pMemory);
 	}
 
 	VkResult Instance::EnumeratePhysicalDeviceGroups(VkInstance instance, uint32_t* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties)
