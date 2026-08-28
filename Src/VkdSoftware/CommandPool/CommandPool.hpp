@@ -15,7 +15,7 @@ namespace vkd::software
 	class CommandPool : public vkd::CommandPool
 	{
 	public:
-		CommandPool() = default;
+		using vkd::CommandPool::CommandPool;
 		~CommandPool() override = default;
 
 		VkResult Create(Device& owner, const VkCommandPoolCreateInfo& createInfo, const VkAllocationCallbacks& pAllocator) override;

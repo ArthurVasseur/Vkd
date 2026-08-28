@@ -1,7 +1,7 @@
 namespace vkd
 {
-	inline ShaderModule::ShaderModule() :
-		ObjectBase(ObjectType),
+	inline ShaderModule::ShaderModule(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr)
 	{
 	}

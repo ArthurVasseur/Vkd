@@ -14,8 +14,8 @@
 
 namespace vkd
 {
-	inline ObjectBase::ObjectBase(VkObjectType objectType) :
-		m_allocationCallbacks(nullptr),
+	inline ObjectBase::ObjectBase(VkObjectType objectType, const VkAllocationCallbacks& allocationCallbacks) :
+		m_allocationCallbacks(&allocationCallbacks),
 		m_objectType(objectType),
 		m_createResult(VK_ERROR_UNKNOWN)
 	{
@@ -37,11 +37,6 @@ namespace vkd
 		CCT_ASSERT(m_allocationCallbacks, "Error, object '{}' does not have a valid allocation callbacks.\n{}", GetClassName(), cpptrace::generate_trace().to_string());
 #endif // VKD_DEBUG_CHECKS
 		return *m_allocationCallbacks;
-	}
-
-	inline void ObjectBase::SetAllocationCallbacks(const VkAllocationCallbacks& allocationCallbacks)
-	{
-		m_allocationCallbacks = &allocationCallbacks;
 	}
 
 	inline void ObjectBase::AssertValid() const

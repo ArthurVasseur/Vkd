@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_IMAGE_VIEW;
 		VKD_NON_DISPATCHABLE_HANDLE(ImageView);
 
-		ImageView();
+		explicit ImageView(const VkAllocationCallbacks& allocationCallbacks);
 		~ImageView() override = default;
 
 		virtual VkResult Create(Device& owner, const VkImageViewCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

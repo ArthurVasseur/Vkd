@@ -39,7 +39,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
 		VKD_DISPATCHABLE_HANDLE(CommandBuffer);
 
-		CommandBuffer();
+		explicit CommandBuffer(const VkAllocationCallbacks& allocationCallbacks);
 		~CommandBuffer() override = default;
 
 		virtual VkResult Create(CommandPool& owner, VkCommandBufferLevel level);

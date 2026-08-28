@@ -15,7 +15,7 @@ namespace vkd::software
 	class Image : public vkd::Image
 	{
 	public:
-		Image() = default;
+		using vkd::Image::Image;
 		~Image() override = default;
 	};
 }

@@ -24,7 +24,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_FRAMEBUFFER;
 		VKD_NON_DISPATCHABLE_HANDLE(Framebuffer);
 
-		Framebuffer();
+		explicit Framebuffer(const VkAllocationCallbacks& allocationCallbacks);
 		~Framebuffer() override = default;
 
 		virtual VkResult Create(Device& owner, const VkFramebufferCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

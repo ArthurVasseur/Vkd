@@ -26,7 +26,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_INSTANCE;
 		VKD_DISPATCHABLE_HANDLE(Instance)
 
-		Instance();
+		explicit Instance(const VkAllocationCallbacks& allocationCallbacks);
 		~Instance() override;
 
 		VkResult Create(const VkAllocationCallbacks& allocationCallbacks);

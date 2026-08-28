@@ -23,7 +23,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_COMMAND_POOL;
 		VKD_NON_DISPATCHABLE_HANDLE(CommandPool);
 
-		CommandPool();
+		explicit CommandPool(const VkAllocationCallbacks& allocationCallbacks);
 		~CommandPool() override = default;
 
 		virtual VkResult Create(Device& owner, const VkCommandPoolCreateInfo& createInfo, const VkAllocationCallbacks& pAllocator);

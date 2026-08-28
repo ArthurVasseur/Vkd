@@ -16,7 +16,7 @@ namespace vkd::software
 	class DeviceMemory : public vkd::DeviceMemory
 	{
 	public:
-		DeviceMemory();
+		explicit DeviceMemory(const VkAllocationCallbacks& allocationCallbacks);
 		~DeviceMemory() override;
 
 		VkResult Create(vkd::Device& owner, const VkMemoryAllocateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;

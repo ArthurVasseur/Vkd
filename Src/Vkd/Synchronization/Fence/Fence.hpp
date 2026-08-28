@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_FENCE;
 		VKD_NON_DISPATCHABLE_HANDLE(Fence);
 
-		Fence();
+		explicit Fence(const VkAllocationCallbacks& allocationCallbacks);
 		~Fence() override = default;
 
 		virtual VkResult Create(Device& owner, const VkFenceCreateInfo& createInfo);

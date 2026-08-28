@@ -15,7 +15,7 @@ namespace vkd::software
 	class PhysicalDevice : public vkd::PhysicalDevice
 	{
 	public:
-		PhysicalDevice() = default;
+		using vkd::PhysicalDevice::PhysicalDevice;
 		~PhysicalDevice() override = default;
 
 		VkResult Create(Instance& owner, const VkAllocationCallbacks& allocationCallbacks) override;

@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline CommandPool::CommandPool() :
-		ObjectBase(ObjectType),
+	inline CommandPool::CommandPool(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_flags(0),
 		m_queueFamilyIndex(0)
@@ -24,8 +24,6 @@ namespace vkd
 		m_owner = &owner;
 		m_flags = createInfo.flags;
 		m_queueFamilyIndex = createInfo.queueFamilyIndex;
-
-		SetAllocationCallbacks(pAllocator);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

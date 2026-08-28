@@ -31,7 +31,7 @@ namespace vkd
 			using other = allocator<U>;
 		};
 
-		inline allocator() noexcept;
+		allocator() = delete;
 		inline allocator(const VkAllocationCallbacks& allocationCallbacks, VkSystemAllocationScope allocationScope = VK_SYSTEM_ALLOCATION_SCOPE_OBJECT) noexcept;
 		template<typename U>
 		inline allocator(const allocator<U>& other) noexcept;

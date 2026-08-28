@@ -8,7 +8,8 @@
 
 namespace vkd::software
 {
-	Fence::Fence() :
+	Fence::Fence(const VkAllocationCallbacks& allocationCallbacks) :
+		vkd::Fence(allocationCallbacks),
 		m_signaled(false)
 	{
 	}

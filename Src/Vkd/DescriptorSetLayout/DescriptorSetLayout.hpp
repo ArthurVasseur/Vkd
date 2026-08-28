@@ -34,7 +34,7 @@ namespace vkd
 			std::vector<VkSampler> immutableSamplers;
 		};
 
-		DescriptorSetLayout();
+		explicit DescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks);
 		~DescriptorSetLayout() override = default;
 
 		virtual VkResult Create(Device& owner, const VkDescriptorSetLayoutCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

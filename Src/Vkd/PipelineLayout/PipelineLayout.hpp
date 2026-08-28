@@ -25,7 +25,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
 		VKD_NON_DISPATCHABLE_HANDLE(PipelineLayout);
 
-		PipelineLayout();
+		explicit PipelineLayout(const VkAllocationCallbacks& allocationCallbacks);
 		~PipelineLayout() override = default;
 
 		virtual VkResult Create(Device& owner, const VkPipelineLayoutCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

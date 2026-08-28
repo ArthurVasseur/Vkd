@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline DeviceMemory::DeviceMemory() :
-		ObjectBase(ObjectType),
+	inline DeviceMemory::DeviceMemory(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_size(0),
 		m_typeIndex(0),
@@ -25,8 +25,6 @@ namespace vkd
 		m_owner = &owner;
 		m_size = info.allocationSize;
 		m_typeIndex = info.memoryTypeIndex;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

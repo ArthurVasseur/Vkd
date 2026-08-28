@@ -15,7 +15,7 @@ namespace vkd::software
 	class RenderPass : public vkd::RenderPass
 	{
 	public:
-		RenderPass() = default;
+		using vkd::RenderPass::RenderPass;
 		~RenderPass() override = default;
 
 		VkResult Create(Device& owner, const VkRenderPassCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;

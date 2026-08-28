@@ -13,13 +13,6 @@
 namespace vkd
 {
 	template<typename T>
-	inline allocator<T>::allocator() noexcept :
-		m_allocationCallbacks(&mem::GetDefaultAllocationCallbacks()),
-		m_allocationScope(VK_SYSTEM_ALLOCATION_SCOPE_OBJECT)
-	{
-	}
-
-	template<typename T>
 	inline allocator<T>::allocator(const VkAllocationCallbacks& allocationCallbacks, VkSystemAllocationScope allocationScope) noexcept :
 		m_allocationCallbacks(&allocationCallbacks),
 		m_allocationScope(allocationScope)

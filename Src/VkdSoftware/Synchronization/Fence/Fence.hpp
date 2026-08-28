@@ -20,7 +20,7 @@ namespace vkd::software
 	class Fence : public vkd::Fence
 	{
 	public:
-		Fence();
+		explicit Fence(const VkAllocationCallbacks& allocationCallbacks);
 		~Fence() override = default;
 
 		VkResult Create(Device& owner, const VkFenceCreateInfo& createInfo) override;

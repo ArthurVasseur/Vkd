@@ -15,7 +15,7 @@ namespace vkd::software
 	class Framebuffer : public vkd::Framebuffer
 	{
 	public:
-		Framebuffer() = default;
+		using vkd::Framebuffer::Framebuffer;
 		~Framebuffer() override = default;
 
 		VkResult Create(Device& owner, const VkFramebufferCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;

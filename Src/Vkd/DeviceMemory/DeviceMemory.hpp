@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
 		VKD_NON_DISPATCHABLE_HANDLE(DeviceMemory);
 
-		DeviceMemory();
+		explicit DeviceMemory(const VkAllocationCallbacks& allocationCallbacks);
 		~DeviceMemory() override = default;
 
 		virtual VkResult Create(Device& owner, const VkMemoryAllocateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

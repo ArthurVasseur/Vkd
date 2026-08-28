@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline DescriptorPool::DescriptorPool() :
-		ObjectBase(ObjectType),
+	inline DescriptorPool::DescriptorPool(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_flags(0)
 	{
@@ -22,8 +22,6 @@ namespace vkd
 	{
 		m_owner = &owner;
 		m_flags = info.flags;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

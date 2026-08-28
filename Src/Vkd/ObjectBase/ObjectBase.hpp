@@ -17,7 +17,7 @@ namespace vkd
 	class ObjectBase
 	{
 	public:
-		explicit ObjectBase(VkObjectType objectType);
+		ObjectBase(VkObjectType objectType, const VkAllocationCallbacks& allocationCallbacks);
 		ObjectBase(ObjectBase&&) = default;
 		ObjectBase(const ObjectBase&) = delete;
 		virtual ~ObjectBase() = default;
@@ -28,7 +28,6 @@ namespace vkd
 		[[nodiscard]] inline bool IsValid() const;
 		[[nodiscard]] inline VkObjectType GetObjectType() const;
 		[[nodiscard]] inline const VkAllocationCallbacks& GetAllocationCallbacks() const;
-		inline void SetAllocationCallbacks(const VkAllocationCallbacks& allocationCallbacks);
 
 		inline void AssertValid() const;
 #ifdef VKD_DEBUG_CHECKS

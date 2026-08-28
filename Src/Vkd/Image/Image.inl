@@ -13,8 +13,8 @@
 
 namespace vkd
 {
-	inline Image::Image() :
-		ObjectBase(ObjectType),
+	inline Image::Image(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_imageType(VK_IMAGE_TYPE_2D),
 		m_format(VK_FORMAT_UNDEFINED),
@@ -40,8 +40,6 @@ namespace vkd
 		m_samples = info.samples;
 		m_tiling = info.tiling;
 		m_usage = info.usage;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

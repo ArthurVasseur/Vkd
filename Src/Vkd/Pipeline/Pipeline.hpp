@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_PIPELINE;
 		VKD_NON_DISPATCHABLE_HANDLE(Pipeline);
 
-		Pipeline();
+		explicit Pipeline(const VkAllocationCallbacks& allocationCallbacks);
 		~Pipeline() override = default;
 
 		virtual VkResult CreateGraphicsPipeline(Device& owner, const VkGraphicsPipelineCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

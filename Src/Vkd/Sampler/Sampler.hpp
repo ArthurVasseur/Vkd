@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_SAMPLER;
 		VKD_NON_DISPATCHABLE_HANDLE(Sampler);
 
-		Sampler();
+		explicit Sampler(const VkAllocationCallbacks& allocationCallbacks);
 		~Sampler() override = default;
 
 		virtual VkResult Create(Device& owner, const VkSamplerCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

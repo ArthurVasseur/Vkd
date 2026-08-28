@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline Sampler::Sampler() :
-		ObjectBase(ObjectType),
+	inline Sampler::Sampler(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_magFilter(VK_FILTER_NEAREST),
 		m_minFilter(VK_FILTER_NEAREST),
@@ -28,8 +28,6 @@ namespace vkd
 		m_minFilter = info.minFilter;
 		m_addressModeU = info.addressModeU;
 		m_addressModeV = info.addressModeV;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

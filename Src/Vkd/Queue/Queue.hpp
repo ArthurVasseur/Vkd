@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_QUEUE;
 		VKD_DISPATCHABLE_HANDLE(Queue);
 
-		Queue();
+		explicit Queue(const VkAllocationCallbacks& allocationCallbacks);
 		~Queue() override = default;
 
 		virtual VkResult Create(Device& owner, UInt32 queueFamilyIndex, UInt32 queueIndex, VkDeviceQueueCreateFlags flags);

@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline Buffer::Buffer() :
-		ObjectBase(ObjectType),
+	inline Buffer::Buffer(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_size(0),
 		m_usage(0),
@@ -26,8 +26,6 @@ namespace vkd
 		m_owner = &owner;
 		m_size = info.size;
 		m_usage = info.usage;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

@@ -29,7 +29,8 @@
 
 namespace vkd::software
 {
-	SoftwareDevice::SoftwareDevice() :
+	SoftwareDevice::SoftwareDevice(const VkAllocationCallbacks& allocationCallbacks) :
+		Device(allocationCallbacks),
 		m_allocator([]() -> std::size_t
 					{
 		System system;

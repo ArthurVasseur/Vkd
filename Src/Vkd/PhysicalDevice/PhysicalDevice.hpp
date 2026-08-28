@@ -25,7 +25,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_PHYSICAL_DEVICE;
 		VKD_DISPATCHABLE_HANDLE(PhysicalDevice);
 
-		PhysicalDevice();
+		explicit PhysicalDevice(const VkAllocationCallbacks& allocationCallbacks);
 		~PhysicalDevice() override = default;
 
 		[[nodiscard]] const VkPhysicalDeviceProperties& GetPhysicalDeviceProperties() const;

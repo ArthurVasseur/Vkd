@@ -248,7 +248,7 @@ TEST_CASE("Vkd allocator - Container aliases", "[vkd][allocator][stl]")
 		vkd::vector<UInt32> source(alloc);
 		source.push_back(42);
 
-		vkd::vector<UInt32> destination;
+		vkd::vector<UInt32> destination{allocator<UInt32>(mem::GetDefaultAllocationCallbacks())};
 		destination = std::move(source);
 
 		REQUIRE(destination.get_allocator() == alloc);
@@ -275,9 +275,11 @@ TEST_CASE("Vkd allocator - Container aliases", "[vkd][allocator][stl]")
 	}
 }
 
-TEST_CASE("Vkd allocator - Default construction", "[vkd][allocator]")
+TEST_CASE("Vkd allocator - Driver default callbacks", "[vkd][allocator]")
 {
-	vkd::vector<UInt32> values;
+	static_assert(!std::is_default_constructible_v<allocator<UInt32>>);
+
+	vkd::vector<UInt32> values{allocator<UInt32>(mem::GetDefaultAllocationCallbacks())};
 	for (UInt32 i = 0; i < 32; ++i)
 		values.push_back(i);
 

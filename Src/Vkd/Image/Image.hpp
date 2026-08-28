@@ -44,7 +44,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_IMAGE;
 		VKD_NON_DISPATCHABLE_HANDLE(Image);
 
-		Image();
+		explicit Image(const VkAllocationCallbacks& allocationCallbacks);
 		~Image() override = default;
 
 		virtual VkResult Create(Device& owner, const VkImageCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

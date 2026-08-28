@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline DescriptorSetLayout::DescriptorSetLayout() :
-		ObjectBase(ObjectType),
+	inline DescriptorSetLayout::DescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_flags(0)
 	{
@@ -22,8 +22,6 @@ namespace vkd
 	{
 		m_owner = &owner;
 		m_flags = info.flags;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		if (info.bindingCount > 0 && info.pBindings != nullptr)
 		{

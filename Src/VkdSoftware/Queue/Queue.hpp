@@ -18,7 +18,7 @@ namespace vkd::software
 	class Queue : public vkd::Queue
 	{
 	public:
-		Queue() = default;
+		using vkd::Queue::Queue;
 		~Queue() override = default;
 
 		VkResult Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;

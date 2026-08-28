@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline PipelineLayout::PipelineLayout() :
-		ObjectBase(ObjectType),
+	inline PipelineLayout::PipelineLayout(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_flags(0)
 	{
@@ -28,8 +28,6 @@ namespace vkd
 
 		if (info.pushConstantRangeCount > 0 && info.pPushConstantRanges != nullptr)
 			m_pushConstantRanges.assign(info.pPushConstantRanges, info.pPushConstantRanges + info.pushConstantRangeCount);
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

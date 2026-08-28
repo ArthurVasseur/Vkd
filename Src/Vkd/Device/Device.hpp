@@ -41,7 +41,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_DEVICE;
 		VKD_DISPATCHABLE_HANDLE(Device);
 
-		Device();
+		explicit Device(const VkAllocationCallbacks& allocationCallbacks);
 		~Device() override;
 
 		virtual VkResult Create(PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks);

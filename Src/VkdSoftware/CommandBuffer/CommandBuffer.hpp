@@ -15,7 +15,7 @@ namespace vkd::software
 	class CommandBuffer : public vkd::CommandBuffer
 	{
 	public:
-		CommandBuffer() = default;
+		using vkd::CommandBuffer::CommandBuffer;
 		~CommandBuffer() override = default;
 	};
 } // namespace vkd::software

@@ -13,8 +13,8 @@ namespace vkd
 	// Supported device extensions for the CPU backend
 	std::array<VkExtensionProperties, 0> PhysicalDevice::s_supportedExtensions = {};
 
-	PhysicalDevice::PhysicalDevice() :
-		ObjectBase(ObjectType),
+	PhysicalDevice::PhysicalDevice(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_instance(nullptr),
 		m_physicalDeviceProperties(),
 		m_queueFamilyProperties()
@@ -28,7 +28,6 @@ namespace vkd
 		m_instance = &owner;
 		m_physicalDeviceProperties = physicalDeviceProperties;
 		m_queueFamilyProperties = queueFamilyProperties;
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

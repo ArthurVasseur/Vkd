@@ -73,7 +73,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_BUFFER;
 		VKD_NON_DISPATCHABLE_HANDLE(Buffer);
 
-		Buffer();
+		explicit Buffer(const VkAllocationCallbacks& allocationCallbacks);
 		~Buffer() override = default;
 
 		virtual VkResult Create(Device& owner, const VkBufferCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

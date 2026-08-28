@@ -11,7 +11,8 @@
 
 namespace vkd::software
 {
-	inline DeviceMemory::DeviceMemory() :
+	inline DeviceMemory::DeviceMemory(const VkAllocationCallbacks& allocationCallbacks) :
+		vkd::DeviceMemory(allocationCallbacks),
 		m_allocation{0, 0},
 		m_mapOffset(0)
 	{

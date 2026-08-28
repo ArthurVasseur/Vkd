@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline DescriptorSet::DescriptorSet() :
-		ObjectBase(ObjectType),
+	inline DescriptorSet::DescriptorSet(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_layout(nullptr)
 	{
@@ -22,8 +22,6 @@ namespace vkd
 	{
 		m_owner = &owner;
 		m_layout = &layout;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

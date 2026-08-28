@@ -15,7 +15,7 @@ namespace vkd::software
 	class BufferView : public vkd::BufferView
 	{
 	public:
-		BufferView() = default;
+		using vkd::BufferView::BufferView;
 		~BufferView() override = default;
 
 		VkResult Create(vkd::Device& owner, const VkBufferViewCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;

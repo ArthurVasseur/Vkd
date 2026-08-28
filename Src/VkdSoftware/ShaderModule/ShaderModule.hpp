@@ -13,7 +13,7 @@ namespace vkd::software
 	class ShaderModule : public vkd::ShaderModule
 	{
 	public:
-		ShaderModule() = default;
+		using vkd::ShaderModule::ShaderModule;
 		~ShaderModule() override = default;
 
 		VkResult Create(vkd::Device& owner, const VkShaderModuleCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;

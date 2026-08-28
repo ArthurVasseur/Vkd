@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline Pipeline::Pipeline() :
-		ObjectBase(ObjectType),
+	inline Pipeline::Pipeline(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_bindPoint(VK_PIPELINE_BIND_POINT_MAX_ENUM),
 		m_layout(VK_NULL_HANDLE)
@@ -25,8 +25,6 @@ namespace vkd
 		m_bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		m_layout = info.layout;
 
-		SetAllocationCallbacks(allocationCallbacks);
-
 		m_createResult = VK_SUCCESS;
 		return m_createResult;
 	}
@@ -36,8 +34,6 @@ namespace vkd
 		m_owner = &owner;
 		m_bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 		m_layout = info.layout;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

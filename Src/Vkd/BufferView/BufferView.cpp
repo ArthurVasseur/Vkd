@@ -10,8 +10,8 @@
 
 namespace vkd
 {
-	BufferView::BufferView() :
-		ObjectBase(ObjectType),
+	BufferView::BufferView(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_buffer(VK_NULL_HANDLE),
 		m_format(VK_FORMAT_UNDEFINED),
@@ -27,8 +27,6 @@ namespace vkd
 		m_format = info.format;
 		m_offset = info.offset;
 		m_range = info.range;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

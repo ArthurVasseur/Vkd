@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_BUFFER_VIEW;
 		VKD_NON_DISPATCHABLE_HANDLE(BufferView);
 
-		BufferView();
+		explicit BufferView(const VkAllocationCallbacks& allocationCallbacks);
 		~BufferView() override = default;
 
 		virtual VkResult Create(Device& owner, const VkBufferViewCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

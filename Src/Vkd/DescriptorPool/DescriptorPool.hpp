@@ -29,7 +29,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_DESCRIPTOR_POOL;
 		VKD_NON_DISPATCHABLE_HANDLE(DescriptorPool);
 
-		DescriptorPool();
+		explicit DescriptorPool(const VkAllocationCallbacks& allocationCallbacks);
 		~DescriptorPool() override = default;
 
 		virtual VkResult Create(Device& owner, const VkDescriptorPoolCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

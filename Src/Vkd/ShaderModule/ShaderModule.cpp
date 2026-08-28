@@ -11,7 +11,6 @@ namespace vkd
 	VkResult ShaderModule::Create(Device& owner, const VkShaderModuleCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks)
 	{
 		m_owner = &owner;
-		SetAllocationCallbacks(allocationCallbacks);
 
 		if (info.codeSize == 0 || !info.pCode || (info.codeSize % sizeof(UInt32)) != 0)
 		{

@@ -12,8 +12,8 @@
 
 namespace vkd
 {
-	Instance::Instance() :
-		ObjectBase(ObjectType),
+	Instance::Instance(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_physicalDevicesAlreadyEnumerated(false)
 	{
 	}
@@ -26,7 +26,6 @@ namespace vkd
 
 	VkResult Instance::Create(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		SetAllocationCallbacks(allocationCallbacks);
 		cct::Logger::SetContext(&m_logger);
 
 		m_createResult = VK_SUCCESS;

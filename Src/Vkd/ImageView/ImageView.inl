@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline ImageView::ImageView() :
-		ObjectBase(ObjectType),
+	inline ImageView::ImageView(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_image(VK_NULL_HANDLE),
 		m_viewType(VK_IMAGE_VIEW_TYPE_2D),
@@ -30,8 +30,6 @@ namespace vkd
 		m_format = info.format;
 		m_components = info.components;
 		m_subresourceRange = info.subresourceRange;
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

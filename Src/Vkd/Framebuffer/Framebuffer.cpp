@@ -15,7 +15,6 @@ namespace vkd
 		m_width = info.width;
 		m_height = info.height;
 		m_layers = info.layers;
-		SetAllocationCallbacks(allocationCallbacks);
 
 		if (info.attachmentCount > 0 && info.pAttachments != nullptr)
 		{

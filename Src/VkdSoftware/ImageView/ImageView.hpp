@@ -15,7 +15,7 @@ namespace vkd::software
 	class ImageView : public vkd::ImageView
 	{
 	public:
-		ImageView() = default;
+		using vkd::ImageView::ImageView;
 		~ImageView() override = default;
 
 		VkResult Create(Device& owner, const VkImageViewCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;

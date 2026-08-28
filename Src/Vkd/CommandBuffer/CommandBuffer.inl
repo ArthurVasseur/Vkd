@@ -15,8 +15,8 @@
 
 namespace vkd
 {
-	inline CommandBuffer::CommandBuffer() :
-		ObjectBase(ObjectType),
+	inline CommandBuffer::CommandBuffer(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_level(VK_COMMAND_BUFFER_LEVEL_PRIMARY),
 		m_state(State::Initial)
@@ -27,8 +27,6 @@ namespace vkd
 	{
 		m_owner = &owner;
 		m_level = level;
-
-		SetAllocationCallbacks(m_owner->GetAllocationCallbacks());
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

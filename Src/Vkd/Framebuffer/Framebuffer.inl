@@ -1,7 +1,7 @@
 namespace vkd
 {
-	inline Framebuffer::Framebuffer() :
-		ObjectBase(ObjectType),
+	inline Framebuffer::Framebuffer(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_renderPass(VK_NULL_HANDLE),
 		m_width(0),

@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline RenderPass::RenderPass() :
-		ObjectBase(ObjectType),
+	inline RenderPass::RenderPass(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr)
 	{
 	}
@@ -73,8 +73,6 @@ namespace vkd
 
 		if (info.pDependencies)
 			m_dependencies.assign(info.pDependencies, info.pDependencies + info.dependencyCount);
-
-		SetAllocationCallbacks(allocationCallbacks);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

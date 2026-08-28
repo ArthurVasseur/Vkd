@@ -20,7 +20,7 @@ namespace vkd::software
 	class SoftwareDevice : public Device
 	{
 	public:
-		SoftwareDevice();
+		explicit SoftwareDevice(const VkAllocationCallbacks& allocationCallbacks);
 		~SoftwareDevice() override;
 
 		VkResult Create(vkd::PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks) override;

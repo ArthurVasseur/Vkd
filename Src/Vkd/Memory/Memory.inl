@@ -25,7 +25,10 @@ namespace vkd::mem
 	{
 		T* allocation = Allocate<T>(pAllocator, allocationScope);
 
-		return new (allocation) T;
+		if constexpr (std::is_base_of_v<ObjectBase, T>)
+			return new (allocation) T(pAllocator);
+		else
+			return new (allocation) T;
 	}
 
 	template<typename T, typename... Args>
@@ -33,7 +36,10 @@ namespace vkd::mem
 	{
 		T* allocation = Allocate<T>(pAllocator, allocationScope);
 
-		return new (allocation) T(std::forward<Args>(args)...);
+		if constexpr (std::is_base_of_v<ObjectBase, T>)
+			return new (allocation) T(pAllocator, std::forward<Args>(args)...);
+		else
+			return new (allocation) T(std::forward<Args>(args)...);
 	}
 
 	template<typename T>

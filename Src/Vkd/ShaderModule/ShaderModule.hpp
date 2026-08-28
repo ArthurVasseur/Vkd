@@ -22,7 +22,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_SHADER_MODULE;
 		VKD_NON_DISPATCHABLE_HANDLE(ShaderModule);
 
-		ShaderModule();
+		explicit ShaderModule(const VkAllocationCallbacks& allocationCallbacks);
 		~ShaderModule() override = default;
 
 		virtual VkResult Create(Device& owner, const VkShaderModuleCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

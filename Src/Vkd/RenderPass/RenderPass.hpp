@@ -25,7 +25,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_RENDER_PASS;
 		VKD_NON_DISPATCHABLE_HANDLE(RenderPass);
 
-		RenderPass();
+		explicit RenderPass(const VkAllocationCallbacks& allocationCallbacks);
 		~RenderPass() override = default;
 
 		virtual VkResult Create(Device& owner, const VkRenderPassCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);

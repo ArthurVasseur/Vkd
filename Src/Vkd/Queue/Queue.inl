@@ -11,8 +11,8 @@
 
 namespace vkd
 {
-	inline Queue::Queue() :
-		ObjectBase(ObjectType),
+	inline Queue::Queue(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_queueFamilyIndex(0),
 		m_queueIndex(0),
@@ -26,8 +26,6 @@ namespace vkd
 		m_queueFamilyIndex = queueFamilyIndex;
 		m_queueIndex = queueIndex;
 		m_flags = flags;
-
-		SetAllocationCallbacks(m_owner->GetAllocationCallbacks());
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;

@@ -30,7 +30,7 @@ namespace vkd::software
 	class Pipeline : public vkd::Pipeline
 	{
 	public:
-		Pipeline() = default;
+		using vkd::Pipeline::Pipeline;
 		~Pipeline() override = default;
 
 		VkResult CreateGraphicsPipeline(Device& owner, const VkGraphicsPipelineCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;

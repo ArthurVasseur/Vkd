@@ -43,7 +43,7 @@ namespace vkd
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_DESCRIPTOR_SET;
 		VKD_NON_DISPATCHABLE_HANDLE(DescriptorSet);
 
-		DescriptorSet();
+		explicit DescriptorSet(const VkAllocationCallbacks& allocationCallbacks);
 		~DescriptorSet() override = default;
 
 		virtual VkResult Create(Device& owner, DescriptorSetLayout& layout, const VkAllocationCallbacks& allocationCallbacks);

@@ -33,8 +33,8 @@
 
 namespace vkd
 {
-	Device::Device() :
-		ObjectBase(ObjectType),
+	Device::Device(const VkAllocationCallbacks& allocationCallbacks) :
+		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_queues()
 	{
@@ -56,7 +56,6 @@ namespace vkd
 	VkResult Device::Create(PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks)
 	{
 		m_owner = &owner;
-		SetAllocationCallbacks(allocationCallbacks);
 
 #ifdef VKD_DEBUG_CHECKS
 		m_createResult = VK_SUCCESS; // avoid false positive in AssertValid()
