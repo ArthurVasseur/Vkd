@@ -51,6 +51,7 @@ namespace see::ir
 				case SpvOpConstantTrue:
 				case SpvOpConstantFalse:
 				case SpvOpConstant:
+				case SpvOpConstantComposite:
 					return true;
 				default:
 					return false;
@@ -223,7 +224,7 @@ namespace see::ir
 					auto componentIt = module.m_types.find(operands[0]);
 					if (componentIt == module.m_types.end() || componentIt->second.m_kind != TypeKind::Scalar)
 						break;
-					module.m_types[id] = Type{.m_kind = TypeKind::Vector, .m_scalar = componentIt->second.m_scalar, .m_componentCount = operands[1]};
+					module.m_types[id] = Type{.m_kind = TypeKind::Vector, .m_scalar = componentIt->second.m_scalar, .m_componentCount = operands[1], .m_pointee = operands[0]};
 					break;
 				}
 				case SpvOpTypeMatrix:
@@ -286,6 +287,29 @@ namespace see::ir
 					if (!operands.empty())
 						module.m_constants[instruction.m_resultId] = Constant{.m_type = instruction.m_typeId, .m_bits = operands[0]};
 					break;
+				case SpvOpConstantComposite:
+				{
+					std::vector<cct::UInt32> words;
+					bool resolved = true;
+					for (cct::UInt32 constituent : operands)
+					{
+						auto constituentIt = module.m_constants.find(constituent);
+						if (constituentIt == module.m_constants.end())
+						{
+							resolved = false;
+							break;
+						}
+
+						if (constituentIt->second.m_words.empty())
+							words.push_back(constituentIt->second.m_bits);
+						else
+							words.insert(words.end(), constituentIt->second.m_words.begin(), constituentIt->second.m_words.end());
+					}
+
+					if (resolved)
+						module.m_constants[instruction.m_resultId] = Constant{.m_type = instruction.m_typeId, .m_words = std::move(words)};
+					break;
+				}
 				default:
 					break;
 			}

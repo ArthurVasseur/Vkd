@@ -46,7 +46,7 @@ namespace see::ir
 		TypeKind m_kind = TypeKind::Void;
 		ScalarKind m_scalar = ScalarKind::Float32; // meaningful for Scalar/Vector/Matrix
 		cct::UInt32 m_componentCount = 0; // Vector: component count. Matrix: column count.
-		cct::UInt32 m_pointee = 0; // Pointer: pointee type id. Matrix: column (Vector) type id. SampledImage: image type id. Array: element type id.
+		cct::UInt32 m_pointee = 0; // Pointer: pointee type id. Vector: scalar component type id. Matrix: column (Vector) type id. SampledImage: image type id. Array: element type id.
 		cct::UInt32 m_arrayLength = 0; // Array: element count (0 for OpTypeRuntimeArray, whose length isn't known at compile time).
 		std::vector<cct::UInt32> m_memberTypes; // Struct: member type ids, in declaration order.
 	};
@@ -127,7 +127,8 @@ namespace see::ir
 	struct Constant
 	{
 		cct::UInt32 m_type = 0;
-		cct::UInt32 m_bits = 0; // raw bit pattern, reinterpret via m_type's scalar kind
+		cct::UInt32 m_bits = 0; // scalar constant (OpConstant/True/False): raw bit pattern, reinterpret via m_type's scalar kind. Unused when m_words is non-empty.
+		std::vector<cct::UInt32> m_words; // OpConstantComposite: constituents flattened in order (m_bits of each, recursively for nested composites).
 	};
 
 	struct Decoration

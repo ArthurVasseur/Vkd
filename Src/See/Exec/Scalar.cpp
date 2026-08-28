@@ -199,7 +199,12 @@ namespace see::exec
 			if (!value)
 				return std::nullopt;
 
-			value->m_bits[0] = constantIt->second.m_bits;
+			if (constantIt->second.m_words.empty())
+				value->m_bits[0] = constantIt->second.m_bits;
+			else
+				for (cct::UInt32 i = 0; i < constantIt->second.m_words.size() && i < 16; ++i)
+					value->m_bits[i] = constantIt->second.m_words[i];
+
 			return value;
 		}
 
@@ -343,9 +348,13 @@ namespace see::exec
 					info.m_wordOffset += indexValue * stride;
 					info.m_pointeeType = typeIt->second.m_pointee;
 				}
+				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Vector)
+				{
+					info.m_wordOffset += indexValue;
+					info.m_pointeeType = typeIt->second.m_pointee;
+				}
 				else
 				{
-					// Vector component: one word per index, pointee type unchanged (we don't track scalar element type ids).
 					info.m_wordOffset += indexValue;
 				}
 			}
@@ -637,38 +646,43 @@ namespace see::exec
 			if (!lhs || !rhs)
 				return false;
 
-			bool comparisonResult = false;
 			const bool isInt = lhs->m_scalar == ir::ScalarKind::Int32;
-			const float a = isInt ? static_cast<float>(lhs->GetInt32()) : lhs->GetFloat();
-			const float b = isInt ? static_cast<float>(rhs->GetInt32()) : rhs->GetFloat();
-
-			switch (instruction.m_op)
-			{
-				case ir::Op::CompareEqual:
-					comparisonResult = a == b;
-					break;
-				case ir::Op::CompareNotEqual:
-					comparisonResult = a != b;
-					break;
-				case ir::Op::CompareLess:
-					comparisonResult = a < b;
-					break;
-				case ir::Op::CompareLessEqual:
-					comparisonResult = a <= b;
-					break;
-				case ir::Op::CompareGreater:
-					comparisonResult = a > b;
-					break;
-				case ir::Op::CompareGreaterEqual:
-					comparisonResult = a >= b;
-					break;
-				default:
-					return false;
-			}
 
 			Value result;
 			result.m_scalar = ir::ScalarKind::Bool;
-			result.SetBool(0, comparisonResult);
+			result.m_rows = lhs->m_rows;
+			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
+			{
+				const float a = isInt ? static_cast<float>(lhs->GetInt32(i)) : lhs->GetFloat(i);
+				const float b = isInt ? static_cast<float>(rhs->GetInt32(i)) : rhs->GetFloat(i);
+
+				bool comparisonResult = false;
+				switch (instruction.m_op)
+				{
+					case ir::Op::CompareEqual:
+						comparisonResult = a == b;
+						break;
+					case ir::Op::CompareNotEqual:
+						comparisonResult = a != b;
+						break;
+					case ir::Op::CompareLess:
+						comparisonResult = a < b;
+						break;
+					case ir::Op::CompareLessEqual:
+						comparisonResult = a <= b;
+						break;
+					case ir::Op::CompareGreater:
+						comparisonResult = a > b;
+						break;
+					case ir::Op::CompareGreaterEqual:
+						comparisonResult = a >= b;
+						break;
+					default:
+						return false;
+				}
+				result.SetBool(i, comparisonResult);
+			}
+
 			state.m_ssaValues[instruction.m_id] = result;
 			return true;
 		}
