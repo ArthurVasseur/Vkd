@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstring>
 
+#include <spirv/unified1/GLSL.std.450.h>
 #include <spirv/unified1/spirv.h>
 
 namespace see::exec
@@ -895,6 +896,291 @@ namespace see::exec
 			return true;
 		}
 
+		bool ExecuteGlslStd450(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			std::vector<Value> operands;
+			operands.reserve(instruction.m_args.size() - 1);
+			for (std::size_t i = 1; i < instruction.m_args.size(); ++i)
+			{
+				std::optional<Value> operand = ResolveValue(state, instruction.m_args[i]);
+				if (!operand)
+					return false;
+				operands.push_back(*operand);
+			}
+
+			if (operands.empty())
+				return false;
+
+			const cct::UInt32 componentCount = operands[0].m_rows * operands[0].m_columns;
+			Value result = operands[0];
+
+			const auto floatUnary = [&](auto&& f)
+			{
+				for (cct::UInt32 i = 0; i < componentCount; ++i)
+					result.SetFloat(i, f(operands[0].GetFloat(i)));
+				return true;
+			};
+			const auto floatBinary = [&](auto&& f)
+			{
+				if (operands.size() < 2)
+					return false;
+				for (cct::UInt32 i = 0; i < componentCount; ++i)
+					result.SetFloat(i, f(operands[0].GetFloat(i), operands[1].GetFloat(i)));
+				return true;
+			};
+			const auto floatTernary = [&](auto&& f)
+			{
+				if (operands.size() < 3)
+					return false;
+				for (cct::UInt32 i = 0; i < componentCount; ++i)
+					result.SetFloat(i, f(operands[0].GetFloat(i), operands[1].GetFloat(i), operands[2].GetFloat(i)));
+				return true;
+			};
+			const auto intUnary = [&](auto&& f)
+			{
+				for (cct::UInt32 i = 0; i < componentCount; ++i)
+					result.SetInt32(i, f(operands[0].GetInt32(i)));
+				return true;
+			};
+			const auto intBinary = [&](auto&& f)
+			{
+				if (operands.size() < 2)
+					return false;
+				for (cct::UInt32 i = 0; i < componentCount; ++i)
+					result.SetInt32(i, f(operands[0].GetInt32(i), operands[1].GetInt32(i)));
+				return true;
+			};
+			const auto intTernary = [&](auto&& f)
+			{
+				if (operands.size() < 3)
+					return false;
+				for (cct::UInt32 i = 0; i < componentCount; ++i)
+					result.SetInt32(i, f(operands[0].GetInt32(i), operands[1].GetInt32(i), operands[2].GetInt32(i)));
+				return true;
+			};
+			const auto vectorLength = [](const Value& v)
+			{
+				float sum = 0.0f;
+				for (cct::UInt32 i = 0; i < v.m_rows * v.m_columns; ++i)
+					sum += v.GetFloat(i) * v.GetFloat(i);
+				return std::sqrt(sum);
+			};
+
+			bool ok = true;
+			switch (static_cast<GLSLstd450>(instruction.m_args[0]))
+			{
+				case GLSLstd450Round:
+					ok = floatUnary([](float x)
+									{ return std::round(x); });
+					break;
+				case GLSLstd450RoundEven:
+					ok = floatUnary([](float x)
+									{ return std::nearbyint(x); });
+					break;
+				case GLSLstd450Trunc:
+					ok = floatUnary([](float x)
+									{ return std::trunc(x); });
+					break;
+				case GLSLstd450FAbs:
+					ok = floatUnary([](float x)
+									{ return std::fabs(x); });
+					break;
+				case GLSLstd450SAbs:
+					ok = intUnary([](cct::Int32 x)
+								  { return x < 0 ? -x : x; });
+					break;
+				case GLSLstd450FSign:
+					ok = floatUnary([](float x)
+									{ return x > 0.0f ? 1.0f : (x < 0.0f ? -1.0f : 0.0f); });
+					break;
+				case GLSLstd450SSign:
+					ok = intUnary([](cct::Int32 x)
+								  { return x > 0 ? 1 : (x < 0 ? -1 : 0); });
+					break;
+				case GLSLstd450Floor:
+					ok = floatUnary([](float x)
+									{ return std::floor(x); });
+					break;
+				case GLSLstd450Ceil:
+					ok = floatUnary([](float x)
+									{ return std::ceil(x); });
+					break;
+				case GLSLstd450Fract:
+					ok = floatUnary([](float x)
+									{ return x - std::floor(x); });
+					break;
+				case GLSLstd450Radians:
+					ok = floatUnary([](float x)
+									{ return x * 0.017453292519943295f; });
+					break;
+				case GLSLstd450Degrees:
+					ok = floatUnary([](float x)
+									{ return x * 57.29577951308232f; });
+					break;
+				case GLSLstd450Sin:
+					ok = floatUnary([](float x)
+									{ return std::sin(x); });
+					break;
+				case GLSLstd450Cos:
+					ok = floatUnary([](float x)
+									{ return std::cos(x); });
+					break;
+				case GLSLstd450Tan:
+					ok = floatUnary([](float x)
+									{ return std::tan(x); });
+					break;
+				case GLSLstd450Asin:
+					ok = floatUnary([](float x)
+									{ return std::asin(x); });
+					break;
+				case GLSLstd450Acos:
+					ok = floatUnary([](float x)
+									{ return std::acos(x); });
+					break;
+				case GLSLstd450Atan:
+					ok = floatUnary([](float x)
+									{ return std::atan(x); });
+					break;
+				case GLSLstd450Atan2:
+					ok = floatBinary([](float y, float x)
+									 { return std::atan2(y, x); });
+					break;
+				case GLSLstd450Pow:
+					ok = floatBinary([](float x, float y)
+									 { return std::pow(x, y); });
+					break;
+				case GLSLstd450Exp:
+					ok = floatUnary([](float x)
+									{ return std::exp(x); });
+					break;
+				case GLSLstd450Log:
+					ok = floatUnary([](float x)
+									{ return std::log(x); });
+					break;
+				case GLSLstd450Exp2:
+					ok = floatUnary([](float x)
+									{ return std::exp2(x); });
+					break;
+				case GLSLstd450Log2:
+					ok = floatUnary([](float x)
+									{ return std::log2(x); });
+					break;
+				case GLSLstd450Sqrt:
+					ok = floatUnary([](float x)
+									{ return std::sqrt(x); });
+					break;
+				case GLSLstd450InverseSqrt:
+					ok = floatUnary([](float x)
+									{ return 1.0f / std::sqrt(x); });
+					break;
+				case GLSLstd450FMin:
+					ok = floatBinary([](float x, float y)
+									 { return std::min(x, y); });
+					break;
+				case GLSLstd450FMax:
+					ok = floatBinary([](float x, float y)
+									 { return std::max(x, y); });
+					break;
+				case GLSLstd450FClamp:
+					ok = floatTernary([](float x, float lo, float hi)
+									  { return std::clamp(x, lo, hi); });
+					break;
+				case GLSLstd450SMin:
+					ok = intBinary([](cct::Int32 x, cct::Int32 y)
+								   { return std::min(x, y); });
+					break;
+				case GLSLstd450SMax:
+					ok = intBinary([](cct::Int32 x, cct::Int32 y)
+								   { return std::max(x, y); });
+					break;
+				case GLSLstd450SClamp:
+					ok = intTernary([](cct::Int32 x, cct::Int32 lo, cct::Int32 hi)
+									{ return std::clamp(x, lo, hi); });
+					break;
+				case GLSLstd450UMin:
+					ok = intBinary([](cct::Int32 x, cct::Int32 y)
+								   { return static_cast<cct::Int32>(std::min(static_cast<cct::UInt32>(x), static_cast<cct::UInt32>(y))); });
+					break;
+				case GLSLstd450UMax:
+					ok = intBinary([](cct::Int32 x, cct::Int32 y)
+								   { return static_cast<cct::Int32>(std::max(static_cast<cct::UInt32>(x), static_cast<cct::UInt32>(y))); });
+					break;
+				case GLSLstd450UClamp:
+					ok = intTernary([](cct::Int32 x, cct::Int32 lo, cct::Int32 hi)
+									{ return static_cast<cct::Int32>(std::clamp(static_cast<cct::UInt32>(x), static_cast<cct::UInt32>(lo), static_cast<cct::UInt32>(hi))); });
+					break;
+				case GLSLstd450FMix:
+					ok = floatTernary([](float x, float y, float t)
+									  { return x + t * (y - x); });
+					break;
+				case GLSLstd450Step:
+					ok = floatBinary([](float edge, float x)
+									 { return x < edge ? 0.0f : 1.0f; });
+					break;
+				case GLSLstd450SmoothStep:
+					ok = floatTernary(
+						[](float edge0, float edge1, float x)
+						{
+							const float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+							return t * t * (3.0f - 2.0f * t);
+						});
+					break;
+				case GLSLstd450Fma:
+					ok = floatTernary([](float a, float b, float c)
+									  { return a * b + c; });
+					break;
+				case GLSLstd450Length:
+					result = Value{};
+					result.SetFloat(0, vectorLength(operands[0]));
+					break;
+				case GLSLstd450Distance:
+				{
+					if (operands.size() < 2)
+						return false;
+					float sum = 0.0f;
+					for (cct::UInt32 i = 0; i < componentCount; ++i)
+					{
+						const float d = operands[0].GetFloat(i) - operands[1].GetFloat(i);
+						sum += d * d;
+					}
+					result = Value{};
+					result.SetFloat(0, std::sqrt(sum));
+					break;
+				}
+				case GLSLstd450Cross:
+				{
+					if (operands.size() < 2 || componentCount != 3)
+						return false;
+					const Value& a = operands[0];
+					const Value& b = operands[1];
+					result.SetFloat(0, a.GetFloat(1) * b.GetFloat(2) - a.GetFloat(2) * b.GetFloat(1));
+					result.SetFloat(1, a.GetFloat(2) * b.GetFloat(0) - a.GetFloat(0) * b.GetFloat(2));
+					result.SetFloat(2, a.GetFloat(0) * b.GetFloat(1) - a.GetFloat(1) * b.GetFloat(0));
+					break;
+				}
+				case GLSLstd450Normalize:
+				{
+					const float length = vectorLength(operands[0]);
+					if (length == 0.0f)
+						return false;
+					for (cct::UInt32 i = 0; i < componentCount; ++i)
+						result.SetFloat(i, operands[0].GetFloat(i) / length);
+					break;
+				}
+				default:
+					return false;
+			}
+
+			if (!ok)
+				return false;
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
 		bool ExecuteInstruction(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			switch (instruction.m_op)
@@ -964,6 +1250,8 @@ namespace see::exec
 					return ExecuteImageSample(state, instruction);
 				case ir::Op::FunctionCall:
 					return ExecuteFunctionCall(state, instruction);
+				case ir::Op::GlslStd450:
+					return ExecuteGlslStd450(state, instruction);
 				default:
 					return false;
 			}

@@ -1010,3 +1010,72 @@ TEST_CASE("see::exec::Run - OpFNegate/OpSNegate and int<->float conversions", "[
 	CHECK(result->find(outUToFId)->second.GetFloat() == 4294967296.0f); // 0xFFFFFFFD as unsigned, rounded to float
 	CHECK(result->find(outFToSId)->second.GetInt32() == 2); // truncation toward zero
 }
+
+TEST_CASE("see::exec::Run - GLSL.std.450 FAbs/FClamp/FMix and vector Normalize", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"%glsl = OpExtInstImport \"GLSL.std.450\"\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%float3 = OpTypeVector %float 3\n"
+		"%_ptr_Private_float = OpTypePointer Private %float\n"
+		"%_ptr_Private_float3 = OpTypePointer Private %float3\n"
+		"%x = OpVariable %_ptr_Private_float Private\n"
+		"%v = OpVariable %_ptr_Private_float3 Private\n"
+		"%outAbs = OpVariable %_ptr_Private_float Private\n"
+		"%outClamp = OpVariable %_ptr_Private_float Private\n"
+		"%outMix = OpVariable %_ptr_Private_float Private\n"
+		"%outNorm = OpVariable %_ptr_Private_float3 Private\n"
+		"%zero = OpConstant %float 0\n"
+		"%one = OpConstant %float 1\n"
+		"%ten = OpConstant %float 10\n"
+		"%quarter = OpConstant %float 0.25\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%vx = OpLoad %float %x\n"
+		"%vv = OpLoad %float3 %v\n"
+		"%abs = OpExtInst %float %glsl FAbs %vx\n"
+		"%clamp = OpExtInst %float %glsl FClamp %vx %zero %one\n"
+		"%mix = OpExtInst %float %glsl FMix %zero %ten %quarter\n"
+		"%norm = OpExtInst %float3 %glsl Normalize %vv\n"
+		"OpStore %outAbs %abs\n"
+		"OpStore %outClamp %clamp\n"
+		"OpStore %outMix %mix\n"
+		"OpStore %outNorm %norm\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 xId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 vId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outAbsId = module.m_globalInstructions[2].m_id;
+	const cct::UInt32 outClampId = module.m_globalInstructions[3].m_id;
+	const cct::UInt32 outMixId = module.m_globalInstructions[4].m_id;
+	const cct::UInt32 outNormId = module.m_globalInstructions[5].m_id;
+
+	see::exec::Value x;
+	x.SetFloat(0, -2.5f);
+
+	see::exec::Value v;
+	v.m_rows = 3;
+	v.SetFloat(0, 3.0f);
+	v.SetFloat(1, 0.0f);
+	v.SetFloat(2, 4.0f);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{xId, x}, {vId, v}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	CHECK(result->find(outAbsId)->second.GetFloat() == 2.5f);
+	CHECK(result->find(outClampId)->second.GetFloat() == 0.0f);
+	CHECK(result->find(outMixId)->second.GetFloat() == 2.5f);
+	const see::exec::Value& norm = result->find(outNormId)->second;
+	CHECK(norm.GetFloat(0) == 0.6f);
+	CHECK(norm.GetFloat(1) == 0.0f);
+	CHECK(norm.GetFloat(2) == 0.8f);
+}

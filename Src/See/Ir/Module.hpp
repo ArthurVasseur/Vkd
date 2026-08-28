@@ -95,7 +95,8 @@ namespace see::ir
 		Any,
 		Select,
 		ImageSample,
-		FunctionCall
+		FunctionCall,
+		GlslStd450 // OpExtInst from a "GLSL.std.450" import; m_args = [extended instruction number, operands...]
 	};
 
 	struct Instruction

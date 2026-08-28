@@ -6,6 +6,9 @@
 
 #include "See/Ir/Module.hpp"
 
+#include <string>
+#include <unordered_set>
+
 #include "See/Spirv/Module.hpp"
 #include <spirv/unified1/spirv.h>
 
@@ -334,7 +337,21 @@ namespace see::ir
 			}
 		}
 
-		Instruction ConvertInstruction(const spirv::Instruction& instruction)
+		std::string DecodeLiteralString(const std::vector<cct::UInt32>& words)
+		{
+			std::string result;
+			for (cct::UInt32 word : words)
+				for (cct::UInt32 byteIndex = 0; byteIndex < 4; ++byteIndex)
+				{
+					const char c = static_cast<char>((word >> (byteIndex * 8)) & 0xFF);
+					if (c == '\0')
+						return result;
+					result.push_back(c);
+				}
+			return result;
+		}
+
+		Instruction ConvertInstruction(const spirv::Instruction& instruction, const std::unordered_set<cct::UInt32>& glslStd450Imports)
 		{
 			Instruction result;
 			result.m_id = instruction.m_resultId;
@@ -342,6 +359,16 @@ namespace see::ir
 			result.m_spirvOpcode = instruction.m_opcode;
 			result.m_op = ToOp(static_cast<SpvOp>(instruction.m_opcode));
 			result.m_args = RealOperands(instruction);
+
+			if (static_cast<SpvOp>(instruction.m_opcode) == SpvOpExtInst && !result.m_args.empty())
+			{
+				if (glslStd450Imports.contains(result.m_args[0]))
+				{
+					result.m_op = Op::GlslStd450;
+					result.m_args.erase(result.m_args.begin());
+				}
+			}
+
 			return result;
 		}
 	} // namespace
@@ -367,15 +394,21 @@ namespace see::ir
 					MemberDecoration{.m_member = spirvDecoration.m_member, .m_kind = spirvDecoration.m_kind, .m_literals = spirvDecoration.m_literals});
 		}
 
+		std::unordered_set<cct::UInt32> glslStd450Imports;
 		for (const spirv::Instruction& instruction : spirvModule.m_globalInstructions)
 		{
 			const SpvOp opcode = static_cast<SpvOp>(instruction.m_opcode);
-			if (IsTypeOpcode(opcode))
+			if (opcode == SpvOpExtInstImport)
+			{
+				if (DecodeLiteralString(RealOperands(instruction)) == "GLSL.std.450")
+					glslStd450Imports.insert(instruction.m_resultId);
+			}
+			else if (IsTypeOpcode(opcode))
 				ConvertType(module, instruction, opcode);
 			else if (IsConstantOpcode(opcode))
 				ConvertConstant(module, instruction, opcode);
 			else if (!IsIgnorableOpcode(opcode))
-				module.m_globalInstructions.push_back(ConvertInstruction(instruction));
+				module.m_globalInstructions.push_back(ConvertInstruction(instruction, glslStd450Imports));
 		}
 
 		module.m_functions.reserve(spirvModule.m_functions.size());
@@ -397,7 +430,7 @@ namespace see::ir
 				block.m_instructions.reserve(spirvBlock.m_instructions.size());
 				for (const spirv::Instruction& instruction : spirvBlock.m_instructions)
 					if (!IsIgnorableOpcode(static_cast<SpvOp>(instruction.m_opcode)))
-						block.m_instructions.push_back(ConvertInstruction(instruction));
+						block.m_instructions.push_back(ConvertInstruction(instruction, glslStd450Imports));
 
 				function.m_blocks.push_back(std::move(block));
 			}
