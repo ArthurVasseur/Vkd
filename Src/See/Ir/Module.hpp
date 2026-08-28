@@ -71,6 +71,11 @@ namespace see::ir
 		Rem, // OpFRem/OpSRem: sign follows the dividend
 		Mod, // OpFMod/OpSMod: sign follows the divisor
 		UnsignedMod,
+		Negate, // OpFNegate/OpSNegate, dispatched on the operand's scalar kind
+		ConvertSignedToFloat,
+		ConvertUnsignedToFloat,
+		ConvertFloatToSigned,
+		ConvertFloatToUnsigned,
 		Dot,
 		MatrixTimesVector,
 		VectorTimesMatrix,

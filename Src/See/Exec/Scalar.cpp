@@ -553,6 +553,64 @@ namespace see::exec
 			return true;
 		}
 
+		bool ExecuteNegate(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			if (!operand)
+				return false;
+
+			Value result = *operand;
+			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+			{
+				if (result.m_scalar == ir::ScalarKind::Int32)
+					result.SetInt32(i, -operand->GetInt32(i));
+				else
+					result.SetFloat(i, -operand->GetFloat(i));
+			}
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
+		bool ExecuteConvert(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			if (!operand)
+				return false;
+
+			Value result = *operand;
+			result.m_scalar = (instruction.m_op == ir::Op::ConvertSignedToFloat || instruction.m_op == ir::Op::ConvertUnsignedToFloat) ? ir::ScalarKind::Float32 : ir::ScalarKind::Int32;
+			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+			{
+				switch (instruction.m_op)
+				{
+					case ir::Op::ConvertSignedToFloat:
+						result.SetFloat(i, static_cast<float>(operand->GetInt32(i)));
+						break;
+					case ir::Op::ConvertUnsignedToFloat:
+						result.SetFloat(i, static_cast<float>(static_cast<cct::UInt32>(operand->GetInt32(i))));
+						break;
+					case ir::Op::ConvertFloatToSigned:
+						result.SetInt32(i, static_cast<cct::Int32>(operand->GetFloat(i)));
+						break;
+					case ir::Op::ConvertFloatToUnsigned:
+						result.SetInt32(i, static_cast<cct::Int32>(static_cast<cct::UInt32>(operand->GetFloat(i))));
+						break;
+					default:
+						return false;
+				}
+			}
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
 		bool ExecuteDot(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			if (instruction.m_args.size() < 2)
@@ -868,6 +926,13 @@ namespace see::exec
 				case ir::Op::Mod:
 				case ir::Op::UnsignedMod:
 					return ExecuteArithmetic(state, instruction);
+				case ir::Op::Negate:
+					return ExecuteNegate(state, instruction);
+				case ir::Op::ConvertSignedToFloat:
+				case ir::Op::ConvertUnsignedToFloat:
+				case ir::Op::ConvertFloatToSigned:
+				case ir::Op::ConvertFloatToUnsigned:
+					return ExecuteConvert(state, instruction);
 				case ir::Op::Dot:
 					return ExecuteDot(state, instruction);
 				case ir::Op::MatrixTimesVector:

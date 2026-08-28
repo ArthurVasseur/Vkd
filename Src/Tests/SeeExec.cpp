@@ -945,3 +945,68 @@ TEST_CASE("see::exec::Run - OpSRem/OpSMod/OpUMod integer remainder semantics", "
 	CHECK(result->find(outModId)->second.GetInt32() == 2); // sign of the divisor
 	CHECK(result->find(outUModId)->second.GetInt32() == 4);
 }
+
+TEST_CASE("see::exec::Run - OpFNegate/OpSNegate and int<->float conversions", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%int = OpTypeInt 32 1\n"
+		"%uint = OpTypeInt 32 0\n"
+		"%_ptr_Private_float = OpTypePointer Private %float\n"
+		"%_ptr_Private_int = OpTypePointer Private %int\n"
+		"%_ptr_Private_uint = OpTypePointer Private %uint\n"
+		"%f = OpVariable %_ptr_Private_float Private\n"
+		"%i = OpVariable %_ptr_Private_int Private\n"
+		"%outNegF = OpVariable %_ptr_Private_float Private\n"
+		"%outNegI = OpVariable %_ptr_Private_int Private\n"
+		"%outSToF = OpVariable %_ptr_Private_float Private\n"
+		"%outUToF = OpVariable %_ptr_Private_float Private\n"
+		"%outFToS = OpVariable %_ptr_Private_int Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%vf = OpLoad %float %f\n"
+		"%vi = OpLoad %int %i\n"
+		"%negf = OpFNegate %float %vf\n"
+		"%negi = OpSNegate %int %vi\n"
+		"%stof = OpConvertSToF %float %vi\n"
+		"%utof = OpConvertUToF %float %vi\n"
+		"%ftos = OpConvertFToS %int %vf\n"
+		"OpStore %outNegF %negf\n"
+		"OpStore %outNegI %negi\n"
+		"OpStore %outSToF %stof\n"
+		"OpStore %outUToF %utof\n"
+		"OpStore %outFToS %ftos\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 fId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 iId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outNegFId = module.m_globalInstructions[2].m_id;
+	const cct::UInt32 outNegIId = module.m_globalInstructions[3].m_id;
+	const cct::UInt32 outSToFId = module.m_globalInstructions[4].m_id;
+	const cct::UInt32 outUToFId = module.m_globalInstructions[5].m_id;
+	const cct::UInt32 outFToSId = module.m_globalInstructions[6].m_id;
+
+	see::exec::Value f;
+	f.SetFloat(0, 2.75f);
+	see::exec::Value i;
+	i.m_scalar = see::ir::ScalarKind::Int32;
+	i.SetInt32(0, -3);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{fId, f}, {iId, i}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	CHECK(result->find(outNegFId)->second.GetFloat() == -2.75f);
+	CHECK(result->find(outNegIId)->second.GetInt32() == 3);
+	CHECK(result->find(outSToFId)->second.GetFloat() == -3.0f);
+	CHECK(result->find(outUToFId)->second.GetFloat() == 4294967296.0f); // 0xFFFFFFFD as unsigned, rounded to float
+	CHECK(result->find(outFToSId)->second.GetInt32() == 2); // truncation toward zero
+}

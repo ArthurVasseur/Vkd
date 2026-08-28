@@ -131,6 +131,17 @@ namespace see::ir
 					return Op::Mod;
 				case SpvOpUMod:
 					return Op::UnsignedMod;
+				case SpvOpFNegate:
+				case SpvOpSNegate:
+					return Op::Negate;
+				case SpvOpConvertSToF:
+					return Op::ConvertSignedToFloat;
+				case SpvOpConvertUToF:
+					return Op::ConvertUnsignedToFloat;
+				case SpvOpConvertFToS:
+					return Op::ConvertFloatToSigned;
+				case SpvOpConvertFToU:
+					return Op::ConvertFloatToUnsigned;
 				case SpvOpDot:
 					return Op::Dot;
 				case SpvOpMatrixTimesVector:
