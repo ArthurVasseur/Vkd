@@ -284,6 +284,58 @@ TEST_CASE("see::exec::Run - matrix times vector", "[see][exec]")
 	CHECK(out.GetFloat(3) == 8.0f);
 }
 
+TEST_CASE("see::exec::Run - OpTypeArray indexed dynamically via OpAccessChain", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%int = OpTypeInt 32 1\n"
+		"%uint = OpTypeInt 32 0\n"
+		"%uint_4 = OpConstant %uint 4\n"
+		"%arr4float = OpTypeArray %float %uint_4\n"
+		"%_ptr_Private_arr4float = OpTypePointer Private %arr4float\n"
+		"%_ptr_Private_float = OpTypePointer Private %float\n"
+		"%_ptr_Private_int = OpTypePointer Private %int\n"
+		"%arr = OpVariable %_ptr_Private_arr4float Private\n"
+		"%idx = OpVariable %_ptr_Private_int Private\n"
+		"%out = OpVariable %_ptr_Private_float Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%i = OpLoad %int %idx\n"
+		"%p = OpAccessChain %_ptr_Private_float %arr %i\n"
+		"%v = OpLoad %float %p\n"
+		"OpStore %out %v\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 arrId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 idxId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[2].m_id;
+
+	see::exec::Value arr;
+	arr.m_rows = 4;
+	arr.SetFloat(0, 10.0f);
+	arr.SetFloat(1, 20.0f);
+	arr.SetFloat(2, 30.0f);
+	arr.SetFloat(3, 40.0f);
+
+	see::exec::Value idx;
+	idx.m_scalar = see::ir::ScalarKind::Int32;
+	idx.SetInt32(0, 2);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{arrId, arr}, {idxId, idx}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	CHECK(result->find(outId)->second.GetFloat() == 30.0f);
+}
+
 TEST_CASE("see::exec::Run - struct-typed function locals (OpCopyMemory, member AccessChain, whole-struct Load/Extract)", "[see][exec]")
 {
 	// Mirrors the pattern real shader compilers emit for struct-typed entry-point I/O:

@@ -34,6 +34,8 @@ namespace see::ir
 				case SpvOpTypeMatrix:
 				case SpvOpTypePointer:
 				case SpvOpTypeStruct:
+				case SpvOpTypeArray:
+				case SpvOpTypeRuntimeArray:
 				case SpvOpTypeImage:
 				case SpvOpTypeSampledImage:
 					return true;
@@ -226,6 +228,22 @@ namespace see::ir
 					break;
 				case SpvOpTypeStruct:
 					module.m_types[id] = Type{.m_kind = TypeKind::Struct, .m_memberTypes = operands};
+					break;
+				case SpvOpTypeArray:
+				{
+					if (operands.size() < 2)
+						break;
+					if (module.m_types.find(operands[0]) == module.m_types.end())
+						break;
+					auto lengthIt = module.m_constants.find(operands[1]);
+					if (lengthIt == module.m_constants.end())
+						break;
+					module.m_types[id] = Type{.m_kind = TypeKind::Array, .m_pointee = operands[0], .m_arrayLength = lengthIt->second.m_bits};
+					break;
+				}
+				case SpvOpTypeRuntimeArray:
+					if (!operands.empty() && module.m_types.find(operands[0]) != module.m_types.end())
+						module.m_types[id] = Type{.m_kind = TypeKind::Array, .m_pointee = operands[0], .m_arrayLength = 0};
 					break;
 				case SpvOpTypeImage:
 					module.m_types[id] = Type{.m_kind = TypeKind::Image};

@@ -121,6 +121,18 @@ namespace see::exec
 			return layout;
 		}
 
+		// Word stride of one array element: the ArrayStride decoration on the array type if the SPIR-V
+		// carries one (required for std140/std430-backed arrays), otherwise the element's own natural size.
+		cct::UInt32 GetArrayStride(const ir::Module& module, cct::UInt32 arrayTypeId, cct::UInt32 naturalElementWordCount)
+		{
+			if (auto it = module.m_decorations.find(arrayTypeId); it != module.m_decorations.end())
+				for (const ir::Decoration& decoration : it->second)
+					if (decoration.m_kind == SpvDecorationArrayStride && !decoration.m_literals.empty())
+						return decoration.m_literals[0] / 4; // byte stride -> word stride
+
+			return naturalElementWordCount;
+		}
+
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId)
 		{
 			auto typeIt = module.m_types.find(typeId);
@@ -155,6 +167,22 @@ namespace see::exec
 					if (totalWords > 16)
 						return std::nullopt;
 					return Value{.m_rows = totalWords, .m_structType = typeId};
+				}
+				case ir::TypeKind::Array:
+				{
+					if (type.m_arrayLength == 0)
+						return std::nullopt; // runtime array: unbounded, addressed member-by-member via an external buffer
+
+					std::optional<Value> elementShape = MakeZeroValue(module, type.m_pointee);
+					if (!elementShape)
+						return std::nullopt;
+
+					const cct::UInt32 stride = GetArrayStride(module, typeId, elementShape->m_rows * elementShape->m_columns);
+					const cct::UInt32 totalWords = stride * type.m_arrayLength;
+					if (totalWords > 16)
+						return std::nullopt;
+
+					return Value{.m_rows = totalWords};
 				}
 				default:
 					return std::nullopt;
@@ -290,9 +318,9 @@ namespace see::exec
 				return false;
 
 			PointerInfo info = basePointerIt->second;
-			if (instruction.m_args.size() >= 2)
+			for (std::size_t argIndex = 1; argIndex < instruction.m_args.size(); ++argIndex)
 			{
-				std::optional<Value> index = ResolveValue(state, instruction.m_args[1]);
+				std::optional<Value> index = ResolveValue(state, instruction.m_args[argIndex]);
 				if (!index)
 					return false;
 				const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
@@ -305,6 +333,15 @@ namespace see::exec
 						return false;
 					info.m_wordOffset += (*layout)[indexValue].m_offset;
 					info.m_pointeeType = typeIt->second.m_memberTypes[indexValue];
+				}
+				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Array)
+				{
+					std::optional<Value> elementShape = MakeZeroValue(state.m_module, typeIt->second.m_pointee);
+					if (!elementShape)
+						return false;
+					const cct::UInt32 stride = GetArrayStride(state.m_module, info.m_pointeeType, elementShape->m_rows * elementShape->m_columns);
+					info.m_wordOffset += indexValue * stride;
+					info.m_pointeeType = typeIt->second.m_pointee;
 				}
 				else
 				{
