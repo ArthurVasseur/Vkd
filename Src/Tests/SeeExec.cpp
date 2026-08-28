@@ -1079,3 +1079,60 @@ TEST_CASE("see::exec::Run - GLSL.std.450 FAbs/FClamp/FMix and vector Normalize",
 	CHECK(norm.GetFloat(1) == 0.0f);
 	CHECK(norm.GetFloat(2) == 0.8f);
 }
+
+TEST_CASE("see::exec::Run - OpVectorTimesScalar and OpFUnordNotEqual", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%float3 = OpTypeVector %float 3\n"
+		"%bool = OpTypeBool\n"
+		"%_ptr_Private_float3 = OpTypePointer Private %float3\n"
+		"%_ptr_Private_float = OpTypePointer Private %float\n"
+		"%_ptr_Private_bool = OpTypePointer Private %bool\n"
+		"%v = OpVariable %_ptr_Private_float3 Private\n"
+		"%s = OpVariable %_ptr_Private_float Private\n"
+		"%outScaled = OpVariable %_ptr_Private_float3 Private\n"
+		"%outCompare = OpVariable %_ptr_Private_bool Private\n"
+		"%two = OpConstant %float 2\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%vv = OpLoad %float3 %v\n"
+		"%vs = OpLoad %float %s\n"
+		"%scaled = OpVectorTimesScalar %float3 %vv %vs\n"
+		"%cmp = OpFUnordNotEqual %bool %vs %two\n"
+		"OpStore %outScaled %scaled\n"
+		"OpStore %outCompare %cmp\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 vId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 sId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outScaledId = module.m_globalInstructions[2].m_id;
+	const cct::UInt32 outCompareId = module.m_globalInstructions[3].m_id;
+
+	see::exec::Value v;
+	v.m_rows = 3;
+	v.SetFloat(0, 1.0f);
+	v.SetFloat(1, -2.0f);
+	v.SetFloat(2, 0.5f);
+
+	see::exec::Value s;
+	s.SetFloat(0, 3.0f);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{vId, v}, {sId, s}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	const see::exec::Value& scaled = result->find(outScaledId)->second;
+	CHECK(scaled.GetFloat(0) == 3.0f);
+	CHECK(scaled.GetFloat(1) == -6.0f);
+	CHECK(scaled.GetFloat(2) == 1.5f);
+	CHECK(result->find(outCompareId)->second.GetBool()); // 3.0 != 2.0
+}

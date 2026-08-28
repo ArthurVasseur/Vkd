@@ -153,25 +153,34 @@ namespace see::ir
 					return Op::VectorTimesMatrix;
 				case SpvOpMatrixTimesMatrix:
 					return Op::MatrixTimesMatrix;
+				case SpvOpVectorTimesScalar:
+				case SpvOpMatrixTimesScalar:
+					return Op::VectorTimesScalar;
 				case SpvOpFOrdEqual:
+				case SpvOpFUnordEqual:
 				case SpvOpIEqual:
 					return Op::CompareEqual;
 				case SpvOpFOrdNotEqual:
+				case SpvOpFUnordNotEqual:
 				case SpvOpINotEqual:
 					return Op::CompareNotEqual;
 				case SpvOpFOrdLessThan:
+				case SpvOpFUnordLessThan:
 				case SpvOpSLessThan:
 				case SpvOpULessThan:
 					return Op::CompareLess;
 				case SpvOpFOrdLessThanEqual:
+				case SpvOpFUnordLessThanEqual:
 				case SpvOpSLessThanEqual:
 				case SpvOpULessThanEqual:
 					return Op::CompareLessEqual;
 				case SpvOpFOrdGreaterThan:
+				case SpvOpFUnordGreaterThan:
 				case SpvOpSGreaterThan:
 				case SpvOpUGreaterThan:
 					return Op::CompareGreater;
 				case SpvOpFOrdGreaterThanEqual:
+				case SpvOpFUnordGreaterThanEqual:
 				case SpvOpSGreaterThanEqual:
 				case SpvOpUGreaterThanEqual:
 					return Op::CompareGreaterEqual;

@@ -711,6 +711,25 @@ namespace see::exec
 			return true;
 		}
 
+		bool ExecuteVectorTimesScalar(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.size() < 2)
+				return false;
+
+			std::optional<Value> composite = ResolveValue(state, instruction.m_args[0]);
+			std::optional<Value> scalar = ResolveValue(state, instruction.m_args[1]);
+			if (!composite || !scalar)
+				return false;
+
+			Value result = *composite;
+			const float factor = scalar->GetFloat(0);
+			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+				result.SetFloat(i, composite->GetFloat(i) * factor);
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
 		bool ExecuteCompare(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			if (instruction.m_args.size() < 2)
@@ -1227,6 +1246,8 @@ namespace see::exec
 					return ExecuteVectorTimesMatrix(state, instruction);
 				case ir::Op::MatrixTimesMatrix:
 					return ExecuteMatrixTimesMatrix(state, instruction);
+				case ir::Op::VectorTimesScalar:
+					return ExecuteVectorTimesScalar(state, instruction);
 				case ir::Op::CompareEqual:
 				case ir::Op::CompareNotEqual:
 				case ir::Op::CompareLess:

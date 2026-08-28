@@ -80,6 +80,7 @@ namespace see::ir
 		MatrixTimesVector,
 		VectorTimesMatrix,
 		MatrixTimesMatrix,
+		VectorTimesScalar, // also OpMatrixTimesScalar: every component scaled by one scalar
 		CompareEqual,
 		CompareNotEqual,
 		CompareLess,
