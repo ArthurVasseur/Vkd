@@ -7,6 +7,7 @@
 #include "See/Exec/Scalar.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include <spirv/unified1/spirv.h>
@@ -502,6 +503,15 @@ namespace see::exec
 						case ir::Op::Div:
 							r = b != 0 ? a / b : 0;
 							break;
+						case ir::Op::Rem:
+							r = b != 0 ? a % b : 0;
+							break;
+						case ir::Op::Mod:
+							r = b != 0 ? ((a % b) + b) % b : 0;
+							break;
+						case ir::Op::UnsignedMod:
+							r = b != 0 ? static_cast<cct::Int32>(static_cast<cct::UInt32>(a) % static_cast<cct::UInt32>(b)) : 0;
+							break;
 						default:
 							return false;
 					}
@@ -525,6 +535,12 @@ namespace see::exec
 							break;
 						case ir::Op::Div:
 							r = b != 0.0f ? a / b : 0.0f;
+							break;
+						case ir::Op::Rem:
+							r = b != 0.0f ? std::fmod(a, b) : 0.0f;
+							break;
+						case ir::Op::Mod:
+							r = b != 0.0f ? a - b * std::floor(a / b) : 0.0f;
 							break;
 						default:
 							return false;
@@ -848,6 +864,9 @@ namespace see::exec
 				case ir::Op::Sub:
 				case ir::Op::Mul:
 				case ir::Op::Div:
+				case ir::Op::Rem:
+				case ir::Op::Mod:
+				case ir::Op::UnsignedMod:
 					return ExecuteArithmetic(state, instruction);
 				case ir::Op::Dot:
 					return ExecuteDot(state, instruction);

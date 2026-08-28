@@ -68,6 +68,9 @@ namespace see::ir
 		Sub,
 		Mul,
 		Div,
+		Rem, // OpFRem/OpSRem: sign follows the dividend
+		Mod, // OpFMod/OpSMod: sign follows the divisor
+		UnsignedMod,
 		Dot,
 		MatrixTimesVector,
 		VectorTimesMatrix,

@@ -123,6 +123,14 @@ namespace see::ir
 				case SpvOpSDiv:
 				case SpvOpUDiv:
 					return Op::Div;
+				case SpvOpFRem:
+				case SpvOpSRem:
+					return Op::Rem;
+				case SpvOpFMod:
+				case SpvOpSMod:
+					return Op::Mod;
+				case SpvOpUMod:
+					return Op::UnsignedMod;
 				case SpvOpDot:
 					return Op::Dot;
 				case SpvOpMatrixTimesVector:

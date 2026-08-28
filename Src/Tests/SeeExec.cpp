@@ -832,3 +832,116 @@ TEST_CASE("see::exec::Run - OpAccessChain on a vector narrows to the scalar comp
 	CHECK(out.GetBool(1)); // v.x
 	CHECK(out.GetBool(2)); // v.y
 }
+
+TEST_CASE("see::exec::Run - OpFRem/OpFMod sign conventions on negative operands", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%_ptr_Private_float = OpTypePointer Private %float\n"
+		"%a = OpVariable %_ptr_Private_float Private\n"
+		"%b = OpVariable %_ptr_Private_float Private\n"
+		"%outRem = OpVariable %_ptr_Private_float Private\n"
+		"%outMod = OpVariable %_ptr_Private_float Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%va = OpLoad %float %a\n"
+		"%vb = OpLoad %float %b\n"
+		"%rem = OpFRem %float %va %vb\n"
+		"%mod = OpFMod %float %va %vb\n"
+		"OpStore %outRem %rem\n"
+		"OpStore %outMod %mod\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outRemId = module.m_globalInstructions[2].m_id;
+	const cct::UInt32 outModId = module.m_globalInstructions[3].m_id;
+
+	see::exec::Value a;
+	a.SetFloat(0, -5.5f);
+	see::exec::Value b;
+	b.SetFloat(0, 2.0f);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, a}, {bId, b}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	CHECK(result->find(outRemId)->second.GetFloat() == -1.5f); // sign of the dividend
+	CHECK(result->find(outModId)->second.GetFloat() == 0.5f); // sign of the divisor
+}
+
+TEST_CASE("see::exec::Run - OpSRem/OpSMod/OpUMod integer remainder semantics", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%int = OpTypeInt 32 1\n"
+		"%uint = OpTypeInt 32 0\n"
+		"%_ptr_Private_int = OpTypePointer Private %int\n"
+		"%_ptr_Private_uint = OpTypePointer Private %uint\n"
+		"%a = OpVariable %_ptr_Private_int Private\n"
+		"%b = OpVariable %_ptr_Private_int Private\n"
+		"%ua = OpVariable %_ptr_Private_uint Private\n"
+		"%ub = OpVariable %_ptr_Private_uint Private\n"
+		"%outRem = OpVariable %_ptr_Private_int Private\n"
+		"%outMod = OpVariable %_ptr_Private_int Private\n"
+		"%outUMod = OpVariable %_ptr_Private_uint Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%va = OpLoad %int %a\n"
+		"%vb = OpLoad %int %b\n"
+		"%vua = OpLoad %uint %ua\n"
+		"%vub = OpLoad %uint %ub\n"
+		"%rem = OpSRem %int %va %vb\n"
+		"%mod = OpSMod %int %va %vb\n"
+		"%umod = OpUMod %uint %vua %vub\n"
+		"OpStore %outRem %rem\n"
+		"OpStore %outMod %mod\n"
+		"OpStore %outUMod %umod\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 uaId = module.m_globalInstructions[2].m_id;
+	const cct::UInt32 ubId = module.m_globalInstructions[3].m_id;
+	const cct::UInt32 outRemId = module.m_globalInstructions[4].m_id;
+	const cct::UInt32 outModId = module.m_globalInstructions[5].m_id;
+	const cct::UInt32 outUModId = module.m_globalInstructions[6].m_id;
+
+	see::exec::Value a;
+	a.m_scalar = see::ir::ScalarKind::Int32;
+	a.SetInt32(0, -7);
+	see::exec::Value b;
+	b.m_scalar = see::ir::ScalarKind::Int32;
+	b.SetInt32(0, 3);
+
+	// 0xFFFFFFFE % 5 as unsigned is 4294967294 % 5 = 4; a signed interpretation (-2 % 5) would give -2 or 3.
+	see::exec::Value ua;
+	ua.m_scalar = see::ir::ScalarKind::Int32;
+	ua.SetInt32(0, static_cast<cct::Int32>(0xFFFFFFFEu));
+	see::exec::Value ub;
+	ub.m_scalar = see::ir::ScalarKind::Int32;
+	ub.SetInt32(0, 5);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, a}, {bId, b}, {uaId, ua}, {ubId, ub}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	CHECK(result->find(outRemId)->second.GetInt32() == -1); // sign of the dividend
+	CHECK(result->find(outModId)->second.GetInt32() == 2); // sign of the divisor
+	CHECK(result->find(outUModId)->second.GetInt32() == 4);
+}
