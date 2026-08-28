@@ -78,6 +78,13 @@ namespace see::ir
 		CompareLessEqual,
 		CompareGreater,
 		CompareGreaterEqual,
+		LogicalAnd,
+		LogicalOr,
+		LogicalNot,
+		LogicalEqual,
+		LogicalNotEqual,
+		All,
+		Any,
 		Select,
 		ImageSample,
 		FunctionCall

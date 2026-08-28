@@ -152,6 +152,20 @@ namespace see::ir
 				case SpvOpSGreaterThanEqual:
 				case SpvOpUGreaterThanEqual:
 					return Op::CompareGreaterEqual;
+				case SpvOpLogicalEqual:
+					return Op::LogicalEqual;
+				case SpvOpLogicalNotEqual:
+					return Op::LogicalNotEqual;
+				case SpvOpLogicalAnd:
+					return Op::LogicalAnd;
+				case SpvOpLogicalOr:
+					return Op::LogicalOr;
+				case SpvOpLogicalNot:
+					return Op::LogicalNot;
+				case SpvOpAll:
+					return Op::All;
+				case SpvOpAny:
+					return Op::Any;
 				case SpvOpSelect:
 					return Op::Select;
 				case SpvOpImageSampleImplicitLod:

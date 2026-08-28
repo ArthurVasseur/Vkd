@@ -570,3 +570,115 @@ TEST_CASE("see::exec::Run - nearest-neighbor image sampling through an external 
 	CHECK(color.GetFloat(2) == 0.0f);
 	CHECK(color.GetFloat(3) == 1.0f);
 }
+
+TEST_CASE("see::exec::Run - OpLogicalEqual on a bool3 reduced by OpAll", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%bool = OpTypeBool\n"
+		"%v3bool = OpTypeVector %bool 3\n"
+		"%_ptr_Private_v3bool = OpTypePointer Private %v3bool\n"
+		"%_ptr_Private_bool = OpTypePointer Private %bool\n"
+		"%lhs = OpVariable %_ptr_Private_v3bool Private\n"
+		"%rhs = OpVariable %_ptr_Private_v3bool Private\n"
+		"%out = OpVariable %_ptr_Private_bool Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%a = OpLoad %v3bool %lhs\n"
+		"%b = OpLoad %v3bool %rhs\n"
+		"%eq = OpLogicalEqual %v3bool %a %b\n"
+		"%allEq = OpAll %bool %eq\n"
+		"OpStore %out %allEq\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 lhsId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 rhsId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[2].m_id;
+
+	auto makeBool3 = [](bool x, bool y, bool z)
+	{
+		see::exec::Value value;
+		value.m_scalar = see::ir::ScalarKind::Bool;
+		value.m_rows = 3;
+		value.SetBool(0, x);
+		value.SetBool(1, y);
+		value.SetBool(2, z);
+		return value;
+	};
+
+	SECTION("all components equal")
+	{
+		std::unordered_map<cct::UInt32, see::exec::Value> inputs{{lhsId, makeBool3(true, false, true)}, {rhsId, makeBool3(true, false, true)}};
+		std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+		REQUIRE(result.has_value());
+		CHECK(result->find(outId)->second.GetBool());
+	}
+
+	SECTION("one component differs")
+	{
+		std::unordered_map<cct::UInt32, see::exec::Value> inputs{{lhsId, makeBool3(true, false, true)}, {rhsId, makeBool3(true, true, true)}};
+		std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+		REQUIRE(result.has_value());
+		CHECK_FALSE(result->find(outId)->second.GetBool());
+	}
+}
+
+TEST_CASE("see::exec::Run - OpLogicalAnd/OpLogicalOr/OpLogicalNot on scalar bools", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%bool = OpTypeBool\n"
+		"%_ptr_Private_bool = OpTypePointer Private %bool\n"
+		"%a = OpVariable %_ptr_Private_bool Private\n"
+		"%b = OpVariable %_ptr_Private_bool Private\n"
+		"%outAnd = OpVariable %_ptr_Private_bool Private\n"
+		"%outOr = OpVariable %_ptr_Private_bool Private\n"
+		"%outNotA = OpVariable %_ptr_Private_bool Private\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%va = OpLoad %bool %a\n"
+		"%vb = OpLoad %bool %b\n"
+		"%andResult = OpLogicalAnd %bool %va %vb\n"
+		"%orResult = OpLogicalOr %bool %va %vb\n"
+		"%notA = OpLogicalNot %bool %va\n"
+		"OpStore %outAnd %andResult\n"
+		"OpStore %outOr %orResult\n"
+		"OpStore %outNotA %notA\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outAndId = module.m_globalInstructions[2].m_id;
+	const cct::UInt32 outOrId = module.m_globalInstructions[3].m_id;
+	const cct::UInt32 outNotAId = module.m_globalInstructions[4].m_id;
+
+	see::exec::Value trueValue;
+	trueValue.m_scalar = see::ir::ScalarKind::Bool;
+	trueValue.SetBool(0, true);
+
+	see::exec::Value falseValue;
+	falseValue.m_scalar = see::ir::ScalarKind::Bool;
+	falseValue.SetBool(0, false);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, trueValue}, {bId, falseValue}};
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs);
+	REQUIRE(result.has_value());
+
+	CHECK_FALSE(result->find(outAndId)->second.GetBool());
+	CHECK(result->find(outOrId)->second.GetBool());
+	CHECK_FALSE(result->find(outNotAId)->second.GetBool());
+}

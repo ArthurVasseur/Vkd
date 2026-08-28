@@ -673,6 +673,90 @@ namespace see::exec
 			return true;
 		}
 
+		bool ExecuteLogicalBinary(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.size() < 2)
+				return false;
+
+			std::optional<Value> lhs = ResolveValue(state, instruction.m_args[0]);
+			std::optional<Value> rhs = ResolveValue(state, instruction.m_args[1]);
+			if (!lhs || !rhs)
+				return false;
+
+			Value result;
+			result.m_scalar = ir::ScalarKind::Bool;
+			result.m_rows = lhs->m_rows;
+			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
+			{
+				const bool a = lhs->GetBool(i);
+				const bool b = rhs->GetBool(i);
+				switch (instruction.m_op)
+				{
+					case ir::Op::LogicalAnd:
+						result.SetBool(i, a && b);
+						break;
+					case ir::Op::LogicalOr:
+						result.SetBool(i, a || b);
+						break;
+					case ir::Op::LogicalEqual:
+						result.SetBool(i, a == b);
+						break;
+					case ir::Op::LogicalNotEqual:
+						result.SetBool(i, a != b);
+						break;
+					default:
+						return false;
+				}
+			}
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
+		bool ExecuteLogicalNot(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			if (!operand)
+				return false;
+
+			Value result;
+			result.m_scalar = ir::ScalarKind::Bool;
+			result.m_rows = operand->m_rows;
+			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
+				result.SetBool(i, !operand->GetBool(i));
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
+		bool ExecuteAllAny(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			if (!operand)
+				return false;
+
+			bool accumulator = instruction.m_op == ir::Op::All;
+			for (cct::UInt32 i = 0; i < operand->m_rows; ++i)
+			{
+				if (instruction.m_op == ir::Op::All)
+					accumulator = accumulator && operand->GetBool(i);
+				else
+					accumulator = accumulator || operand->GetBool(i);
+			}
+
+			Value result;
+			result.m_scalar = ir::ScalarKind::Bool;
+			result.SetBool(0, accumulator);
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
 		bool ExecuteSelect(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			if (instruction.m_args.size() < 3)
@@ -766,6 +850,16 @@ namespace see::exec
 				case ir::Op::CompareGreater:
 				case ir::Op::CompareGreaterEqual:
 					return ExecuteCompare(state, instruction);
+				case ir::Op::LogicalAnd:
+				case ir::Op::LogicalOr:
+				case ir::Op::LogicalEqual:
+				case ir::Op::LogicalNotEqual:
+					return ExecuteLogicalBinary(state, instruction);
+				case ir::Op::LogicalNot:
+					return ExecuteLogicalNot(state, instruction);
+				case ir::Op::All:
+				case ir::Op::Any:
+					return ExecuteAllAny(state, instruction);
 				case ir::Op::Select:
 					return ExecuteSelect(state, instruction);
 				case ir::Op::ImageSample:
