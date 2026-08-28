@@ -14,6 +14,10 @@
 
 #include <Concerto/Core/Types/Types.hpp>
 
+#include "See/Ir/Instruction.hpp"
+#include "See/Ir/Type.hpp"
+#include "See/Ir/Value.hpp"
+
 namespace see::spirv
 {
 	struct Module;
@@ -21,139 +25,6 @@ namespace see::spirv
 
 namespace see::ir
 {
-	enum class ScalarKind
-	{
-		Bool,
-		Int32,
-		Float32
-	};
-
-	enum class TypeKind
-	{
-		Void,
-		Scalar,
-		Vector,
-		Matrix,
-		Pointer,
-		Struct,
-		Array,
-		Image,
-		SampledImage
-	};
-
-	struct Type
-	{
-		TypeKind m_kind = TypeKind::Void;
-		ScalarKind m_scalar = ScalarKind::Float32; // meaningful for Scalar/Vector/Matrix
-		cct::UInt32 m_componentCount = 0; // Vector: component count. Matrix: column count.
-		cct::UInt32 m_pointee = 0; // Pointer: pointee type id. Vector: scalar component type id. Matrix: column (Vector) type id. SampledImage: image type id. Array: element type id.
-		cct::UInt32 m_arrayLength = 0; // Array: element count (0 for OpTypeRuntimeArray, whose length isn't known at compile time).
-		std::vector<cct::UInt32> m_memberTypes; // Struct: member type ids, in declaration order.
-	};
-
-	enum class Op
-	{
-		Unsupported,
-		Variable,
-		Constant,
-		Load,
-		Store,
-		CopyMemory,
-		AccessChain,
-		CompositeConstruct,
-		CompositeExtract,
-		VectorExtractDynamic,
-		VectorInsertDynamic,
-		Add,
-		Sub,
-		Mul,
-		Div,
-		Rem, // OpFRem/OpSRem: sign follows the dividend
-		Mod, // OpFMod/OpSMod: sign follows the divisor
-		UnsignedMod,
-		Negate, // OpFNegate/OpSNegate, dispatched on the operand's scalar kind
-		ConvertSignedToFloat,
-		ConvertUnsignedToFloat,
-		ConvertFloatToSigned,
-		ConvertFloatToUnsigned,
-		Dot,
-		MatrixTimesVector,
-		VectorTimesMatrix,
-		MatrixTimesMatrix,
-		VectorTimesScalar, // also OpMatrixTimesScalar: every component scaled by one scalar
-		CompareEqual,
-		CompareNotEqual,
-		CompareLess,
-		CompareLessEqual,
-		CompareGreater,
-		CompareGreaterEqual,
-		LogicalAnd,
-		LogicalOr,
-		LogicalNot,
-		LogicalEqual,
-		LogicalNotEqual,
-		All,
-		Any,
-		Select,
-		ImageSample,
-		FunctionCall,
-		GlslStd450 // OpExtInst from a "GLSL.std.450" import; m_args = [extended instruction number, operands...]
-	};
-
-	struct Instruction
-	{
-		Op m_op = Op::Unsupported;
-		cct::UInt32 m_id = 0; // SSA result id (0 if the op has none, e.g. Store)
-		cct::UInt32 m_type = 0; // SPIR-V id of the result type (0 if none)
-		std::vector<cct::UInt32> m_args;
-		cct::UInt32 m_spirvOpcode = 0; // original SpvOp, kept for Op::Unsupported
-	};
-
-	enum class Terminator
-	{
-		None,
-		Branch,
-		BranchConditional,
-		Return,
-		ReturnValue
-	};
-
-	struct BasicBlock
-	{
-		cct::UInt32 m_label = 0;
-		std::vector<Instruction> m_instructions;
-		Terminator m_terminator = Terminator::None;
-		std::vector<cct::UInt32> m_branchTargets;
-		cct::UInt32 m_terminatorOperand = 0; // BranchConditional: condition id. ReturnValue: returned value id.
-	};
-
-	struct Function
-	{
-		cct::UInt32 m_id = 0;
-		std::vector<cct::UInt32> m_parameters;
-		std::vector<BasicBlock> m_blocks;
-	};
-
-	struct Constant
-	{
-		cct::UInt32 m_type = 0;
-		cct::UInt32 m_bits = 0; // scalar constant (OpConstant/True/False): raw bit pattern, reinterpret via m_type's scalar kind. Unused when m_words is non-empty.
-		std::vector<cct::UInt32> m_words; // OpConstantComposite: constituents flattened in order (m_bits of each, recursively for nested composites).
-	};
-
-	struct Decoration
-	{
-		cct::UInt32 m_kind = 0; // raw SpvDecoration value
-		std::vector<cct::UInt32> m_literals;
-	};
-
-	struct MemberDecoration
-	{
-		cct::UInt32 m_member = 0;
-		cct::UInt32 m_kind = 0; // raw SpvDecoration value
-		std::vector<cct::UInt32> m_literals;
-	};
-
 	struct Module
 	{
 		std::unordered_map<cct::UInt32, Type> m_types;
