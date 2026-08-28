@@ -66,6 +66,10 @@ if has_config("cts") then
                         "--deqp-shadercache-filename=" .. path.join(output_dir, "vk-cts-shadercache.bin"),
                         "--deqp-log-filename=" .. path.join(output_dir, "vk-cts-log.txt"),
                         "--deqp-caselist-file=" .. path.join(os.projectdir(), "vk-default.txt"),
+                        -- The full mustpass is 2.84M tests: without these the qpa log grows to tens of GB.
+                        -- Re-enable locally (or use a targeted caselist) when debugging a specific failure.
+                        "--deqp-log-images=disable",
+                        "--deqp-log-shader-sources=disable",
                     },
                     {envs = envs, try = true}
                 )
