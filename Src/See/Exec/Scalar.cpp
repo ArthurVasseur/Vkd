@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "See/Defines.hpp"
 #include <spirv/unified1/GLSL.std.450.h>
 #include <spirv/unified1/spirv.h>
 
@@ -1321,6 +1322,7 @@ namespace see::exec
 
 		BlockWalkOutcome RunBlocks(RuntimeState& state, const ir::Function& function)
 		{
+			SEE_AUTO_PROFILER_SCOPE();
 			if (function.m_blocks.empty())
 				return {};
 
@@ -1368,6 +1370,7 @@ namespace see::exec
 
 		bool ExecuteFunctionCall(RuntimeState& state, const ir::Instruction& instruction)
 		{
+			SEE_AUTO_PROFILER_SCOPE();
 			if (instruction.m_args.empty())
 				return false;
 
@@ -1445,6 +1448,7 @@ namespace see::exec
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
+		SEE_AUTO_PROFILER_SCOPE();
 		RuntimeState state{.m_module = module, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)

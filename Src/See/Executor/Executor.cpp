@@ -10,6 +10,7 @@
 
 #include <Concerto/Core/Logger/Logger.hpp>
 
+#include "See/Defines.hpp"
 #include "See/Spirv/Module.hpp"
 #include <spirv-tools/libspirv.h>
 
@@ -28,6 +29,7 @@ namespace see
 
 	bool Executor::IsValidSpirv(const std::vector<cct::UInt32>& spirvCode) const
 	{
+		SEE_AUTO_PROFILER_SCOPE();
 		spv_diagnostic diagnostic = nullptr;
 		spv_result_t result = spvValidateBinary(m_context, spirvCode.data(), spirvCode.size(), &diagnostic);
 		if (result == SPV_SUCCESS)
@@ -43,6 +45,7 @@ namespace see
 
 	ShaderHandle Executor::RegisterShader(ShaderStage stage, const std::vector<cct::UInt32>& spirvCode, const std::string& entryPoint)
 	{
+		SEE_AUTO_PROFILER_SCOPE();
 		if (!IsValidSpirv(spirvCode))
 			return InvalidShaderHandle;
 

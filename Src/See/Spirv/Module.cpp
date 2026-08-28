@@ -8,6 +8,7 @@
 
 #include <Concerto/Core/Logger/Logger.hpp>
 
+#include "See/Defines.hpp"
 #include <spirv-tools/libspirv.h>
 #include <spirv/unified1/spirv.h>
 
@@ -219,6 +220,7 @@ namespace see::spirv
 
 	std::optional<Module> Parse(const std::vector<cct::UInt32>& code)
 	{
+		SEE_AUTO_PROFILER_SCOPE();
 		spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_5);
 		ParseState state;
 

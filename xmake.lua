@@ -88,6 +88,11 @@ target("see")
         add_cxflags("-fPIC")
     end
 
+    if has_config("profiling") then
+        add_deps("concerto-profiler", { public = true })
+        add_defines("SEE_PROFILING", { public = true })
+    end
+
     local files = {
         ".",
         "Executor",

@@ -6,6 +6,7 @@
 
 #include "See/Exec/Stage.hpp"
 
+#include "See/Defines.hpp"
 #include <spirv/unified1/spirv.h>
 
 namespace see::exec
@@ -76,6 +77,7 @@ namespace see::exec
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
+		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
 		{
@@ -138,6 +140,7 @@ namespace see::exec
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
+		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
 		{

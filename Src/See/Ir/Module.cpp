@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "See/Defines.hpp"
 #include "See/Spirv/Module.hpp"
 #include <spirv/unified1/spirv.h>
 
@@ -384,6 +385,7 @@ namespace see::ir
 
 	std::optional<Module> Convert(const see::spirv::Module& spirvModule)
 	{
+		SEE_AUTO_PROFILER_SCOPE();
 		Module module;
 
 		for (const auto& [id, spirvDecorations] : spirvModule.m_decorations)
