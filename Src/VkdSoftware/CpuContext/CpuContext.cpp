@@ -62,6 +62,12 @@ namespace vkd::software
 
 		see::exec::Value InterpolateLocation(const see::exec::Value& a, const see::exec::Value& b, const see::exec::Value& c, float l0, float l1, float l2)
 		{
+			// Integer-typed fragment inputs must be decorated Flat (SPIR-V requires it), meaning they
+			// take the provoking vertex's (v0's, under Vulkan's default first-vertex convention) value
+			// verbatim rather than being blended - blending would reinterpret their bit pattern as float.
+			if (a.m_scalar != see::ir::ScalarKind::Float32)
+				return a;
+
 			see::exec::Value result;
 			result.m_scalar = a.m_scalar;
 			result.m_rows = a.m_rows;
