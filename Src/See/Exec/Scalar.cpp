@@ -163,10 +163,10 @@ namespace see::exec
 					if (!layout)
 						return std::nullopt;
 					const cct::UInt32 totalWords = layout->empty() ? 0 : layout->back().m_offset + layout->back().m_wordCount;
-					// A Value can only hold 16 words - fine for small locals (the usual case), but a struct
+					// A Value can only hold Value::MaxWords words - fine for locals (the usual case), but a struct
 					// backed by an external buffer is addressed member-by-member instead of ever being
 					// materialized whole, so this cap doesn't limit external (e.g. uniform block) size.
-					if (totalWords > 16)
+					if (totalWords > Value::MaxWords)
 						return std::nullopt;
 					return Value{.m_rows = totalWords, .m_structType = typeId};
 				}
@@ -181,7 +181,7 @@ namespace see::exec
 
 					const cct::UInt32 stride = GetArrayStride(module, typeId, elementShape->m_rows * elementShape->m_columns);
 					const cct::UInt32 totalWords = stride * type.m_arrayLength;
-					if (totalWords > 16)
+					if (totalWords > Value::MaxWords)
 						return std::nullopt;
 
 					return Value{.m_rows = totalWords};
@@ -204,7 +204,7 @@ namespace see::exec
 			if (constantIt->second.m_words.empty())
 				value->m_bits[0] = constantIt->second.m_bits;
 			else
-				for (cct::UInt32 i = 0; i < constantIt->second.m_words.size() && i < 16; ++i)
+				for (cct::UInt32 i = 0; i < constantIt->second.m_words.size() && i < Value::MaxWords; ++i)
 					value->m_bits[i] = constantIt->second.m_words[i];
 
 			return value;
@@ -258,7 +258,7 @@ namespace see::exec
 			if (!source)
 				return false;
 
-			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
+			for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
 				result->m_bits[i] = source[i];
 
 			state.m_ssaValues[instruction.m_id] = *result;
@@ -283,7 +283,7 @@ namespace see::exec
 			if (!target)
 				return false;
 
-			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
+			for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
 				target[i] = value->m_bits[i];
 
 			return true;
@@ -309,7 +309,7 @@ namespace see::exec
 			if (!target || !source)
 				return false;
 
-			for (cct::UInt32 i = 0; i < wordCount && i < 16; ++i)
+			for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
 				target[i] = source[i];
 
 			return true;
@@ -1359,7 +1359,7 @@ namespace see::exec
 				if (!source)
 					return false;
 
-				for (cct::UInt32 w = 0; w < wordCount && w < 16; ++w)
+				for (cct::UInt32 w = 0; w < wordCount && w < Value::MaxWords; ++w)
 					copy->m_bits[w] = source[w];
 
 				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
@@ -1395,7 +1395,7 @@ namespace see::exec
 			return std::nullopt;
 
 		const MemberLayout& member = (*layout)[memberIndex];
-		for (cct::UInt32 i = 0; i < member.m_wordCount && i < 16; ++i)
+		for (cct::UInt32 i = 0; i < member.m_wordCount && i < Value::MaxWords; ++i)
 			result->m_bits[i] = composite.m_bits[member.m_offset + i];
 
 		return result;

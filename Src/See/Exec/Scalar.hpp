@@ -18,12 +18,17 @@ namespace see::exec
 {
 	struct Value
 	{
+		// Sized for composite locals (arrays of matrices, arrays of structs): a mat4[4] is 64 words.
+		// Anything larger (big uniform blocks) lives in an ExternalBuffer and is addressed
+		// member-by-member instead of ever being materialized whole in a Value.
+		static constexpr cct::UInt32 MaxWords = 64;
+
 		ir::ScalarKind m_scalar = ir::ScalarKind::Float32;
 		cct::UInt32 m_rows = 1; // vector length, or total word count when m_structType != 0. 1 for a plain scalar.
 		cct::UInt32 m_columns = 1; // matrix column count. 1 for scalar/vector/struct.
 		cct::UInt32 m_structType = 0; // non-zero: this is a struct (ir type id), m_bits is its flat word layout.
 		cct::UInt32 m_imageVariable = 0; // non-zero: this is an (optionally sampled) image handle, naming the UniformConstant variable it was loaded from.
-		std::array<cct::UInt32, 16> m_bits{};
+		std::array<cct::UInt32, MaxWords> m_bits{};
 
 		[[nodiscard]] float GetFloat(cct::UInt32 index = 0) const;
 		void SetFloat(cct::UInt32 index, float value);
@@ -34,8 +39,8 @@ namespace see::exec
 	};
 
 	// A word-addressed view over externally-owned memory (e.g. a mapped uniform/storage buffer). Unlike a
-	// Value, which caps a variable's storage at 16 words, this lets a pointer variable address memory of
-	// any size without copying it into the interpreter's register file.
+	// Value, which caps a variable's storage at Value::MaxWords, this lets a pointer variable address
+	// memory of any size without copying it into the interpreter's register file.
 	struct ExternalBuffer
 	{
 		cct::UInt32* m_words = nullptr;
