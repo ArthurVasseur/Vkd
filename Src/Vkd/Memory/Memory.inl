@@ -25,10 +25,21 @@ namespace vkd::mem
 	{
 		T* allocation = Allocate<T>(pAllocator, allocationScope);
 
-		if constexpr (std::is_base_of_v<ObjectBase, T>)
-			return new (allocation) T(pAllocator);
-		else
-			return new (allocation) T;
+		if (allocation == nullptr)
+			return nullptr;
+
+		try
+		{
+			if constexpr (std::is_base_of_v<ObjectBase, T>)
+				return new (allocation) T(pAllocator);
+			else
+				return new (allocation) T;
+		}
+		catch (const std::bad_alloc&)
+		{
+			Free(pAllocator, allocation);
+			return nullptr;
+		}
 	}
 
 	template<typename T, typename... Args>
@@ -36,10 +47,21 @@ namespace vkd::mem
 	{
 		T* allocation = Allocate<T>(pAllocator, allocationScope);
 
-		if constexpr (std::is_base_of_v<ObjectBase, T>)
-			return new (allocation) T(pAllocator, std::forward<Args>(args)...);
-		else
-			return new (allocation) T(std::forward<Args>(args)...);
+		if (allocation == nullptr)
+			return nullptr;
+
+		try
+		{
+			if constexpr (std::is_base_of_v<ObjectBase, T>)
+				return new (allocation) T(pAllocator, std::forward<Args>(args)...);
+			else
+				return new (allocation) T(std::forward<Args>(args)...);
+		}
+		catch (const std::bad_alloc&)
+		{
+			Free(pAllocator, allocation);
+			return nullptr;
+		}
 	}
 
 	template<typename T>
@@ -60,6 +82,11 @@ namespace vkd::mem
 
 		dispatchableObject->LoaderData.loaderMagic = ICD_LOADER_MAGIC;
 		dispatchableObject->Object = New<T>(pAllocator, allocationScope);
+		if (dispatchableObject->Object == nullptr)
+		{
+			Free(pAllocator, dispatchableObject);
+			return nullptr;
+		}
 
 		return dispatchableObject;
 	}
@@ -74,6 +101,11 @@ namespace vkd::mem
 
 		dispatchableObject->LoaderData.loaderMagic = ICD_LOADER_MAGIC;
 		dispatchableObject->Object = New<T>(pAllocator, allocationScope, std::forward<Args>(args)...);
+		if (dispatchableObject->Object == nullptr)
+		{
+			Free(pAllocator, dispatchableObject);
+			return nullptr;
+		}
 
 		return dispatchableObject;
 	}
