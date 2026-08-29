@@ -394,6 +394,20 @@ namespace vkd::software
 				}
 			}
 		}
+
+		VkResult MapRange(vkd::DeviceMemory* memory, VkDeviceSize offset, VkDeviceSize size, cct::UByte** outData)
+		{
+			CCT_ASSERT(memory, "Invalid memory");
+
+			*outData = nullptr;
+			const VkResult result = memory->Map(offset, size, reinterpret_cast<void**>(outData));
+			if (result != VK_SUCCESS)
+				return result;
+			if (*outData == nullptr)
+				return VK_ERROR_MEMORY_MAP_FAILED;
+
+			return VK_SUCCESS;
+		}
 	} // namespace
 
 	CpuContext::CpuContext()
@@ -544,9 +558,9 @@ namespace vkd::software
 
 		const VkDeviceSize imageSize = static_cast<VkDeviceSize>(extent.width) * extent.height * 4;
 		cct::UByte* pixels = nullptr;
-		VkResult mapResult = colorImage->GetMemory()->Map(0, imageSize, reinterpret_cast<void**>(&pixels));
-		if (mapResult != VK_SUCCESS || pixels == nullptr)
-			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
+		const VkResult mapResult = MapRange(colorImage->GetMemory(), colorImage->GetMemoryOffset(), imageSize, &pixels);
+		if (mapResult != VK_SUCCESS)
+			return mapResult;
 
 		const VkViewport& viewport = viewportDynamic ? m_dynamicViewports[0] : pipeline->GetViewports()[0];
 
@@ -627,10 +641,17 @@ namespace vkd::software
 			CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
 
 			cct::UByte* srcData = nullptr;
-			op.src->GetMemory()->Map(region.srcOffset, region.size, reinterpret_cast<void**>(&srcData));
+			VkResult result = MapRange(op.src->GetMemory(), op.src->GetMemoryOffset() + region.srcOffset, region.size, &srcData);
+			if (result != VK_SUCCESS)
+				return result;
 
 			cct::UByte* dstData = nullptr;
-			op.dst->GetMemory()->Map(region.dstOffset, region.size, reinterpret_cast<void**>(&dstData));
+			result = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset() + region.dstOffset, region.size, &dstData);
+			if (result != VK_SUCCESS)
+			{
+				op.src->GetMemory()->Unmap();
+				return result;
+			}
 
 			std::memcpy(dstData, srcData, region.size);
 
@@ -651,10 +672,17 @@ namespace vkd::software
 			CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
 
 			cct::UByte* srcData = nullptr;
-			op.src->GetMemory()->Map(region.srcOffset, region.size, reinterpret_cast<void**>(&srcData));
+			VkResult result = MapRange(op.src->GetMemory(), op.src->GetMemoryOffset() + region.srcOffset, region.size, &srcData);
+			if (result != VK_SUCCESS)
+				return result;
 
 			cct::UByte* dstData = nullptr;
-			op.dst->GetMemory()->Map(region.dstOffset, region.size, reinterpret_cast<void**>(&dstData));
+			result = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset() + region.dstOffset, region.size, &dstData);
+			if (result != VK_SUCCESS)
+			{
+				op.src->GetMemory()->Unmap();
+				return result;
+			}
 
 			std::memcpy(dstData, srcData, region.size);
 
@@ -672,7 +700,9 @@ namespace vkd::software
 		CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
 
 		cct::UByte* dstData = nullptr;
-		op.dst->GetMemory()->Map(op.offset, op.data.size(), reinterpret_cast<void**>(&dstData));
+		const VkResult result = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset() + op.offset, op.data.size(), &dstData);
+		if (result != VK_SUCCESS)
+			return result;
 
 		std::memcpy(dstData, op.data.data(), op.data.size());
 
@@ -697,9 +727,9 @@ namespace vkd::software
 			return VK_SUCCESS;
 
 		cct::UByte* data = nullptr;
-		const VkResult mapResult = op.dst->GetMemory()->Map(op.dst->GetMemoryOffset() + op.offset, size, reinterpret_cast<void**>(&data));
-		if (mapResult != VK_SUCCESS || data == nullptr)
-			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
+		const VkResult mapResult = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset() + op.offset, size, &data);
+		if (mapResult != VK_SUCCESS)
+			return mapResult;
 
 		UInt32* data32 = reinterpret_cast<UInt32*>(data);
 		const std::size_t count = size / sizeof(UInt32);
@@ -728,10 +758,17 @@ namespace vkd::software
 			VkDeviceSize dstImageSize = dstRowPitch * op.dst->GetExtent().height * op.dst->GetExtent().depth;
 
 			cct::UByte* srcBase = nullptr;
-			op.src->GetMemory()->Map(0, srcImageSize, reinterpret_cast<void**>(&srcBase));
+			VkResult result = MapRange(op.src->GetMemory(), op.src->GetMemoryOffset(), srcImageSize, &srcBase);
+			if (result != VK_SUCCESS)
+				return result;
 
 			cct::UByte* dstBase = nullptr;
-			op.dst->GetMemory()->Map(0, dstImageSize, reinterpret_cast<void**>(&dstBase));
+			result = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset(), dstImageSize, &dstBase);
+			if (result != VK_SUCCESS)
+			{
+				op.src->GetMemory()->Unmap();
+				return result;
+			}
 
 			VkDeviceSize rowSize = region.extent.width * pixelSize;
 			for (UInt32 z = 0; z < region.extent.depth; ++z)
@@ -775,12 +812,20 @@ namespace vkd::software
 			VkDeviceSize bufferRowPitch = bufferRowLength * pixelSize;
 
 			cct::UByte* srcBase = nullptr;
-			op.src->GetMemory()->Map(region.bufferOffset,
-									 bufferRowPitch * region.imageExtent.height * region.imageExtent.depth,
-									 reinterpret_cast<void**>(&srcBase));
+			VkResult result = MapRange(op.src->GetMemory(),
+									   op.src->GetMemoryOffset() + region.bufferOffset,
+									   bufferRowPitch * region.imageExtent.height * region.imageExtent.depth,
+									   &srcBase);
+			if (result != VK_SUCCESS)
+				return result;
 
 			cct::UByte* dstBase = nullptr;
-			op.dst->GetMemory()->Map(0, imageSize, reinterpret_cast<void**>(&dstBase));
+			result = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset(), imageSize, &dstBase);
+			if (result != VK_SUCCESS)
+			{
+				op.src->GetMemory()->Unmap();
+				return result;
+			}
 
 			VkDeviceSize rowSize = region.imageExtent.width * pixelSize;
 			for (UInt32 z = 0; z < region.imageExtent.depth; ++z)
@@ -822,12 +867,20 @@ namespace vkd::software
 			VkDeviceSize bufferRowPitch = bufferRowLength * pixelSize;
 
 			cct::UByte* srcBase = nullptr;
-			op.src->GetMemory()->Map(0, imageSize, reinterpret_cast<void**>(&srcBase));
+			VkResult result = MapRange(op.src->GetMemory(), op.src->GetMemoryOffset(), imageSize, &srcBase);
+			if (result != VK_SUCCESS)
+				return result;
 
 			cct::UByte* dstBase = nullptr;
-			op.dst->GetMemory()->Map(region.bufferOffset,
-									 bufferRowPitch * region.imageExtent.height * region.imageExtent.depth,
-									 reinterpret_cast<void**>(&dstBase));
+			result = MapRange(op.dst->GetMemory(),
+							  op.dst->GetMemoryOffset() + region.bufferOffset,
+							  bufferRowPitch * region.imageExtent.height * region.imageExtent.depth,
+							  &dstBase);
+			if (result != VK_SUCCESS)
+			{
+				op.src->GetMemory()->Unmap();
+				return result;
+			}
 
 			VkDeviceSize rowSize = region.imageExtent.width * pixelSize;
 			for (UInt32 z = 0; z < region.imageExtent.depth; ++z)
@@ -932,9 +985,9 @@ namespace vkd::software
 		const VkDeviceSize imageSize = static_cast<VkDeviceSize>(extent.width) * extent.height * extent.depth * pixelSize;
 
 		cct::UByte* data = nullptr;
-		VkResult mapResult = image->GetMemory()->Map(0, imageSize, reinterpret_cast<void**>(&data));
-		if (mapResult != VK_SUCCESS || data == nullptr)
-			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
+		const VkResult mapResult = MapRange(image->GetMemory(), image->GetMemoryOffset(), imageSize, &data);
+		if (mapResult != VK_SUCCESS)
+			return mapResult;
 
 		UInt8 pattern[32] = {};
 		const bool supported = IsSupportedColorFormat(format);

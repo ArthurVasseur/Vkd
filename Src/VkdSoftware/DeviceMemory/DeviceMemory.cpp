@@ -44,6 +44,13 @@ namespace vkd::software
 			return VK_ERROR_MEMORY_MAP_FAILED;
 		}
 
+		const VkDeviceSize available = m_size - offset;
+		if (size != VK_WHOLE_SIZE && size > available)
+		{
+			CCT_ASSERT_FALSE("Map size out of range");
+			return VK_ERROR_MEMORY_MAP_FAILED;
+		}
+
 		m_mapOffset = offset;
 		*ppData = Data() + m_mapOffset;
 
