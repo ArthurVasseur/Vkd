@@ -19,6 +19,7 @@ import argparse
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 DefaultTag = "vulkan-cts-1.4.4.1"
@@ -111,7 +112,14 @@ def main() -> None:
             total += content.count("\n")
             print(f"{entry}: done")
 
+    # The committed artifact: the raw file is gitignored (over GitHub's size limit), the
+    # vk-cts-* xmake target extracts this zip when vk-default.txt is absent (fresh checkout, CI).
+    zip_path = args.output + ".zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        archive.write(args.output, Path(args.output).name)
+
     print(f"\n{total} tests -> {args.output} ({skipped} group files skipped)")
+    print(f"compressed -> {zip_path} ({os.path.getsize(zip_path)} bytes)")
 
 
 if __name__ == "__main__":

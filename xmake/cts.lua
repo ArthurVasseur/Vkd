@@ -36,7 +36,20 @@ if has_config("cts") then
 
             on_run(function (target)
                 import("lib.detect.find_tool")
-                
+                import("utils.archive")
+
+                -- The caselist itself is gitignored (146+ MB); a fresh checkout (e.g. CI) only
+                -- has the committed zip. scripts/generate_caselist.py regenerates both.
+                local caselist = path.join(os.projectdir(), "vk-default.txt")
+                if not os.isfile(caselist) then
+                    local caselist_zip = caselist .. ".zip"
+                    if not os.isfile(caselist_zip) then
+                        raise("vk-default.txt not found and no vk-default.txt.zip to extract it from - run scripts/generate_caselist.py")
+                    end
+                    print("extracting " .. caselist_zip)
+                    archive.extract(caselist_zip, os.projectdir())
+                end
+
                 local vk_gl_cts = target:pkg("vk-gl-cts")
                 if not vk_gl_cts then
                     raise("VK-GL-CTS package not found. Please run 'xmake f --cts=y' and rebuild.")
