@@ -8,6 +8,7 @@
 
 #include <array>
 #include <optional>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -30,6 +31,23 @@ namespace see::exec
 		cct::UInt32 m_structType = 0; // non-zero: this is a struct (ir type id), m_bits is its flat word layout.
 		cct::UInt32 m_imageVariable = 0; // non-zero: this is an (optionally sampled) image handle, naming the UniformConstant variable it was loaded from.
 		std::array<cct::UInt32, MaxWords> m_bits{};
+
+		[[nodiscard]] constexpr cct::UInt32 WordCount() const noexcept
+		{
+			return m_rows * m_columns;
+		}
+
+		// A register slot outlives the value it held, so only the first WordCount() words are meaningful;
+		// the rest are whatever the previous occupant left behind. Iterate through Words(), never m_bits.
+		[[nodiscard]] std::span<const cct::UInt32> Words() const noexcept
+		{
+			return std::span<const cct::UInt32>(m_bits.data(), WordCount());
+		}
+
+		[[nodiscard]] std::span<cct::UInt32> Words() noexcept
+		{
+			return std::span<cct::UInt32>(m_bits.data(), WordCount());
+		}
 
 		[[nodiscard]] float GetFloat(cct::UInt32 index = 0) const;
 		void SetFloat(cct::UInt32 index, float value);

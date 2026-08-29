@@ -119,7 +119,7 @@ namespace see::exec
 							matrixStride = decoration.m_literals[0] / 4;
 					}
 
-				cct::UInt32 wordCount = memberShape ? memberShape->m_rows * memberShape->m_columns : 0;
+				cct::UInt32 wordCount = memberShape ? memberShape->WordCount() : 0;
 				if (matrixStride != 0 && memberShape && memberShape->m_columns > 1)
 					wordCount = matrixStride * memberShape->m_columns;
 
@@ -185,7 +185,7 @@ namespace see::exec
 					if (!elementShape)
 						return std::nullopt;
 
-					const cct::UInt32 stride = GetArrayStride(module, typeId, elementShape->m_rows * elementShape->m_columns);
+					const cct::UInt32 stride = GetArrayStride(module, typeId, elementShape->WordCount());
 					const cct::UInt32 totalWords = stride * type.m_arrayLength;
 					if (totalWords > Value::MaxWords)
 						return std::nullopt;
@@ -305,7 +305,7 @@ namespace see::exec
 
 			std::optional<Value> result = *resultShape;
 
-			const cct::UInt32 wordCount = result->m_rows * result->m_columns;
+			const cct::UInt32 wordCount = result->WordCount();
 			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *result);
 			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (result->m_columns - 1) + result->m_rows : wordCount;
 			const cct::UInt32* source = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, spannedWords);
@@ -340,7 +340,7 @@ namespace see::exec
 			if (!value)
 				return false;
 
-			const cct::UInt32 wordCount = value->m_rows * value->m_columns;
+			const cct::UInt32 wordCount = value->WordCount();
 			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *value);
 			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (value->m_columns - 1) + value->m_rows : wordCount;
 			cct::UInt32* target = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, spannedWords);
@@ -376,7 +376,7 @@ namespace see::exec
 			if (!shape)
 				return false;
 
-			const cct::UInt32 wordCount = shape->m_rows * shape->m_columns;
+			const cct::UInt32 wordCount = shape->WordCount();
 			cct::UInt32* target = ResolveWords(state, targetIt->second.m_baseVariable, targetIt->second.m_wordOffset, wordCount);
 			const cct::UInt32* source = ResolveWords(state, sourceIt->second.m_baseVariable, sourceIt->second.m_wordOffset, wordCount);
 			if (!target || !source)
@@ -458,7 +458,7 @@ namespace see::exec
 
 			// Each arg contributes its own word count, concatenated in order - covers scalars-into-vector,
 			// vectors-into-matrix-columns, and mixed scalar/vector args (e.g. vec4 built from a vec3 + a float).
-			const cct::UInt32 totalWords = result->m_rows * result->m_columns;
+			const cct::UInt32 totalWords = result->WordCount();
 			cct::UInt32 writeIndex = 0;
 			for (cct::UInt32 argId : instruction.m_args)
 			{
@@ -466,7 +466,7 @@ namespace see::exec
 				if (!component)
 					return false;
 
-				const cct::UInt32 componentWords = component->m_rows * component->m_columns;
+				const cct::UInt32 componentWords = component->WordCount();
 				for (cct::UInt32 i = 0; i < componentWords && writeIndex < totalWords; ++i, ++writeIndex)
 					result->m_bits[writeIndex] = component->m_bits[i];
 			}
@@ -539,7 +539,7 @@ namespace see::exec
 				return false;
 
 			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
-			if (indexValue >= vector->m_rows * vector->m_columns)
+			if (indexValue >= vector->WordCount())
 				return false;
 
 			Value* result = EmplaceResult(state, instruction.m_id);
@@ -564,7 +564,7 @@ namespace see::exec
 				return false;
 
 			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
-			if (indexValue >= vector->m_rows * vector->m_columns)
+			if (indexValue >= vector->WordCount())
 				return false;
 
 			Value* result = SsaSlot(state, instruction.m_id);
@@ -596,11 +596,11 @@ namespace see::exec
 			std::optional<Value> result = *resultShape;
 
 			const cct::UInt32 componentCount = static_cast<cct::UInt32>(instruction.m_args.size() - 2);
-			if (componentCount != result->m_rows * result->m_columns)
+			if (componentCount != result->WordCount())
 				return false;
 
-			const cct::UInt32 firstWords = first->m_rows * first->m_columns;
-			const cct::UInt32 secondWords = second->m_rows * second->m_columns;
+			const cct::UInt32 firstWords = first->WordCount();
+			const cct::UInt32 secondWords = second->WordCount();
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
 			{
 				const cct::UInt32 selector = instruction.m_args[i + 2];
@@ -740,7 +740,7 @@ namespace see::exec
 				return false;
 
 			*result = *operand;
-			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
+			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
 				if (result->m_scalar == ir::ScalarKind::Int32)
 					result->SetInt32(i, -operand->GetInt32(i));
@@ -774,7 +774,7 @@ namespace see::exec
 				return false;
 
 			*result = *operand;
-			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
+			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
 				const cct::UInt32 bits = static_cast<cct::UInt32>(operand->GetInt32(i));
 				switch (instruction.m_op)
@@ -819,7 +819,7 @@ namespace see::exec
 				return false;
 
 			*result = *base;
-			const cct::UInt32 componentCount = result->m_rows * result->m_columns;
+			const cct::UInt32 componentCount = result->WordCount();
 
 			if (countValue == 0)
 			{
@@ -872,8 +872,8 @@ namespace see::exec
 
 			std::optional<Value> result = *resultShape;
 
-			const cct::UInt32 componentCount = operand->m_rows * operand->m_columns;
-			if (result->m_rows * result->m_columns != componentCount)
+			const cct::UInt32 componentCount = operand->WordCount();
+			if (result->WordCount() != componentCount)
 				return false;
 
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
@@ -897,7 +897,7 @@ namespace see::exec
 
 			*result = *operand;
 			result->m_scalar = (instruction.m_op == ir::Op::ConvertSignedToFloat || instruction.m_op == ir::Op::ConvertUnsignedToFloat) ? ir::ScalarKind::Float32 : ir::ScalarKind::Int32;
-			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
+			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
 				switch (instruction.m_op)
 				{
@@ -1044,7 +1044,7 @@ namespace see::exec
 
 			*result = *composite;
 			const float factor = scalar->GetFloat(0);
-			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
+			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 				result->SetFloat(i, composite->GetFloat(i) * factor);
 
 			return true;
@@ -1222,14 +1222,14 @@ namespace see::exec
 
 			// A vector condition selects component-wise (e.g. glslang's uvec3(bvec3) conversion);
 			// a scalar condition picks one operand whole, whatever its shape.
-			if (condition->m_rows * condition->m_columns > 1)
+			if (condition->WordCount() > 1)
 			{
 				Value* result = SsaSlot(state, instruction.m_id);
 				if (!result)
 					return false;
 
 				*result = *whenTrue;
-				for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
+				for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 					result->m_bits[i] = condition->GetBool(i) ? whenTrue->m_bits[i] : whenFalse->m_bits[i];
 				return true;
 			}
@@ -1346,7 +1346,7 @@ namespace see::exec
 			const auto vectorLength = [](const Value& v)
 			{
 				float sum = 0.0f;
-				for (cct::UInt32 i = 0; i < v.m_rows * v.m_columns; ++i)
+				for (cct::UInt32 i = 0; i < v.WordCount(); ++i)
 					sum += v.GetFloat(i) * v.GetFloat(i);
 				return std::sqrt(sum);
 			};
@@ -1765,7 +1765,7 @@ namespace see::exec
 
 				std::optional<Value> copy = *copyShape;
 
-				const cct::UInt32 wordCount = copy->m_rows * copy->m_columns;
+				const cct::UInt32 wordCount = copy->WordCount();
 				const cct::UInt32* source = ResolveWords(state, argPointerIt->second.m_baseVariable, argPointerIt->second.m_wordOffset, wordCount);
 				if (!source)
 					return false;
@@ -1821,7 +1821,7 @@ namespace see::exec
 			return result;
 		}
 
-		const cct::UInt32 packedWords = result->m_rows * result->m_columns;
+		const cct::UInt32 packedWords = result->WordCount();
 		for (cct::UInt32 i = 0; i < packedWords && member.m_offset + i < Value::MaxWords; ++i)
 			result->m_bits[i] = composite.m_bits[member.m_offset + i];
 
@@ -1892,7 +1892,7 @@ namespace see::exec
 			else if (type.m_kind == ir::TypeKind::Array)
 			{
 				if (std::optional<Value> elementShape = MakeZeroValue(module, type.m_pointee))
-					prepared.m_arrayStrides[typeId] = GetArrayStride(module, typeId, elementShape->m_rows * elementShape->m_columns);
+					prepared.m_arrayStrides[typeId] = GetArrayStride(module, typeId, elementShape->WordCount());
 			}
 		}
 
