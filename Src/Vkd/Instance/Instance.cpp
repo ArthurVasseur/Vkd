@@ -126,21 +126,24 @@ namespace vkd
 
 		VKD_FROM_HANDLE(vkd::Instance, instance, pInstance);
 
+		VKD_CHECK(instance && pPhysicalDeviceCount);
+
 		instance->EnumeratePlatformPhysicalDevices();
-		if (pPhysicalDeviceCount && !pPhysicalDevices)
+		auto physicalDevices = instance->GetPhysicalDevices();
+		const UInt32 deviceCount = static_cast<UInt32>(physicalDevices.size());
+
+		if (!pPhysicalDevices)
 		{
-			*pPhysicalDeviceCount = static_cast<UInt32>(instance->GetPhysicalDevices().size());
+			*pPhysicalDeviceCount = deviceCount;
 			return VK_SUCCESS;
 		}
 
-		auto physicalDevices = instance->GetPhysicalDevices();
-
-		for (std::size_t i = 0; i < *pPhysicalDeviceCount; ++i)
-		{
+		const UInt32 writtenCount = std::min(*pPhysicalDeviceCount, deviceCount);
+		for (UInt32 i = 0; i < writtenCount; ++i)
 			pPhysicalDevices[i] = VKD_TO_HANDLE(VkPhysicalDevice, physicalDevices[i]);
-		}
 
-		return VK_SUCCESS;
+		*pPhysicalDeviceCount = writtenCount;
+		return writtenCount < deviceCount ? VK_INCOMPLETE : VK_SUCCESS;
 	}
 
 	VkResult Instance::EnumeratePlatformPhysicalDevices()
