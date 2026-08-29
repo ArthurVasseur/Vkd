@@ -114,6 +114,8 @@ namespace see::ir
 					return Op::VectorExtractDynamic;
 				case SpvOpVectorInsertDynamic:
 					return Op::VectorInsertDynamic;
+				case SpvOpVectorShuffle:
+					return Op::VectorShuffle;
 				case SpvOpFAdd:
 				case SpvOpIAdd:
 					return Op::Add;

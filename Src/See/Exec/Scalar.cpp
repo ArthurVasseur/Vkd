@@ -478,6 +478,46 @@ namespace see::exec
 			return true;
 		}
 
+		static constexpr cct::UInt32 UndefinedShuffleComponent = 0xFFFFFFFF;
+
+		bool ExecuteVectorShuffle(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.size() < 2)
+				return false;
+
+			std::optional<Value> first = ResolveValue(state, instruction.m_args[0]);
+			std::optional<Value> second = ResolveValue(state, instruction.m_args[1]);
+			if (!first || !second || first->m_scalar != second->m_scalar)
+				return false;
+
+			std::optional<Value> result = MakeZeroValue(state.m_module, instruction.m_type);
+			if (!result)
+				return false;
+
+			const cct::UInt32 componentCount = static_cast<cct::UInt32>(instruction.m_args.size() - 2);
+			if (componentCount != result->m_rows * result->m_columns)
+				return false;
+
+			const cct::UInt32 firstWords = first->m_rows * first->m_columns;
+			const cct::UInt32 secondWords = second->m_rows * second->m_columns;
+			for (cct::UInt32 i = 0; i < componentCount; ++i)
+			{
+				const cct::UInt32 selector = instruction.m_args[i + 2];
+				if (selector == UndefinedShuffleComponent)
+					continue;
+
+				if (selector < firstWords)
+					result->m_bits[i] = first->m_bits[selector];
+				else if (selector - firstWords < secondWords)
+					result->m_bits[i] = second->m_bits[selector - firstWords];
+				else
+					return false;
+			}
+
+			state.m_ssaValues[instruction.m_id] = *result;
+			return true;
+		}
+
 		bool ExecuteArithmetic(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			if (instruction.m_args.size() < 2)
@@ -1243,6 +1283,8 @@ namespace see::exec
 					return ExecuteVectorExtractDynamic(state, instruction);
 				case ir::Op::VectorInsertDynamic:
 					return ExecuteVectorInsertDynamic(state, instruction);
+				case ir::Op::VectorShuffle:
+					return ExecuteVectorShuffle(state, instruction);
 				case ir::Op::Add:
 				case ir::Op::Sub:
 				case ir::Op::Mul:

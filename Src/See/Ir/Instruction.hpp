@@ -25,6 +25,7 @@ namespace see::ir
 		CompositeExtract,
 		VectorExtractDynamic,
 		VectorInsertDynamic,
+		VectorShuffle,
 		Add,
 		Sub,
 		Mul,

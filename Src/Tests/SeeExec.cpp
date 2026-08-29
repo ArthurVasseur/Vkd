@@ -1231,3 +1231,98 @@ TEST_CASE("see::exec::Run - OpAccessChain indexes a matrix by column then compon
 	// Column 2, component 0 = word 2*3+0 = 6
 	CHECK(result->find(outId)->second.GetFloat() == 6.0f);
 }
+
+TEST_CASE("see::exec::Run - OpVectorShuffle swizzle from a single vector", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%_ptr_Input_v4float = OpTypePointer Input %v4float\n"
+		"%_ptr_Output_v4float = OpTypePointer Output %v4float\n"
+		"%in_var = OpVariable %_ptr_Input_v4float Input\n"
+		"%out_var = OpVariable %_ptr_Output_v4float Output\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%a = OpLoad %v4float %in_var\n"
+		"%r = OpVectorShuffle %v4float %a %a 3 2 1 0\n"
+		"OpStore %out_var %r\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
+
+	see::exec::Value input;
+	input.m_rows = 4;
+	input.SetFloat(0, 10.0f);
+	input.SetFloat(1, 20.0f);
+	input.SetFloat(2, 30.0f);
+	input.SetFloat(3, 40.0f);
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}});
+	REQUIRE(result.has_value());
+
+	auto outIt = result->find(outId);
+	REQUIRE(outIt != result->end());
+	CHECK(outIt->second.m_rows == 4);
+	CHECK(outIt->second.GetFloat(0) == 40.0f);
+	CHECK(outIt->second.GetFloat(1) == 30.0f);
+	CHECK(outIt->second.GetFloat(2) == 20.0f);
+	CHECK(outIt->second.GetFloat(3) == 10.0f);
+}
+
+TEST_CASE("see::exec::Run - OpVectorShuffle across operands of different lengths", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%v2float = OpTypeVector %float 2\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%_ptr_Input_v4float = OpTypePointer Input %v4float\n"
+		"%_ptr_Output_v4float = OpTypePointer Output %v4float\n"
+		"%in_var = OpVariable %_ptr_Input_v4float Input\n"
+		"%out_var = OpVariable %_ptr_Output_v4float Output\n"
+		"%float_1 = OpConstant %float 1\n"
+		"%float_2 = OpConstant %float 2\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%a = OpLoad %v4float %in_var\n"
+		"%b = OpCompositeConstruct %v2float %float_1 %float_2\n"
+		"%r = OpVectorShuffle %v4float %a %b 2 5 0 4294967295\n"
+		"OpStore %out_var %r\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
+
+	see::exec::Value input;
+	input.m_rows = 4;
+	input.SetFloat(0, 10.0f);
+	input.SetFloat(1, 20.0f);
+	input.SetFloat(2, 30.0f);
+	input.SetFloat(3, 40.0f);
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}});
+	REQUIRE(result.has_value());
+
+	auto outIt = result->find(outId);
+	REQUIRE(outIt != result->end());
+	CHECK(outIt->second.GetFloat(0) == 30.0f);
+	CHECK(outIt->second.GetFloat(1) == 2.0f);
+	CHECK(outIt->second.GetFloat(2) == 10.0f);
+	CHECK(outIt->second.GetFloat(3) == 0.0f);
+}
