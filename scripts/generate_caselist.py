@@ -12,7 +12,9 @@ its test tree (renamed groups like pipeline.* -> pipeline.monolithic.*). For the
 same reason the historical 1.0.x mustpass files cannot be used with a modern
 binary: their test names predate those renames. The vk10 profile is the modern
 equivalent - the 1.4.4.1 names, restricted to the group files a Vulkan 1.0
-driver can exercise (extension/1.1+ groups would all report NotSupported).
+driver can exercise (extension/1.1+ groups would all report NotSupported),
+minus the individual cases that call a core 1.1 entry point without guarding
+on the API version (see Vk10ExcludedCasePrefixes).
 """
 
 import argparse
@@ -68,6 +70,15 @@ Vk10ExcludedPrefixes = (
 	"ycbcr",
 )
 
+# Individual cases living in a group file the vk10 profile keeps, but whose checkSupport
+# calls a core 1.1 entry point unconditionally. On a 1.0 instance the loader returns a null
+# pointer for those names and deqp jumps to address 0 instead of reporting NotSupported,
+# taking the whole run down. Drop them until the driver advertises 1.1.
+Vk10ExcludedCasePrefixes = (
+	# multiplane::checkFormatSupport -> vkGetPhysicalDeviceImageFormatProperties2
+	"dEQP-VK.api.copy_and_blit.multiplanar_xfer.",
+)
+
 
 def git_show(repo: str, tag: str, path: str) -> str:
     result = subprocess.run(
@@ -95,6 +106,7 @@ def main() -> None:
 
     total = 0
     skipped = 0
+    skippedCases = 0
     with open(args.output, "w", newline="\n") as out:
         for entry in index.splitlines():
             entry = entry.strip()
@@ -106,11 +118,16 @@ def main() -> None:
                 print(f"{entry}: skipped ({args.profile} profile)")
                 continue
             content = git_show(args.cts_repo, args.tag, f"{MustpassRoot}/{entry}")
-            if not content.endswith("\n"):
-                content += "\n"
-            out.write(content)
-            total += content.count("\n")
-            print(f"{entry}: done")
+            cases = [case for case in content.splitlines() if case.strip()]
+            dropped = 0
+            if args.profile == "vk10":
+                kept = [case for case in cases if not case.startswith(Vk10ExcludedCasePrefixes)]
+                dropped = len(cases) - len(kept)
+                skippedCases += dropped
+                cases = kept
+            out.write("".join(case + "\n" for case in cases))
+            total += len(cases)
+            print(f"{entry}: done" + (f" ({dropped} cases dropped)" if dropped else ""))
 
     # The committed artifact: the raw file is gitignored (over GitHub's size limit), the
     # vk-cts-* xmake target extracts this zip when vk-default.txt is absent (fresh checkout, CI).
@@ -118,7 +135,7 @@ def main() -> None:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         archive.write(args.output, Path(args.output).name)
 
-    print(f"\n{total} tests -> {args.output} ({skipped} group files skipped)")
+    print(f"\n{total} tests -> {args.output} ({skipped} group files skipped, {skippedCases} cases dropped)")
     print(f"compressed -> {zip_path} ({os.path.getsize(zip_path)} bytes)")
 
 
