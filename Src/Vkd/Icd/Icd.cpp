@@ -40,10 +40,10 @@ namespace vkd
 
 #define VKD_ENTRYPOINT_LOOKUP(klass, name) \
 	if (strcmp(pName, "vk" #name) == 0)    \
-	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
 #define VKD_ENTRYPOINT_LOOKUP_KHR(klass, name) \
 	if (strcmp(pName, "vk" #name "KHR") == 0)  \
-	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceExtensionProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceLayerProperties);

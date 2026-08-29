@@ -10,6 +10,7 @@
 #pragma once
 
 #include <cstring>
+#include <new>
 
 #include <Concerto/Core/Assert.hpp>
 #include <Concerto/Core/EnumFlags/EnumFlags.hpp>
@@ -151,6 +152,37 @@ namespace vkd
 
 		return name;
 	}
+
+	template<auto Entry>
+	struct EntryPointGuard;
+
+	template<typename Ret, typename... Args, Ret(VKAPI_PTR* Entry)(Args...)>
+	struct EntryPointGuard<Entry>
+	{
+		static Ret VKAPI_CALL Call(Args... args) noexcept
+		{
+			try
+			{
+				return Entry(args...);
+			}
+			catch (const std::bad_alloc&)
+			{
+				cct::Logger::Error("host allocation failed, reporting VK_ERROR_OUT_OF_HOST_MEMORY");
+				if constexpr (std::is_same_v<Ret, VkResult>)
+					return VK_ERROR_OUT_OF_HOST_MEMORY;
+				else if constexpr (!std::is_void_v<Ret>)
+					return Ret{};
+			}
+			catch (...)
+			{
+				cct::Logger::Error("unexpected exception escaped a Vulkan entry point");
+				if constexpr (std::is_same_v<Ret, VkResult>)
+					return VK_ERROR_UNKNOWN;
+				else if constexpr (!std::is_void_v<Ret>)
+					return Ret{};
+			}
+		}
+	};
 
 	template<typename... Types>
 	VkResult Error(VkResult result, const std::format_string<Types...> fmt, Types&&... args)
