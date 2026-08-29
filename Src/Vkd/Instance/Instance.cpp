@@ -6,6 +6,8 @@
 
 #include "Vkd/Instance/Instance.hpp"
 
+#include <algorithm>
+
 #include "Vkd/Icd/Icd.hpp"
 #include "Vkd/Memory/AllocationCallbacks.hpp"
 #include "VkdSoftware/PhysicalDevice/PhysicalDevice.hpp"
@@ -174,17 +176,33 @@ namespace vkd
 		return m_physicalDevices;
 	}
 
-	VkResult Instance::EnumeratePhysicalDeviceGroups(VkInstance instance, uint32_t* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties)
+	VkResult Instance::EnumeratePhysicalDeviceGroups(VkInstance pInstance, uint32_t* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkEnumeratePhysicalDeviceGroups not implemented (Vulkan 1.1)");
 
-		if (pPhysicalDeviceGroupCount && !pPhysicalDeviceGroupProperties)
+		VKD_FROM_HANDLE(vkd::Instance, instance, pInstance);
+		VKD_CHECK(instance && pPhysicalDeviceGroupCount);
+
+		instance->EnumeratePlatformPhysicalDevices();
+		auto physicalDevices = instance->GetPhysicalDevices();
+		const UInt32 groupCount = static_cast<UInt32>(physicalDevices.size());
+
+		if (!pPhysicalDeviceGroupProperties)
 		{
-			*pPhysicalDeviceGroupCount = 0;
+			*pPhysicalDeviceGroupCount = groupCount;
 			return VK_SUCCESS;
 		}
 
-		return VK_SUCCESS;
+		const UInt32 writtenCount = std::min(*pPhysicalDeviceGroupCount, groupCount);
+		for (UInt32 i = 0; i < writtenCount; ++i)
+		{
+			VkPhysicalDeviceGroupProperties& group = pPhysicalDeviceGroupProperties[i];
+			group.physicalDeviceCount = 1;
+			group.physicalDevices[0] = VKD_TO_HANDLE(VkPhysicalDevice, physicalDevices[i]);
+			group.subsetAllocation = VK_FALSE;
+		}
+
+		*pPhysicalDeviceGroupCount = writtenCount;
+		return writtenCount < groupCount ? VK_INCOMPLETE : VK_SUCCESS;
 	}
 } // namespace vkd
