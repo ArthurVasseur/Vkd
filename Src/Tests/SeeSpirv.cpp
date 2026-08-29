@@ -36,8 +36,10 @@ namespace
 
 TEST_CASE("see::spirv::Parse - rejects invalid binaries", "[see][spirv]")
 {
+	static constexpr cct::UInt32 BadMagic[] = {0xDEADBEEF, 0, 0, 0, 0};
+
 	REQUIRE_FALSE(see::spirv::Parse({}).has_value());
-	REQUIRE_FALSE(see::spirv::Parse({0xDEADBEEF, 0, 0, 0, 0}).has_value());
+	REQUIRE_FALSE(see::spirv::Parse(BadMagic).has_value());
 }
 
 TEST_CASE("see::spirv::Parse - builds CFG, entry points and decorations for a diamond branch", "[see][spirv]")

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <optional>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -85,5 +86,5 @@ namespace see::spirv
 	};
 
 	// Returns nullopt if the binary fails to parse (invalid SPIR-V).
-	[[nodiscard]] std::optional<Module> Parse(const std::vector<cct::UInt32>& code);
+	[[nodiscard]] std::optional<Module> Parse(std::span<const cct::UInt32> code);
 } // namespace see::spirv

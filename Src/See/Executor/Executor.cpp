@@ -27,7 +27,7 @@ namespace see
 		spvContextDestroy(m_context);
 	}
 
-	bool Executor::IsValidSpirv(const std::vector<cct::UInt32>& spirvCode) const
+	bool Executor::IsValidSpirv(std::span<const cct::UInt32> spirvCode) const
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		spv_diagnostic diagnostic = nullptr;
@@ -43,7 +43,7 @@ namespace see
 		return false;
 	}
 
-	ShaderHandle Executor::RegisterShader(ShaderStage stage, const std::vector<cct::UInt32>& spirvCode, const std::string& entryPoint)
+	ShaderHandle Executor::RegisterShader(ShaderStage stage, std::span<const cct::UInt32> spirvCode, std::string_view entryPoint)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		if (!IsValidSpirv(spirvCode))
@@ -64,7 +64,7 @@ namespace see
 
 		std::unique_lock<std::shared_mutex> lock(m_shadersMutex);
 		const ShaderHandle handle = m_nextHandle++;
-		m_shaders.emplace(handle, RegisteredShader{.m_stage = stage, .m_code = spirvCode, .m_entryPoint = entryPoint, .m_irModule = std::move(*irModule), .m_entryFunctionId = entryPointIt->m_functionId});
+		m_shaders.emplace(handle, RegisteredShader{.m_stage = stage, .m_code = std::vector<cct::UInt32>(spirvCode.begin(), spirvCode.end()), .m_entryPoint = std::string(entryPoint), .m_irModule = std::move(*irModule), .m_entryFunctionId = entryPointIt->m_functionId});
 		return handle;
 	}
 

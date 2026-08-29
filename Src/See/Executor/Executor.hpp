@@ -7,7 +7,9 @@
 #pragma once
 
 #include <shared_mutex>
+#include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -42,10 +44,10 @@ namespace see
 
 		// Validates, parses and converts to IR. Returns InvalidShaderHandle if any of that fails,
 		// or if no OpEntryPoint in the module matches `entryPoint`.
-		[[nodiscard]] ShaderHandle RegisterShader(ShaderStage stage, const std::vector<cct::UInt32>& spirvCode, const std::string& entryPoint);
+		[[nodiscard]] ShaderHandle RegisterShader(ShaderStage stage, std::span<const cct::UInt32> spirvCode, std::string_view entryPoint);
 		void UnregisterShader(ShaderHandle handle);
 
-		[[nodiscard]] bool IsValidSpirv(const std::vector<cct::UInt32>& spirvCode) const;
+		[[nodiscard]] bool IsValidSpirv(std::span<const cct::UInt32> spirvCode) const;
 
 		[[nodiscard]] const ir::Module* GetIrModule(ShaderHandle handle) const;
 		[[nodiscard]] const ir::Function* GetEntryFunction(ShaderHandle handle) const;

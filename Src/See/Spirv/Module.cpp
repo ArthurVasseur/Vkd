@@ -218,7 +218,7 @@ namespace see::spirv
 		}
 	} // namespace
 
-	std::optional<Module> Parse(const std::vector<cct::UInt32>& code)
+	std::optional<Module> Parse(std::span<const cct::UInt32> code)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		spv_context context = spvContextCreate(SPV_ENV_UNIVERSAL_1_5);
