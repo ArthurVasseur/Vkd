@@ -49,7 +49,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceLayerProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceVersion);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, CreateInstance);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, GetInstanceProcAddr);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Icd, GetInstanceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, DestroyInstance);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumeratePhysicalDevices);
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFeatures);

@@ -112,14 +112,6 @@ namespace vkd
 		mem::DeleteDispatchable(dispatchable);
 	}
 
-	PFN_vkVoidFunction Instance::GetInstanceProcAddr(VkInstance instance, const char* pName)
-	{
-		VKD_AUTO_PROFILER_SCOPE();
-
-		CCT_ASSERT_FALSE("Not Implemented");
-		return nullptr;
-	}
-
 	VkResult Instance::EnumeratePhysicalDevices(VkInstance pInstance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
