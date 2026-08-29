@@ -228,6 +228,25 @@ namespace see::exec
 			return &state.m_registers.Emplace(ir::GetSlot(ref));
 		}
 
+		void ResetHeader(Value& value)
+		{
+			value.m_scalar = ir::ScalarKind::Float32;
+			value.m_rows = 1;
+			value.m_columns = 1;
+			value.m_structType = 0;
+			value.m_imageVariable = 0;
+		}
+
+		Value* EmplaceResult(RuntimeState& state, cct::UInt32 id)
+		{
+			Value* slot = SsaSlot(state, id);
+			if (!slot)
+				return nullptr;
+
+			ResetHeader(*slot);
+			return slot;
+		}
+
 		bool StoreSsa(RuntimeState& state, cct::UInt32 id, const Value& value)
 		{
 			Value* slot = SsaSlot(state, id);
@@ -523,11 +542,14 @@ namespace see::exec
 			if (indexValue >= vector->m_rows * vector->m_columns)
 				return false;
 
-			Value result;
-			result.m_scalar = vector->m_scalar;
-			result.m_bits[0] = vector->m_bits[indexValue];
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
 
-			return StoreSsa(state, instruction.m_id, result);
+			result->m_scalar = vector->m_scalar;
+			result->m_bits[0] = vector->m_bits[indexValue];
+
+			return true;
 		}
 
 		bool ExecuteVectorInsertDynamic(RuntimeState& state, const ir::Instruction& instruction)
@@ -545,10 +567,14 @@ namespace see::exec
 			if (indexValue >= vector->m_rows * vector->m_columns)
 				return false;
 
-			Value result = *vector;
-			result.m_bits[indexValue] = component->m_bits[0];
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
 
-			return StoreSsa(state, instruction.m_id, result);
+			*result = *vector;
+			result->m_bits[indexValue] = component->m_bits[0];
+
+			return true;
 		}
 
 		static constexpr cct::UInt32 UndefinedShuffleComponent = 0xFFFFFFFF;
@@ -602,13 +628,16 @@ namespace see::exec
 			if (!lhs || !rhs || lhs->m_rows != rhs->m_rows || lhs->m_scalar != rhs->m_scalar)
 				return false;
 
-			Value result;
-			result.m_scalar = lhs->m_scalar;
-			result.m_rows = lhs->m_rows;
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
 
-			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
+			result->m_scalar = lhs->m_scalar;
+			result->m_rows = lhs->m_rows;
+
+			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
 			{
-				if (result.m_scalar == ir::ScalarKind::Int32)
+				if (result->m_scalar == ir::ScalarKind::Int32)
 				{
 					const cct::Int32 a = lhs->GetInt32(i);
 					const cct::Int32 b = rhs->GetInt32(i);
@@ -660,7 +689,7 @@ namespace see::exec
 						default:
 							return false;
 					}
-					result.SetInt32(i, r);
+					result->SetInt32(i, r);
 				}
 				else
 				{
@@ -690,11 +719,11 @@ namespace see::exec
 						default:
 							return false;
 					}
-					result.SetFloat(i, r);
+					result->SetFloat(i, r);
 				}
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteNegate(RuntimeState& state, const ir::Instruction& instruction)
@@ -706,16 +735,20 @@ namespace see::exec
 			if (!operand)
 				return false;
 
-			Value result = *operand;
-			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			*result = *operand;
+			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
 			{
-				if (result.m_scalar == ir::ScalarKind::Int32)
-					result.SetInt32(i, -operand->GetInt32(i));
+				if (result->m_scalar == ir::ScalarKind::Int32)
+					result->SetInt32(i, -operand->GetInt32(i));
 				else
-					result.SetFloat(i, -operand->GetFloat(i));
+					result->SetFloat(i, -operand->GetFloat(i));
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		cct::UInt32 ReverseBits(cct::UInt32 value)
@@ -736,27 +769,31 @@ namespace see::exec
 			if (!operand || operand->m_scalar != ir::ScalarKind::Int32)
 				return false;
 
-			Value result = *operand;
-			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			*result = *operand;
+			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
 			{
 				const cct::UInt32 bits = static_cast<cct::UInt32>(operand->GetInt32(i));
 				switch (instruction.m_op)
 				{
 					case ir::Op::BitwiseNot:
-						result.SetInt32(i, static_cast<cct::Int32>(~bits));
+						result->SetInt32(i, static_cast<cct::Int32>(~bits));
 						break;
 					case ir::Op::BitCount:
-						result.SetInt32(i, static_cast<cct::Int32>(std::popcount(bits)));
+						result->SetInt32(i, static_cast<cct::Int32>(std::popcount(bits)));
 						break;
 					case ir::Op::BitReverse:
-						result.SetInt32(i, static_cast<cct::Int32>(ReverseBits(bits)));
+						result->SetInt32(i, static_cast<cct::Int32>(ReverseBits(bits)));
 						break;
 					default:
 						return false;
 				}
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteBitField(RuntimeState& state, const ir::Instruction& instruction)
@@ -777,16 +814,20 @@ namespace see::exec
 			if (offsetValue > 32 || countValue > 32 || offsetValue + countValue > 32)
 				return false;
 
-			Value result = *base;
-			const cct::UInt32 componentCount = result.m_rows * result.m_columns;
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			*result = *base;
+			const cct::UInt32 componentCount = result->m_rows * result->m_columns;
 
 			if (countValue == 0)
 			{
 				if (!isInsert)
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
-						result.SetInt32(i, 0);
+						result->SetInt32(i, 0);
 
-				return StoreSsa(state, instruction.m_id, result);
+				return true;
 			}
 
 			const cct::UInt32 mask = countValue == 32 ? 0xFFFFFFFFu : ((1u << countValue) - 1u);
@@ -810,10 +851,10 @@ namespace see::exec
 					default:
 						return false;
 				}
-				result.SetInt32(i, static_cast<cct::Int32>(value));
+				result->SetInt32(i, static_cast<cct::Int32>(value));
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteBitcast(RuntimeState& state, const ir::Instruction& instruction)
@@ -850,30 +891,34 @@ namespace see::exec
 			if (!operand)
 				return false;
 
-			Value result = *operand;
-			result.m_scalar = (instruction.m_op == ir::Op::ConvertSignedToFloat || instruction.m_op == ir::Op::ConvertUnsignedToFloat) ? ir::ScalarKind::Float32 : ir::ScalarKind::Int32;
-			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			*result = *operand;
+			result->m_scalar = (instruction.m_op == ir::Op::ConvertSignedToFloat || instruction.m_op == ir::Op::ConvertUnsignedToFloat) ? ir::ScalarKind::Float32 : ir::ScalarKind::Int32;
+			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
 			{
 				switch (instruction.m_op)
 				{
 					case ir::Op::ConvertSignedToFloat:
-						result.SetFloat(i, static_cast<float>(operand->GetInt32(i)));
+						result->SetFloat(i, static_cast<float>(operand->GetInt32(i)));
 						break;
 					case ir::Op::ConvertUnsignedToFloat:
-						result.SetFloat(i, static_cast<float>(static_cast<cct::UInt32>(operand->GetInt32(i))));
+						result->SetFloat(i, static_cast<float>(static_cast<cct::UInt32>(operand->GetInt32(i))));
 						break;
 					case ir::Op::ConvertFloatToSigned:
-						result.SetInt32(i, static_cast<cct::Int32>(operand->GetFloat(i)));
+						result->SetInt32(i, static_cast<cct::Int32>(operand->GetFloat(i)));
 						break;
 					case ir::Op::ConvertFloatToUnsigned:
-						result.SetInt32(i, static_cast<cct::Int32>(static_cast<cct::UInt32>(operand->GetFloat(i))));
+						result->SetInt32(i, static_cast<cct::Int32>(static_cast<cct::UInt32>(operand->GetFloat(i))));
 						break;
 					default:
 						return false;
 				}
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteDot(RuntimeState& state, const ir::Instruction& instruction)
@@ -890,9 +935,12 @@ namespace see::exec
 			for (cct::UInt32 i = 0; i < lhs->m_rows; ++i)
 				sum += lhs->GetFloat(i) * rhs->GetFloat(i);
 
-			Value result;
-			result.SetFloat(0, sum);
-			return StoreSsa(state, instruction.m_id, result);
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			result->SetFloat(0, sum);
+			return true;
 		}
 
 		bool ExecuteMatrixTimesVector(RuntimeState& state, const ir::Instruction& instruction)
@@ -905,18 +953,21 @@ namespace see::exec
 			if (!matrix || !vector || matrix->m_columns != vector->m_rows)
 				return false;
 
-			Value result;
-			result.m_rows = matrix->m_rows;
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			result->m_rows = matrix->m_rows;
 
 			for (cct::UInt32 row = 0; row < matrix->m_rows; ++row)
 			{
 				float sum = 0.0f;
 				for (cct::UInt32 col = 0; col < matrix->m_columns; ++col)
 					sum += matrix->GetFloat(col * matrix->m_rows + row) * vector->GetFloat(col);
-				result.SetFloat(row, sum);
+				result->SetFloat(row, sum);
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteVectorTimesMatrix(RuntimeState& state, const ir::Instruction& instruction)
@@ -929,18 +980,21 @@ namespace see::exec
 			if (!vector || !matrix || vector->m_rows != matrix->m_rows)
 				return false;
 
-			Value result;
-			result.m_rows = matrix->m_columns;
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			result->m_rows = matrix->m_columns;
 
 			for (cct::UInt32 col = 0; col < matrix->m_columns; ++col)
 			{
 				float sum = 0.0f;
 				for (cct::UInt32 row = 0; row < matrix->m_rows; ++row)
 					sum += vector->GetFloat(row) * matrix->GetFloat(col * matrix->m_rows + row);
-				result.SetFloat(col, sum);
+				result->SetFloat(col, sum);
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteMatrixTimesMatrix(RuntimeState& state, const ir::Instruction& instruction)
@@ -953,22 +1007,25 @@ namespace see::exec
 			if (!lhs || !rhs || lhs->m_columns != rhs->m_rows)
 				return false;
 
-			Value result;
-			result.m_rows = lhs->m_rows;
-			result.m_columns = rhs->m_columns;
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
 
-			for (cct::UInt32 col = 0; col < result.m_columns; ++col)
+			result->m_rows = lhs->m_rows;
+			result->m_columns = rhs->m_columns;
+
+			for (cct::UInt32 col = 0; col < result->m_columns; ++col)
 			{
-				for (cct::UInt32 row = 0; row < result.m_rows; ++row)
+				for (cct::UInt32 row = 0; row < result->m_rows; ++row)
 				{
 					float sum = 0.0f;
 					for (cct::UInt32 k = 0; k < lhs->m_columns; ++k)
 						sum += lhs->GetFloat(k * lhs->m_rows + row) * rhs->GetFloat(col * rhs->m_rows + k);
-					result.SetFloat(col * result.m_rows + row, sum);
+					result->SetFloat(col * result->m_rows + row, sum);
 				}
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteVectorTimesScalar(RuntimeState& state, const ir::Instruction& instruction)
@@ -981,12 +1038,16 @@ namespace see::exec
 			if (!composite || !scalar)
 				return false;
 
-			Value result = *composite;
-			const float factor = scalar->GetFloat(0);
-			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
-				result.SetFloat(i, composite->GetFloat(i) * factor);
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
 
-			return StoreSsa(state, instruction.m_id, result);
+			*result = *composite;
+			const float factor = scalar->GetFloat(0);
+			for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
+				result->SetFloat(i, composite->GetFloat(i) * factor);
+
+			return true;
 		}
 
 		bool ExecuteCompare(RuntimeState& state, const ir::Instruction& instruction)
@@ -1001,10 +1062,13 @@ namespace see::exec
 
 			const bool isInt = lhs->m_scalar != ir::ScalarKind::Float32;
 
-			Value result;
-			result.m_scalar = ir::ScalarKind::Bool;
-			result.m_rows = lhs->m_rows;
-			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			result->m_scalar = ir::ScalarKind::Bool;
+			result->m_rows = lhs->m_rows;
+			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
 			{
 				const cct::Int32 signedLeft = lhs->GetInt32(i);
 				const cct::Int32 signedRight = rhs->GetInt32(i);
@@ -1049,10 +1113,10 @@ namespace see::exec
 					default:
 						return false;
 				}
-				result.SetBool(i, comparisonResult);
+				result->SetBool(i, comparisonResult);
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteLogicalBinary(RuntimeState& state, const ir::Instruction& instruction)
@@ -1065,33 +1129,36 @@ namespace see::exec
 			if (!lhs || !rhs)
 				return false;
 
-			Value result;
-			result.m_scalar = ir::ScalarKind::Bool;
-			result.m_rows = lhs->m_rows;
-			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			result->m_scalar = ir::ScalarKind::Bool;
+			result->m_rows = lhs->m_rows;
+			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
 			{
 				const bool a = lhs->GetBool(i);
 				const bool b = rhs->GetBool(i);
 				switch (instruction.m_op)
 				{
 					case ir::Op::LogicalAnd:
-						result.SetBool(i, a && b);
+						result->SetBool(i, a && b);
 						break;
 					case ir::Op::LogicalOr:
-						result.SetBool(i, a || b);
+						result->SetBool(i, a || b);
 						break;
 					case ir::Op::LogicalEqual:
-						result.SetBool(i, a == b);
+						result->SetBool(i, a == b);
 						break;
 					case ir::Op::LogicalNotEqual:
-						result.SetBool(i, a != b);
+						result->SetBool(i, a != b);
 						break;
 					default:
 						return false;
 				}
 			}
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteLogicalNot(RuntimeState& state, const ir::Instruction& instruction)
@@ -1103,13 +1170,16 @@ namespace see::exec
 			if (!operand)
 				return false;
 
-			Value result;
-			result.m_scalar = ir::ScalarKind::Bool;
-			result.m_rows = operand->m_rows;
-			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
-				result.SetBool(i, !operand->GetBool(i));
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
 
-			return StoreSsa(state, instruction.m_id, result);
+			result->m_scalar = ir::ScalarKind::Bool;
+			result->m_rows = operand->m_rows;
+			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
+				result->SetBool(i, !operand->GetBool(i));
+
+			return true;
 		}
 
 		bool ExecuteAllAny(RuntimeState& state, const ir::Instruction& instruction)
@@ -1130,10 +1200,13 @@ namespace see::exec
 					accumulator = accumulator || operand->GetBool(i);
 			}
 
-			Value result;
-			result.m_scalar = ir::ScalarKind::Bool;
-			result.SetBool(0, accumulator);
-			return StoreSsa(state, instruction.m_id, result);
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			result->m_scalar = ir::ScalarKind::Bool;
+			result->SetBool(0, accumulator);
+			return true;
 		}
 
 		bool ExecuteSelect(RuntimeState& state, const ir::Instruction& instruction)
@@ -1151,10 +1224,14 @@ namespace see::exec
 			// a scalar condition picks one operand whole, whatever its shape.
 			if (condition->m_rows * condition->m_columns > 1)
 			{
-				Value result = *whenTrue;
-				for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
-					result.m_bits[i] = condition->GetBool(i) ? whenTrue->m_bits[i] : whenFalse->m_bits[i];
-				return StoreSsa(state, instruction.m_id, result);
+				Value* result = SsaSlot(state, instruction.m_id);
+				if (!result)
+					return false;
+
+				*result = *whenTrue;
+				for (cct::UInt32 i = 0; i < result->m_rows * result->m_columns; ++i)
+					result->m_bits[i] = condition->GetBool(i) ? whenTrue->m_bits[i] : whenFalse->m_bits[i];
+				return true;
 			}
 
 			return StoreSsa(state, instruction.m_id, condition->GetBool() ? *whenTrue : *whenFalse);
@@ -1186,12 +1263,15 @@ namespace see::exec
 
 			const cct::UInt8* texel = image.m_texels + (static_cast<std::size_t>(y) * image.m_width + x) * 4;
 
-			Value result;
-			result.m_rows = 4;
-			for (cct::UInt32 i = 0; i < 4; ++i)
-				result.SetFloat(i, static_cast<float>(texel[i]) / 255.0f);
+			Value* result = EmplaceResult(state, instruction.m_id);
+			if (!result)
+				return false;
 
-			return StoreSsa(state, instruction.m_id, result);
+			result->m_rows = 4;
+			for (cct::UInt32 i = 0; i < 4; ++i)
+				result->SetFloat(i, static_cast<float>(texel[i]) / 255.0f);
+
+			return true;
 		}
 
 		bool ExecuteGlslStd450(RuntimeState& state, const ir::Instruction& instruction)
@@ -1213,12 +1293,16 @@ namespace see::exec
 				return false;
 
 			const cct::UInt32 componentCount = operands[0]->m_rows * operands[0]->m_columns;
-			Value result = *operands[0];
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			*result = *operands[0];
 
 			const auto floatUnary = [&](auto&& f)
 			{
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetFloat(i, f(operands[0]->GetFloat(i)));
+					result->SetFloat(i, f(operands[0]->GetFloat(i)));
 				return true;
 			};
 			const auto floatBinary = [&](auto&& f)
@@ -1226,7 +1310,7 @@ namespace see::exec
 				if (operands.size() < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i)));
+					result->SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i)));
 				return true;
 			};
 			const auto floatTernary = [&](auto&& f)
@@ -1234,13 +1318,13 @@ namespace see::exec
 				if (operands.size() < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i), operands[2]->GetFloat(i)));
+					result->SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i), operands[2]->GetFloat(i)));
 				return true;
 			};
 			const auto intUnary = [&](auto&& f)
 			{
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetInt32(i, f(operands[0]->GetInt32(i)));
+					result->SetInt32(i, f(operands[0]->GetInt32(i)));
 				return true;
 			};
 			const auto intBinary = [&](auto&& f)
@@ -1248,7 +1332,7 @@ namespace see::exec
 				if (operands.size() < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i)));
+					result->SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i)));
 				return true;
 			};
 			const auto intTernary = [&](auto&& f)
@@ -1256,7 +1340,7 @@ namespace see::exec
 				if (operands.size() < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i), operands[2]->GetInt32(i)));
+					result->SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i), operands[2]->GetInt32(i)));
 				return true;
 			};
 			const auto vectorLength = [](const Value& v)
@@ -1431,8 +1515,8 @@ namespace see::exec
 									  { return a * b + c; });
 					break;
 				case GLSLstd450Length:
-					result = Value{};
-					result.SetFloat(0, vectorLength(*operands[0]));
+					ResetHeader(*result);
+					result->SetFloat(0, vectorLength(*operands[0]));
 					break;
 				case GLSLstd450Distance:
 				{
@@ -1444,8 +1528,8 @@ namespace see::exec
 						const float d = operands[0]->GetFloat(i) - operands[1]->GetFloat(i);
 						sum += d * d;
 					}
-					result = Value{};
-					result.SetFloat(0, std::sqrt(sum));
+					ResetHeader(*result);
+					result->SetFloat(0, std::sqrt(sum));
 					break;
 				}
 				case GLSLstd450Cross:
@@ -1454,9 +1538,9 @@ namespace see::exec
 						return false;
 					const Value& a = *operands[0];
 					const Value& b = *operands[1];
-					result.SetFloat(0, a.GetFloat(1) * b.GetFloat(2) - a.GetFloat(2) * b.GetFloat(1));
-					result.SetFloat(1, a.GetFloat(2) * b.GetFloat(0) - a.GetFloat(0) * b.GetFloat(2));
-					result.SetFloat(2, a.GetFloat(0) * b.GetFloat(1) - a.GetFloat(1) * b.GetFloat(0));
+					result->SetFloat(0, a.GetFloat(1) * b.GetFloat(2) - a.GetFloat(2) * b.GetFloat(1));
+					result->SetFloat(1, a.GetFloat(2) * b.GetFloat(0) - a.GetFloat(0) * b.GetFloat(2));
+					result->SetFloat(2, a.GetFloat(0) * b.GetFloat(1) - a.GetFloat(1) * b.GetFloat(0));
 					break;
 				}
 				case GLSLstd450Normalize:
@@ -1465,7 +1549,7 @@ namespace see::exec
 					if (length == 0.0f)
 						return false;
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
-						result.SetFloat(i, operands[0]->GetFloat(i) / length);
+						result->SetFloat(i, operands[0]->GetFloat(i) / length);
 					break;
 				}
 				default:
@@ -1475,7 +1559,7 @@ namespace see::exec
 			if (!ok)
 				return false;
 
-			return StoreSsa(state, instruction.m_id, result);
+			return true;
 		}
 
 		bool ExecuteInstruction(RuntimeState& state, const ir::Instruction& instruction)
