@@ -51,6 +51,92 @@ namespace see::exec
 			return std::nullopt;
 		}
 
+		struct VariableShape
+		{
+			cct::UInt32 m_rows = 1;
+			cct::UInt32 m_columns = 1;
+		};
+
+		// A matrix consumes one location per column, so its value is split across consecutive locations.
+		VariableShape FindVariableShape(const ir::Module& module, cct::UInt32 variableId)
+		{
+			for (const ir::Instruction& global : module.m_globalInstructions)
+			{
+				if (global.m_id != variableId)
+					continue;
+
+				auto pointerIt = module.m_types.find(global.m_type);
+				if (pointerIt == module.m_types.end() || pointerIt->second.m_kind != ir::TypeKind::Pointer)
+					break;
+
+				auto valueIt = module.m_types.find(pointerIt->second.m_pointee);
+				if (valueIt == module.m_types.end() || valueIt->second.m_kind != ir::TypeKind::Matrix)
+					break;
+
+				auto columnIt = module.m_types.find(valueIt->second.m_pointee);
+				if (columnIt == module.m_types.end())
+					break;
+
+				return VariableShape{.m_rows = columnIt->second.m_componentCount, .m_columns = valueIt->second.m_componentCount};
+			}
+			return VariableShape{};
+		}
+
+		std::optional<Value> GatherLocationValue(const ir::Module& module, cct::UInt32 variableId, cct::UInt32 location, const std::unordered_map<cct::UInt32, Value>& locationInputs)
+		{
+			const VariableShape shape = FindVariableShape(module, variableId);
+			if (shape.m_columns <= 1)
+			{
+				auto it = locationInputs.find(location);
+				if (it == locationInputs.end())
+					return std::nullopt;
+
+				return it->second;
+			}
+
+			Value result;
+			result.m_rows = shape.m_rows;
+			result.m_columns = shape.m_columns;
+			bool any = false;
+			for (cct::UInt32 column = 0; column < shape.m_columns; ++column)
+			{
+				auto it = locationInputs.find(location + column);
+				if (it == locationInputs.end())
+					continue;
+
+				any = true;
+				result.m_scalar = it->second.m_scalar;
+				for (cct::UInt32 row = 0; row < shape.m_rows; ++row)
+					result.m_bits[column * shape.m_rows + row] = it->second.m_bits[row];
+			}
+
+			if (!any)
+				return std::nullopt;
+
+			return result;
+		}
+
+		void ScatterLocationValue(const ir::Module& module, cct::UInt32 variableId, cct::UInt32 location, const Value& value, std::unordered_map<cct::UInt32, Value>& outLocations)
+		{
+			const VariableShape shape = FindVariableShape(module, variableId);
+			if (shape.m_columns <= 1)
+			{
+				outLocations[location] = value;
+				return;
+			}
+
+			for (cct::UInt32 column = 0; column < shape.m_columns; ++column)
+			{
+				Value columnValue;
+				columnValue.m_scalar = value.m_scalar;
+				columnValue.m_rows = shape.m_rows;
+				for (cct::UInt32 row = 0; row < shape.m_rows; ++row)
+					columnValue.m_bits[row] = value.m_bits[column * shape.m_rows + row];
+
+				outLocations[location + column] = columnValue;
+			}
+		}
+
 		// variable id -> location number, for every Variable of the given storage class decorated Location.
 		std::unordered_map<cct::UInt32, cct::UInt32> FindLocationVariables(const ir::Module& module, SpvStorageClass storageClass)
 		{
@@ -80,11 +166,8 @@ namespace see::exec
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
-		{
-			auto valueIt = locationInputs.find(location);
-			if (valueIt != locationInputs.end())
-				inputs[variableId] = valueIt->second;
-		}
+			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
+				inputs[variableId] = *gathered;
 
 		if (std::optional<BuiltinLocation> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
 		{
@@ -129,7 +212,7 @@ namespace see::exec
 		{
 			auto valueIt = result->find(variableId);
 			if (valueIt != result->end())
-				output.m_locations[location] = valueIt->second;
+				ScatterLocationValue(module, variableId, location, valueIt->second, output.m_locations);
 		}
 
 		return output;
@@ -149,11 +232,8 @@ namespace see::exec
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : locations.m_inputs)
-		{
-			auto valueIt = locationInputs.find(location);
-			if (valueIt != locationInputs.end())
-				inputs[variableId] = valueIt->second;
-		}
+			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
+				inputs[variableId] = *gathered;
 
 		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages);
 		if (!result)
@@ -164,7 +244,7 @@ namespace see::exec
 		{
 			auto valueIt = result->find(variableId);
 			if (valueIt != result->end())
-				outputs[location] = valueIt->second;
+				ScatterLocationValue(module, variableId, location, valueIt->second, outputs);
 		}
 
 		return outputs;

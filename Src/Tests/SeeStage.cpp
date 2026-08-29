@@ -258,3 +258,100 @@ TEST_CASE("see::exec::RunFragmentStage - reads a uniform block through an extern
 	CHECK(colorIt->second.GetFloat(2) == 0.3f);
 	CHECK(colorIt->second.GetFloat(3) == 0.4f);
 }
+
+TEST_CASE("see::exec::RunFragmentStage - a matrix input spans one Location per column", "[see][stage]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint Fragment %main \"main\" %in_var %out_var\n"
+		"OpExecutionMode %main OriginUpperLeft\n"
+		"OpDecorate %in_var Flat\n"
+		"OpDecorate %in_var Location 1\n"
+		"OpDecorate %out_var Location 0\n"
+		"%float = OpTypeFloat 32\n"
+		"%v3float = OpTypeVector %float 3\n"
+		"%mat3 = OpTypeMatrix %v3float 3\n"
+		"%_ptr_Input_mat3 = OpTypePointer Input %mat3\n"
+		"%_ptr_Output_v3float = OpTypePointer Output %v3float\n"
+		"%in_var = OpVariable %_ptr_Input_mat3 Input\n"
+		"%out_var = OpVariable %_ptr_Output_v3float Output\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%m = OpLoad %mat3 %in_var\n"
+		"%col = OpCompositeExtract %v3float %m 2\n"
+		"OpStore %out_var %col\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+
+	std::unordered_map<cct::UInt32, see::exec::Value> locationInputs;
+	for (cct::UInt32 column = 0; column < 3; ++column)
+	{
+		see::exec::Value columnValue;
+		columnValue.m_rows = 3;
+		for (cct::UInt32 row = 0; row < 3; ++row)
+			columnValue.SetFloat(row, static_cast<float>(column * 3 + row));
+
+		locationInputs[1 + column] = columnValue;
+	}
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], locationInputs);
+	REQUIRE(outputs.has_value());
+
+	auto outIt = outputs->find(0);
+	REQUIRE(outIt != outputs->end());
+	CHECK(outIt->second.GetFloat(0) == 6.0f);
+	CHECK(outIt->second.GetFloat(1) == 7.0f);
+	CHECK(outIt->second.GetFloat(2) == 8.0f);
+}
+
+TEST_CASE("see::exec::RunVertexStage - a matrix output is split across consecutive Locations", "[see][stage]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint Vertex %main \"main\" %position %out_var\n"
+		"OpDecorate %position BuiltIn Position\n"
+		"OpDecorate %out_var Location 0\n"
+		"%float = OpTypeFloat 32\n"
+		"%v2float = OpTypeVector %float 2\n"
+		"%v4float = OpTypeVector %float 4\n"
+		"%mat2 = OpTypeMatrix %v2float 2\n"
+		"%_ptr_Output_v4float = OpTypePointer Output %v4float\n"
+		"%_ptr_Output_mat2 = OpTypePointer Output %mat2\n"
+		"%position = OpVariable %_ptr_Output_v4float Output\n"
+		"%out_var = OpVariable %_ptr_Output_mat2 Output\n"
+		"%float_1 = OpConstant %float 1\n"
+		"%float_2 = OpConstant %float 2\n"
+		"%float_3 = OpConstant %float 3\n"
+		"%float_4 = OpConstant %float 4\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%c0 = OpCompositeConstruct %v2float %float_1 %float_2\n"
+		"%c1 = OpCompositeConstruct %v2float %float_3 %float_4\n"
+		"%m = OpCompositeConstruct %mat2 %c0 %c1\n"
+		"OpStore %out_var %m\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+
+	std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0);
+	REQUIRE(output.has_value());
+
+	auto first = output->m_locations.find(0);
+	auto second = output->m_locations.find(1);
+	REQUIRE(first != output->m_locations.end());
+	REQUIRE(second != output->m_locations.end());
+	CHECK(first->second.m_rows == 2);
+	CHECK(first->second.GetFloat(0) == 1.0f);
+	CHECK(first->second.GetFloat(1) == 2.0f);
+	CHECK(second->second.GetFloat(0) == 3.0f);
+	CHECK(second->second.GetFloat(1) == 4.0f);
+}
