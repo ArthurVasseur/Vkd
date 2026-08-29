@@ -7,6 +7,7 @@
 #include "See/Exec/Scalar.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstring>
 
@@ -411,26 +412,46 @@ namespace see::exec
 			if (!composite)
 				return false;
 
-			const cct::UInt32 index = instruction.m_args[1];
-
-			if (composite->m_structType != 0)
+			Value current = *composite;
+			for (std::size_t argIndex = 1; argIndex < instruction.m_args.size(); ++argIndex)
 			{
-				std::optional<Value> result = ExtractStructMember(state.m_module, *composite, index);
-				if (!result)
+				const cct::UInt32 index = instruction.m_args[argIndex];
+
+				if (current.m_structType != 0)
+				{
+					std::optional<Value> member = ExtractStructMember(state.m_module, current, index);
+					if (!member)
+						return false;
+
+					current = *member;
+					continue;
+				}
+
+				if (current.m_columns > 1)
+				{
+					if (index >= current.m_columns)
+						return false;
+
+					Value column;
+					column.m_scalar = current.m_scalar;
+					column.m_rows = current.m_rows;
+					for (cct::UInt32 word = 0; word < current.m_rows; ++word)
+						column.m_bits[word] = current.m_bits[index * current.m_rows + word];
+
+					current = column;
+					continue;
+				}
+
+				if (index >= current.m_rows)
 					return false;
 
-				state.m_ssaValues[instruction.m_id] = *result;
-				return true;
+				Value component;
+				component.m_scalar = current.m_scalar;
+				component.m_bits[0] = current.m_bits[index];
+				current = component;
 			}
 
-			if (index >= composite->m_rows * composite->m_columns)
-				return false;
-
-			Value result;
-			result.m_scalar = composite->m_scalar;
-			result.m_bits[0] = composite->m_bits[index];
-
-			state.m_ssaValues[instruction.m_id] = result;
+			state.m_ssaValues[instruction.m_id] = current;
 			return true;
 		}
 
@@ -562,6 +583,27 @@ namespace see::exec
 						case ir::Op::UnsignedMod:
 							r = b != 0 ? static_cast<cct::Int32>(static_cast<cct::UInt32>(a) % static_cast<cct::UInt32>(b)) : 0;
 							break;
+						case ir::Op::UnsignedDiv:
+							r = b != 0 ? static_cast<cct::Int32>(static_cast<cct::UInt32>(a) / static_cast<cct::UInt32>(b)) : 0;
+							break;
+						case ir::Op::BitwiseAnd:
+							r = a & b;
+							break;
+						case ir::Op::BitwiseOr:
+							r = a | b;
+							break;
+						case ir::Op::BitwiseXor:
+							r = a ^ b;
+							break;
+						case ir::Op::ShiftLeftLogical:
+							r = static_cast<cct::Int32>(static_cast<cct::UInt32>(a) << (static_cast<cct::UInt32>(b) & 31u));
+							break;
+						case ir::Op::ShiftRightLogical:
+							r = static_cast<cct::Int32>(static_cast<cct::UInt32>(a) >> (static_cast<cct::UInt32>(b) & 31u));
+							break;
+						case ir::Op::ShiftRightArithmetic:
+							r = a >> (static_cast<cct::UInt32>(b) & 31u);
+							break;
 						default:
 							return false;
 					}
@@ -622,6 +664,131 @@ namespace see::exec
 			}
 
 			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
+		cct::UInt32 ReverseBits(cct::UInt32 value)
+		{
+			value = ((value & 0x55555555u) << 1) | ((value >> 1) & 0x55555555u);
+			value = ((value & 0x33333333u) << 2) | ((value >> 2) & 0x33333333u);
+			value = ((value & 0x0F0F0F0Fu) << 4) | ((value >> 4) & 0x0F0F0F0Fu);
+			value = ((value & 0x00FF00FFu) << 8) | ((value >> 8) & 0x00FF00FFu);
+			return (value << 16) | (value >> 16);
+		}
+
+		bool ExecuteBitUnary(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			if (!operand || operand->m_scalar != ir::ScalarKind::Int32)
+				return false;
+
+			Value result = *operand;
+			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
+			{
+				const cct::UInt32 bits = static_cast<cct::UInt32>(operand->GetInt32(i));
+				switch (instruction.m_op)
+				{
+					case ir::Op::BitwiseNot:
+						result.SetInt32(i, static_cast<cct::Int32>(~bits));
+						break;
+					case ir::Op::BitCount:
+						result.SetInt32(i, static_cast<cct::Int32>(std::popcount(bits)));
+						break;
+					case ir::Op::BitReverse:
+						result.SetInt32(i, static_cast<cct::Int32>(ReverseBits(bits)));
+						break;
+					default:
+						return false;
+				}
+			}
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
+		bool ExecuteBitField(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			const bool isInsert = instruction.m_op == ir::Op::BitFieldInsert;
+			if (instruction.m_args.size() < (isInsert ? 4u : 3u))
+				return false;
+
+			std::optional<Value> base = ResolveValue(state, instruction.m_args[0]);
+			std::optional<Value> insert = isInsert ? ResolveValue(state, instruction.m_args[1]) : std::nullopt;
+			std::optional<Value> offset = ResolveValue(state, instruction.m_args[isInsert ? 2 : 1]);
+			std::optional<Value> count = ResolveValue(state, instruction.m_args[isInsert ? 3 : 2]);
+			if (!base || !offset || !count || (isInsert && !insert))
+				return false;
+
+			const cct::UInt32 offsetValue = static_cast<cct::UInt32>(offset->GetInt32());
+			const cct::UInt32 countValue = static_cast<cct::UInt32>(count->GetInt32());
+			if (offsetValue > 32 || countValue > 32 || offsetValue + countValue > 32)
+				return false;
+
+			Value result = *base;
+			const cct::UInt32 componentCount = result.m_rows * result.m_columns;
+
+			if (countValue == 0)
+			{
+				if (!isInsert)
+					for (cct::UInt32 i = 0; i < componentCount; ++i)
+						result.SetInt32(i, 0);
+
+				state.m_ssaValues[instruction.m_id] = result;
+				return true;
+			}
+
+			const cct::UInt32 mask = countValue == 32 ? 0xFFFFFFFFu : ((1u << countValue) - 1u);
+			for (cct::UInt32 i = 0; i < componentCount; ++i)
+			{
+				const cct::UInt32 bits = static_cast<cct::UInt32>(base->GetInt32(i));
+				cct::UInt32 value = 0;
+				switch (instruction.m_op)
+				{
+					case ir::Op::BitFieldInsert:
+						value = (bits & ~(mask << offsetValue)) | ((static_cast<cct::UInt32>(insert->GetInt32(i)) & mask) << offsetValue);
+						break;
+					case ir::Op::BitFieldUnsignedExtract:
+						value = (bits >> offsetValue) & mask;
+						break;
+					case ir::Op::BitFieldSignedExtract:
+						value = (bits >> offsetValue) & mask;
+						if ((value & (1u << (countValue - 1u))) != 0)
+							value |= ~mask;
+						break;
+					default:
+						return false;
+				}
+				result.SetInt32(i, static_cast<cct::Int32>(value));
+			}
+
+			state.m_ssaValues[instruction.m_id] = result;
+			return true;
+		}
+
+		bool ExecuteBitcast(RuntimeState& state, const ir::Instruction& instruction)
+		{
+			if (instruction.m_args.empty())
+				return false;
+
+			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			if (!operand)
+				return false;
+
+			std::optional<Value> result = MakeZeroValue(state.m_module, instruction.m_type);
+			if (!result)
+				return false;
+
+			const cct::UInt32 componentCount = operand->m_rows * operand->m_columns;
+			if (result->m_rows * result->m_columns != componentCount)
+				return false;
+
+			for (cct::UInt32 i = 0; i < componentCount; ++i)
+				result->m_bits[i] = operand->m_bits[i];
+
+			state.m_ssaValues[instruction.m_id] = *result;
 			return true;
 		}
 
@@ -789,36 +956,52 @@ namespace see::exec
 			if (!lhs || !rhs)
 				return false;
 
-			const bool isInt = lhs->m_scalar == ir::ScalarKind::Int32;
+			const bool isInt = lhs->m_scalar != ir::ScalarKind::Float32;
 
 			Value result;
 			result.m_scalar = ir::ScalarKind::Bool;
 			result.m_rows = lhs->m_rows;
 			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
 			{
-				const float a = isInt ? static_cast<float>(lhs->GetInt32(i)) : lhs->GetFloat(i);
-				const float b = isInt ? static_cast<float>(rhs->GetInt32(i)) : rhs->GetFloat(i);
+				const cct::Int32 signedLeft = lhs->GetInt32(i);
+				const cct::Int32 signedRight = rhs->GetInt32(i);
+				const cct::UInt32 unsignedLeft = static_cast<cct::UInt32>(signedLeft);
+				const cct::UInt32 unsignedRight = static_cast<cct::UInt32>(signedRight);
+				const float floatLeft = lhs->GetFloat(i);
+				const float floatRight = rhs->GetFloat(i);
 
 				bool comparisonResult = false;
 				switch (instruction.m_op)
 				{
 					case ir::Op::CompareEqual:
-						comparisonResult = a == b;
+						comparisonResult = isInt ? signedLeft == signedRight : floatLeft == floatRight;
 						break;
 					case ir::Op::CompareNotEqual:
-						comparisonResult = a != b;
+						comparisonResult = isInt ? signedLeft != signedRight : floatLeft != floatRight;
 						break;
 					case ir::Op::CompareLess:
-						comparisonResult = a < b;
+						comparisonResult = isInt ? signedLeft < signedRight : floatLeft < floatRight;
 						break;
 					case ir::Op::CompareLessEqual:
-						comparisonResult = a <= b;
+						comparisonResult = isInt ? signedLeft <= signedRight : floatLeft <= floatRight;
 						break;
 					case ir::Op::CompareGreater:
-						comparisonResult = a > b;
+						comparisonResult = isInt ? signedLeft > signedRight : floatLeft > floatRight;
 						break;
 					case ir::Op::CompareGreaterEqual:
-						comparisonResult = a >= b;
+						comparisonResult = isInt ? signedLeft >= signedRight : floatLeft >= floatRight;
+						break;
+					case ir::Op::CompareUnsignedLess:
+						comparisonResult = unsignedLeft < unsignedRight;
+						break;
+					case ir::Op::CompareUnsignedLessEqual:
+						comparisonResult = unsignedLeft <= unsignedRight;
+						break;
+					case ir::Op::CompareUnsignedGreater:
+						comparisonResult = unsignedLeft > unsignedRight;
+						break;
+					case ir::Op::CompareUnsignedGreaterEqual:
+						comparisonResult = unsignedLeft >= unsignedRight;
 						break;
 					default:
 						return false;
@@ -1292,7 +1475,24 @@ namespace see::exec
 				case ir::Op::Rem:
 				case ir::Op::Mod:
 				case ir::Op::UnsignedMod:
+				case ir::Op::UnsignedDiv:
+				case ir::Op::BitwiseAnd:
+				case ir::Op::BitwiseOr:
+				case ir::Op::BitwiseXor:
+				case ir::Op::ShiftLeftLogical:
+				case ir::Op::ShiftRightLogical:
+				case ir::Op::ShiftRightArithmetic:
 					return ExecuteArithmetic(state, instruction);
+				case ir::Op::BitwiseNot:
+				case ir::Op::BitCount:
+				case ir::Op::BitReverse:
+					return ExecuteBitUnary(state, instruction);
+				case ir::Op::BitFieldInsert:
+				case ir::Op::BitFieldSignedExtract:
+				case ir::Op::BitFieldUnsignedExtract:
+					return ExecuteBitField(state, instruction);
+				case ir::Op::Bitcast:
+					return ExecuteBitcast(state, instruction);
 				case ir::Op::Negate:
 					return ExecuteNegate(state, instruction);
 				case ir::Op::ConvertSignedToFloat:
@@ -1316,6 +1516,10 @@ namespace see::exec
 				case ir::Op::CompareLessEqual:
 				case ir::Op::CompareGreater:
 				case ir::Op::CompareGreaterEqual:
+				case ir::Op::CompareUnsignedLess:
+				case ir::Op::CompareUnsignedLessEqual:
+				case ir::Op::CompareUnsignedGreater:
+				case ir::Op::CompareUnsignedGreaterEqual:
 					return ExecuteCompare(state, instruction);
 				case ir::Op::LogicalAnd:
 				case ir::Op::LogicalOr:

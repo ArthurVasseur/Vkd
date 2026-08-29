@@ -127,8 +127,35 @@ namespace see::ir
 					return Op::Mul;
 				case SpvOpFDiv:
 				case SpvOpSDiv:
-				case SpvOpUDiv:
 					return Op::Div;
+				case SpvOpUDiv:
+					return Op::UnsignedDiv;
+				case SpvOpBitwiseAnd:
+					return Op::BitwiseAnd;
+				case SpvOpBitwiseOr:
+					return Op::BitwiseOr;
+				case SpvOpBitwiseXor:
+					return Op::BitwiseXor;
+				case SpvOpNot:
+					return Op::BitwiseNot;
+				case SpvOpShiftLeftLogical:
+					return Op::ShiftLeftLogical;
+				case SpvOpShiftRightLogical:
+					return Op::ShiftRightLogical;
+				case SpvOpShiftRightArithmetic:
+					return Op::ShiftRightArithmetic;
+				case SpvOpBitCount:
+					return Op::BitCount;
+				case SpvOpBitReverse:
+					return Op::BitReverse;
+				case SpvOpBitFieldInsert:
+					return Op::BitFieldInsert;
+				case SpvOpBitFieldSExtract:
+					return Op::BitFieldSignedExtract;
+				case SpvOpBitFieldUExtract:
+					return Op::BitFieldUnsignedExtract;
+				case SpvOpBitcast:
+					return Op::Bitcast;
 				case SpvOpFRem:
 				case SpvOpSRem:
 					return Op::Rem;
@@ -170,23 +197,27 @@ namespace see::ir
 				case SpvOpFOrdLessThan:
 				case SpvOpFUnordLessThan:
 				case SpvOpSLessThan:
-				case SpvOpULessThan:
 					return Op::CompareLess;
+				case SpvOpULessThan:
+					return Op::CompareUnsignedLess;
 				case SpvOpFOrdLessThanEqual:
 				case SpvOpFUnordLessThanEqual:
 				case SpvOpSLessThanEqual:
-				case SpvOpULessThanEqual:
 					return Op::CompareLessEqual;
+				case SpvOpULessThanEqual:
+					return Op::CompareUnsignedLessEqual;
 				case SpvOpFOrdGreaterThan:
 				case SpvOpFUnordGreaterThan:
 				case SpvOpSGreaterThan:
-				case SpvOpUGreaterThan:
 					return Op::CompareGreater;
+				case SpvOpUGreaterThan:
+					return Op::CompareUnsignedGreater;
 				case SpvOpFOrdGreaterThanEqual:
 				case SpvOpFUnordGreaterThanEqual:
 				case SpvOpSGreaterThanEqual:
-				case SpvOpUGreaterThanEqual:
 					return Op::CompareGreaterEqual;
+				case SpvOpUGreaterThanEqual:
+					return Op::CompareUnsignedGreaterEqual;
 				case SpvOpLogicalEqual:
 					return Op::LogicalEqual;
 				case SpvOpLogicalNotEqual:
