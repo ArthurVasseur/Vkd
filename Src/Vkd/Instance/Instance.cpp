@@ -81,7 +81,7 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &mem::GetDefaultAllocationCallbacks();
 
-		auto* instance = mem::NewDispatchable<Instance>(*pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+		auto* instance = mem::NewInstanceDispatchable<Instance>(*pAllocator);
 		if (!instance)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
 
@@ -148,7 +148,7 @@ namespace vkd
 		if (m_physicalDevicesAlreadyEnumerated)
 			return VK_SUCCESS; // Enumerate Physical devices only once during the lifetime of this VkInstance
 
-		DispatchableObject<software::PhysicalDevice>* softwarePhysicalDevice = mem::NewDispatchable<software::PhysicalDevice>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+		DispatchableObject<software::PhysicalDevice>* softwarePhysicalDevice = mem::NewInstanceDispatchable<software::PhysicalDevice>(GetAllocationCallbacks());
 		if (!softwarePhysicalDevice)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
 		DispatchableObject<PhysicalDevice>* physicalDevice = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(softwarePhysicalDevice);

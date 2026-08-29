@@ -30,7 +30,7 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		auto* buffer = mem::NewDispatchable<CommandBuffer>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* buffer = mem::NewObjectDispatchable<CommandBuffer>(GetAllocationCallbacks());
 		if (!buffer)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate CommandBuffer");

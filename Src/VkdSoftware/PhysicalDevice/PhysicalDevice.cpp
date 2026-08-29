@@ -159,7 +159,7 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		DispatchableObject<SoftwareDevice>* softwareDevice = mem::NewDispatchable<SoftwareDevice>(GetAllocationCallbacks(), VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+		DispatchableObject<SoftwareDevice>* softwareDevice = mem::NewDeviceDispatchable<SoftwareDevice>(GetAllocationCallbacks());
 		if (!softwareDevice)
 		{
 			CCT_ASSERT_FALSE("Could not allocate new SoftwareDevice");

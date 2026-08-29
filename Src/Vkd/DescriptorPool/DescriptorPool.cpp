@@ -17,7 +17,7 @@ namespace vkd
 	{
 		AssertValid();
 
-		auto* set = mem::New<DescriptorSet>(allocationCallbacks, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+		auto* set = mem::NewObject<DescriptorSet>(allocationCallbacks);
 		if (!set)
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
 

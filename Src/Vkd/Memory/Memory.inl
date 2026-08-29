@@ -78,6 +78,45 @@ namespace vkd::mem
 		return dispatchableObject;
 	}
 
+	template<typename T, typename... Args>
+	T* NewObject(const VkAllocationCallbacks& pAllocator, Args&&... args)
+	{
+		return New<T>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT, std::forward<Args>(args)...);
+	}
+
+	template<typename T, typename... Args>
+	T* NewDevice(const VkAllocationCallbacks& pAllocator, Args&&... args)
+	{
+		return New<T>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, std::forward<Args>(args)...);
+	}
+
+	template<typename T, typename... Args>
+	T* NewInstance(const VkAllocationCallbacks& pAllocator, Args&&... args)
+	{
+		return New<T>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE, std::forward<Args>(args)...);
+	}
+
+	template<typename T, typename... Args>
+		requires std::is_base_of_v<ObjectBase, T>
+	DispatchableObject<T>* NewObjectDispatchable(const VkAllocationCallbacks& pAllocator, Args&&... args)
+	{
+		return NewDispatchable<T>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT, std::forward<Args>(args)...);
+	}
+
+	template<typename T, typename... Args>
+		requires std::is_base_of_v<ObjectBase, T>
+	DispatchableObject<T>* NewDeviceDispatchable(const VkAllocationCallbacks& pAllocator, Args&&... args)
+	{
+		return NewDispatchable<T>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, std::forward<Args>(args)...);
+	}
+
+	template<typename T, typename... Args>
+		requires std::is_base_of_v<ObjectBase, T>
+	DispatchableObject<T>* NewInstanceDispatchable(const VkAllocationCallbacks& pAllocator, Args&&... args)
+	{
+		return NewDispatchable<T>(pAllocator, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE, std::forward<Args>(args)...);
+	}
+
 	template<typename T>
 		requires std::is_base_of_v<ObjectBase, T>
 	void DeleteDispatchable(DispatchableObject<T>* object)
