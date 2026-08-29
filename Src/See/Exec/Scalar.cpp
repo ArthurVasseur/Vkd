@@ -204,15 +204,12 @@ namespace see::exec
 			}
 		}
 
-		std::optional<Value> ResolveValue(const RuntimeState& state, cct::UInt32 id)
+		const Value* ResolveValue(const RuntimeState& state, cct::UInt32 id)
 		{
 			if (auto it = state.m_ssaValues.find(id); it != state.m_ssaValues.end())
-				return it->second;
+				return &it->second;
 
-			if (const Value* constant = state.m_constantTable.Find(id))
-				return *constant;
-
-			return std::nullopt;
+			return state.m_constantTable.Find(id);
 		}
 
 		void RegisterVariable(RuntimeState& state, cct::UInt32 id, cct::UInt32 pointerTypeId)
@@ -294,7 +291,7 @@ namespace see::exec
 			if (pointerIt == state.m_pointers.end())
 				return false;
 
-			std::optional<Value> value = ResolveValue(state, instruction.m_args[1]);
+			const Value* value = ResolveValue(state, instruction.m_args[1]);
 			if (!value)
 				return false;
 
@@ -358,7 +355,7 @@ namespace see::exec
 			PointerInfo info = basePointerIt->second;
 			for (std::size_t argIndex = 1; argIndex < instruction.m_args.size(); ++argIndex)
 			{
-				std::optional<Value> index = ResolveValue(state, instruction.m_args[argIndex]);
+				const Value* index = ResolveValue(state, instruction.m_args[argIndex]);
 				if (!index)
 					return false;
 				const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
@@ -419,7 +416,7 @@ namespace see::exec
 			cct::UInt32 writeIndex = 0;
 			for (cct::UInt32 argId : instruction.m_args)
 			{
-				std::optional<Value> component = ResolveValue(state, argId);
+				const Value* component = ResolveValue(state, argId);
 				if (!component)
 					return false;
 
@@ -440,7 +437,7 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> composite = ResolveValue(state, instruction.m_args[0]);
+			const Value* composite = ResolveValue(state, instruction.m_args[0]);
 			if (!composite)
 				return false;
 
@@ -492,8 +489,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> vector = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> index = ResolveValue(state, instruction.m_args[1]);
+			const Value* vector = ResolveValue(state, instruction.m_args[0]);
+			const Value* index = ResolveValue(state, instruction.m_args[1]);
 			if (!vector || !index)
 				return false;
 
@@ -514,9 +511,9 @@ namespace see::exec
 			if (instruction.m_args.size() < 3)
 				return false;
 
-			std::optional<Value> vector = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> component = ResolveValue(state, instruction.m_args[1]);
-			std::optional<Value> index = ResolveValue(state, instruction.m_args[2]);
+			const Value* vector = ResolveValue(state, instruction.m_args[0]);
+			const Value* component = ResolveValue(state, instruction.m_args[1]);
+			const Value* index = ResolveValue(state, instruction.m_args[2]);
 			if (!vector || !component || !index)
 				return false;
 
@@ -538,8 +535,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> first = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> second = ResolveValue(state, instruction.m_args[1]);
+			const Value* first = ResolveValue(state, instruction.m_args[0]);
+			const Value* second = ResolveValue(state, instruction.m_args[1]);
 			if (!first || !second || first->m_scalar != second->m_scalar)
 				return false;
 
@@ -576,8 +573,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> lhs = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> rhs = ResolveValue(state, instruction.m_args[1]);
+			const Value* lhs = ResolveValue(state, instruction.m_args[0]);
+			const Value* rhs = ResolveValue(state, instruction.m_args[1]);
 			if (!lhs || !rhs || lhs->m_rows != rhs->m_rows || lhs->m_scalar != rhs->m_scalar)
 				return false;
 
@@ -682,7 +679,7 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			const Value* operand = ResolveValue(state, instruction.m_args[0]);
 			if (!operand)
 				return false;
 
@@ -713,7 +710,7 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			const Value* operand = ResolveValue(state, instruction.m_args[0]);
 			if (!operand || operand->m_scalar != ir::ScalarKind::Int32)
 				return false;
 
@@ -747,10 +744,10 @@ namespace see::exec
 			if (instruction.m_args.size() < (isInsert ? 4u : 3u))
 				return false;
 
-			std::optional<Value> base = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> insert = isInsert ? ResolveValue(state, instruction.m_args[1]) : std::nullopt;
-			std::optional<Value> offset = ResolveValue(state, instruction.m_args[isInsert ? 2 : 1]);
-			std::optional<Value> count = ResolveValue(state, instruction.m_args[isInsert ? 3 : 2]);
+			const Value* base = ResolveValue(state, instruction.m_args[0]);
+			const Value* insert = isInsert ? ResolveValue(state, instruction.m_args[1]) : nullptr;
+			const Value* offset = ResolveValue(state, instruction.m_args[isInsert ? 2 : 1]);
+			const Value* count = ResolveValue(state, instruction.m_args[isInsert ? 3 : 2]);
 			if (!base || !offset || !count || (isInsert && !insert))
 				return false;
 
@@ -805,7 +802,7 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			const Value* operand = ResolveValue(state, instruction.m_args[0]);
 			if (!operand)
 				return false;
 
@@ -829,7 +826,7 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			const Value* operand = ResolveValue(state, instruction.m_args[0]);
 			if (!operand)
 				return false;
 
@@ -865,8 +862,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> lhs = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> rhs = ResolveValue(state, instruction.m_args[1]);
+			const Value* lhs = ResolveValue(state, instruction.m_args[0]);
+			const Value* rhs = ResolveValue(state, instruction.m_args[1]);
 			if (!lhs || !rhs || lhs->m_rows != rhs->m_rows)
 				return false;
 
@@ -885,8 +882,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> matrix = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> vector = ResolveValue(state, instruction.m_args[1]);
+			const Value* matrix = ResolveValue(state, instruction.m_args[0]);
+			const Value* vector = ResolveValue(state, instruction.m_args[1]);
 			if (!matrix || !vector || matrix->m_columns != vector->m_rows)
 				return false;
 
@@ -910,8 +907,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> vector = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> matrix = ResolveValue(state, instruction.m_args[1]);
+			const Value* vector = ResolveValue(state, instruction.m_args[0]);
+			const Value* matrix = ResolveValue(state, instruction.m_args[1]);
 			if (!vector || !matrix || vector->m_rows != matrix->m_rows)
 				return false;
 
@@ -935,8 +932,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> lhs = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> rhs = ResolveValue(state, instruction.m_args[1]);
+			const Value* lhs = ResolveValue(state, instruction.m_args[0]);
+			const Value* rhs = ResolveValue(state, instruction.m_args[1]);
 			if (!lhs || !rhs || lhs->m_columns != rhs->m_rows)
 				return false;
 
@@ -964,8 +961,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> composite = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> scalar = ResolveValue(state, instruction.m_args[1]);
+			const Value* composite = ResolveValue(state, instruction.m_args[0]);
+			const Value* scalar = ResolveValue(state, instruction.m_args[1]);
 			if (!composite || !scalar)
 				return false;
 
@@ -983,8 +980,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> lhs = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> rhs = ResolveValue(state, instruction.m_args[1]);
+			const Value* lhs = ResolveValue(state, instruction.m_args[0]);
+			const Value* rhs = ResolveValue(state, instruction.m_args[1]);
 			if (!lhs || !rhs)
 				return false;
 
@@ -1050,8 +1047,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> lhs = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> rhs = ResolveValue(state, instruction.m_args[1]);
+			const Value* lhs = ResolveValue(state, instruction.m_args[0]);
+			const Value* rhs = ResolveValue(state, instruction.m_args[1]);
 			if (!lhs || !rhs)
 				return false;
 
@@ -1090,7 +1087,7 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			const Value* operand = ResolveValue(state, instruction.m_args[0]);
 			if (!operand)
 				return false;
 
@@ -1109,7 +1106,7 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::optional<Value> operand = ResolveValue(state, instruction.m_args[0]);
+			const Value* operand = ResolveValue(state, instruction.m_args[0]);
 			if (!operand)
 				return false;
 
@@ -1134,9 +1131,9 @@ namespace see::exec
 			if (instruction.m_args.size() < 3)
 				return false;
 
-			std::optional<Value> condition = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> whenTrue = ResolveValue(state, instruction.m_args[1]);
-			std::optional<Value> whenFalse = ResolveValue(state, instruction.m_args[2]);
+			const Value* condition = ResolveValue(state, instruction.m_args[0]);
+			const Value* whenTrue = ResolveValue(state, instruction.m_args[1]);
+			const Value* whenFalse = ResolveValue(state, instruction.m_args[2]);
 			if (!condition || !whenTrue || !whenFalse)
 				return false;
 
@@ -1160,8 +1157,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			std::optional<Value> imageHandle = ResolveValue(state, instruction.m_args[0]);
-			std::optional<Value> coord = ResolveValue(state, instruction.m_args[1]);
+			const Value* imageHandle = ResolveValue(state, instruction.m_args[0]);
+			const Value* coord = ResolveValue(state, instruction.m_args[1]);
 			if (!imageHandle || !coord || imageHandle->m_imageVariable == 0)
 				return false;
 
@@ -1195,26 +1192,26 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::vector<Value> operands;
+			std::vector<const Value*> operands;
 			operands.reserve(instruction.m_args.size() - 1);
 			for (std::size_t i = 1; i < instruction.m_args.size(); ++i)
 			{
-				std::optional<Value> operand = ResolveValue(state, instruction.m_args[i]);
+				const Value* operand = ResolveValue(state, instruction.m_args[i]);
 				if (!operand)
 					return false;
-				operands.push_back(*operand);
+				operands.push_back(operand);
 			}
 
 			if (operands.empty())
 				return false;
 
-			const cct::UInt32 componentCount = operands[0].m_rows * operands[0].m_columns;
-			Value result = operands[0];
+			const cct::UInt32 componentCount = operands[0]->m_rows * operands[0]->m_columns;
+			Value result = *operands[0];
 
 			const auto floatUnary = [&](auto&& f)
 			{
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetFloat(i, f(operands[0].GetFloat(i)));
+					result.SetFloat(i, f(operands[0]->GetFloat(i)));
 				return true;
 			};
 			const auto floatBinary = [&](auto&& f)
@@ -1222,7 +1219,7 @@ namespace see::exec
 				if (operands.size() < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetFloat(i, f(operands[0].GetFloat(i), operands[1].GetFloat(i)));
+					result.SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i)));
 				return true;
 			};
 			const auto floatTernary = [&](auto&& f)
@@ -1230,13 +1227,13 @@ namespace see::exec
 				if (operands.size() < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetFloat(i, f(operands[0].GetFloat(i), operands[1].GetFloat(i), operands[2].GetFloat(i)));
+					result.SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i), operands[2]->GetFloat(i)));
 				return true;
 			};
 			const auto intUnary = [&](auto&& f)
 			{
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetInt32(i, f(operands[0].GetInt32(i)));
+					result.SetInt32(i, f(operands[0]->GetInt32(i)));
 				return true;
 			};
 			const auto intBinary = [&](auto&& f)
@@ -1244,7 +1241,7 @@ namespace see::exec
 				if (operands.size() < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetInt32(i, f(operands[0].GetInt32(i), operands[1].GetInt32(i)));
+					result.SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i)));
 				return true;
 			};
 			const auto intTernary = [&](auto&& f)
@@ -1252,7 +1249,7 @@ namespace see::exec
 				if (operands.size() < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result.SetInt32(i, f(operands[0].GetInt32(i), operands[1].GetInt32(i), operands[2].GetInt32(i)));
+					result.SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i), operands[2]->GetInt32(i)));
 				return true;
 			};
 			const auto vectorLength = [](const Value& v)
@@ -1428,7 +1425,7 @@ namespace see::exec
 					break;
 				case GLSLstd450Length:
 					result = Value{};
-					result.SetFloat(0, vectorLength(operands[0]));
+					result.SetFloat(0, vectorLength(*operands[0]));
 					break;
 				case GLSLstd450Distance:
 				{
@@ -1437,7 +1434,7 @@ namespace see::exec
 					float sum = 0.0f;
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
 					{
-						const float d = operands[0].GetFloat(i) - operands[1].GetFloat(i);
+						const float d = operands[0]->GetFloat(i) - operands[1]->GetFloat(i);
 						sum += d * d;
 					}
 					result = Value{};
@@ -1448,8 +1445,8 @@ namespace see::exec
 				{
 					if (operands.size() < 2 || componentCount != 3)
 						return false;
-					const Value& a = operands[0];
-					const Value& b = operands[1];
+					const Value& a = *operands[0];
+					const Value& b = *operands[1];
 					result.SetFloat(0, a.GetFloat(1) * b.GetFloat(2) - a.GetFloat(2) * b.GetFloat(1));
 					result.SetFloat(1, a.GetFloat(2) * b.GetFloat(0) - a.GetFloat(0) * b.GetFloat(2));
 					result.SetFloat(2, a.GetFloat(0) * b.GetFloat(1) - a.GetFloat(1) * b.GetFloat(0));
@@ -1457,11 +1454,11 @@ namespace see::exec
 				}
 				case GLSLstd450Normalize:
 				{
-					const float length = vectorLength(operands[0]);
+					const float length = vectorLength(*operands[0]);
 					if (length == 0.0f)
 						return false;
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
-						result.SetFloat(i, operands[0].GetFloat(i) / length);
+						result.SetFloat(i, operands[0]->GetFloat(i) / length);
 					break;
 				}
 				default:
@@ -1617,10 +1614,10 @@ namespace see::exec
 						return BlockWalkOutcome{.m_success = true};
 					case ir::Terminator::ReturnValue:
 					{
-						std::optional<Value> value = ResolveValue(state, block->m_terminatorOperand);
+						const Value* value = ResolveValue(state, block->m_terminatorOperand);
 						if (!value)
 							return {};
-						return BlockWalkOutcome{.m_success = true, .m_returnValue = value};
+						return BlockWalkOutcome{.m_success = true, .m_returnValue = *value};
 					}
 					case ir::Terminator::Branch:
 						if (block->m_branchTargets.empty())
@@ -1629,7 +1626,7 @@ namespace see::exec
 						break;
 					case ir::Terminator::BranchConditional:
 					{
-						std::optional<Value> condition = ResolveValue(state, block->m_terminatorOperand);
+						const Value* condition = ResolveValue(state, block->m_terminatorOperand);
 						if (!condition || block->m_branchTargets.size() < 2)
 							return {};
 						block = FindBlock(function, condition->GetBool() ? block->m_branchTargets[0] : block->m_branchTargets[1]);
@@ -1661,7 +1658,7 @@ namespace see::exec
 				const cct::UInt32 argId = instruction.m_args[i + 1];
 				const cct::UInt32 paramId = callee->m_parameters[i];
 
-				if (std::optional<Value> argument = ResolveValue(state, argId))
+				if (const Value* argument = ResolveValue(state, argId))
 				{
 					state.m_ssaValues[paramId] = *argument;
 					continue;
