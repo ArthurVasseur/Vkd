@@ -15,6 +15,17 @@
 
 namespace vkd::software
 {
+	Pipeline::Pipeline(const VkAllocationCallbacks& allocationCallbacks) :
+		vkd::Pipeline(allocationCallbacks),
+		m_stages(ObjectAllocator<ShaderStageState>(allocationCallbacks)),
+		m_vertexBindings(ObjectAllocator<VkVertexInputBindingDescription>(allocationCallbacks)),
+		m_vertexAttributes(ObjectAllocator<VkVertexInputAttributeDescription>(allocationCallbacks)),
+		m_viewports(ObjectAllocator<VkViewport>(allocationCallbacks)),
+		m_scissors(ObjectAllocator<VkRect2D>(allocationCallbacks)),
+		m_colorBlendAttachments(ObjectAllocator<VkPipelineColorBlendAttachmentState>(allocationCallbacks))
+	{
+	}
+
 	namespace
 	{
 		see::ShaderStage ToSeeShaderStage(VkShaderStageFlagBits stage)
@@ -36,7 +47,9 @@ namespace vkd::software
 		ShaderStageState RegisterStage(SoftwareDevice& device, const VkPipelineShaderStageCreateInfo& stage)
 		{
 			VKD_FROM_HANDLE(ShaderModule, shaderModule, stage.module);
-			see::ShaderHandle handle = device.GetShaderExecutor().RegisterShader(ToSeeShaderStage(stage.stage), shaderModule->GetCode(), stage.pName);
+			// See takes its SPIR-V as a std::vector; the module keeps it in a VkAllocationCallbacks-backed one.
+			const auto& code = shaderModule->GetCode();
+			see::ShaderHandle handle = device.GetShaderExecutor().RegisterShader(ToSeeShaderStage(stage.stage), std::vector<cct::UInt32>(code.begin(), code.end()), stage.pName);
 			return ShaderStageState{.m_stage = stage.stage, .m_handle = handle};
 		}
 	} // namespace

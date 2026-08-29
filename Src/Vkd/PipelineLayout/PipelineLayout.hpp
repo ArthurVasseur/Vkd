@@ -32,14 +32,14 @@ namespace vkd
 
 		[[nodiscard]] inline Device* GetOwner() const;
 		[[nodiscard]] inline VkPipelineLayoutCreateFlags GetFlags() const;
-		[[nodiscard]] inline const std::vector<VkDescriptorSetLayout>& GetSetLayouts() const;
-		[[nodiscard]] inline const std::vector<VkPushConstantRange>& GetPushConstantRanges() const;
+		[[nodiscard]] inline const vkd::vector<VkDescriptorSetLayout>& GetSetLayouts() const;
+		[[nodiscard]] inline const vkd::vector<VkPushConstantRange>& GetPushConstantRanges() const;
 
 	protected:
 		Device* m_owner;
 		VkPipelineLayoutCreateFlags m_flags;
-		std::vector<VkDescriptorSetLayout> m_setLayouts;
-		std::vector<VkPushConstantRange> m_pushConstantRanges;
+		vkd::vector<VkDescriptorSetLayout> m_setLayouts;
+		vkd::vector<VkPushConstantRange> m_pushConstantRanges;
 	};
 } // namespace vkd
 

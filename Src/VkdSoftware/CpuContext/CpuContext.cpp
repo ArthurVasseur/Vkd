@@ -221,7 +221,7 @@ namespace vkd::software
 			return std::make_pair(*descriptorSet, *binding);
 		}
 
-		std::unordered_map<UInt32, see::exec::ExternalBuffer> ResolveUniformBuffers(const see::ir::Module& module, const std::vector<vkd::DescriptorSet*>& boundSets, std::vector<vkd::DeviceMemory*>& outMappedMemories)
+		std::unordered_map<UInt32, see::exec::ExternalBuffer> ResolveUniformBuffers(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
 		{
 			std::unordered_map<UInt32, see::exec::ExternalBuffer> result;
 
@@ -257,7 +257,7 @@ namespace vkd::software
 			return result;
 		}
 
-		std::unordered_map<UInt32, see::exec::ExternalImage> ResolveSampledImages(const see::ir::Module& module, const std::vector<vkd::DescriptorSet*>& boundSets, std::vector<vkd::DeviceMemory*>& outMappedMemories)
+		std::unordered_map<UInt32, see::exec::ExternalImage> ResolveSampledImages(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
 		{
 			std::unordered_map<UInt32, see::exec::ExternalImage> result;
 
@@ -410,7 +410,13 @@ namespace vkd::software
 		}
 	} // namespace
 
-	CpuContext::CpuContext()
+	CpuContext::CpuContext(const VkAllocationCallbacks& allocationCallbacks) :
+		m_allocationCallbacks(&allocationCallbacks),
+		m_boundVertexBuffers(CommandAllocator<Buffer*>(allocationCallbacks)),
+		m_vertexBufferOffsets(CommandAllocator<VkDeviceSize>(allocationCallbacks)),
+		m_boundDescriptorSets(CommandAllocator<vkd::DescriptorSet*>(allocationCallbacks)),
+		m_dynamicViewports(CommandAllocator<VkViewport>(allocationCallbacks)),
+		m_dynamicScissors(CommandAllocator<VkRect2D>(allocationCallbacks))
 	{
 	}
 
@@ -576,7 +582,7 @@ namespace vkd::software
 		else
 			scissor = pipeline->GetScissors()[0];
 
-		std::vector<vkd::DeviceMemory*> mappedUniformMemories;
+		vkd::vector<vkd::DeviceMemory*> mappedUniformMemories(CommandAllocator<vkd::DeviceMemory*>(*m_allocationCallbacks));
 		const std::unordered_map<UInt32, see::exec::ExternalBuffer> vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, mappedUniformMemories);
 		const std::unordered_map<UInt32, see::exec::ExternalBuffer> fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, mappedUniformMemories);
 		const std::unordered_map<UInt32, see::exec::ExternalImage> vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedUniformMemories);

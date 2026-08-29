@@ -14,7 +14,9 @@ namespace vkd
 	inline PipelineLayout::PipelineLayout(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
-		m_flags(0)
+		m_flags(0),
+		m_setLayouts(ObjectAllocator<VkDescriptorSetLayout>(allocationCallbacks)),
+		m_pushConstantRanges(ObjectAllocator<VkPushConstantRange>(allocationCallbacks))
 	{
 	}
 
@@ -45,13 +47,13 @@ namespace vkd
 		return m_flags;
 	}
 
-	inline const std::vector<VkDescriptorSetLayout>& PipelineLayout::GetSetLayouts() const
+	inline const vkd::vector<VkDescriptorSetLayout>& PipelineLayout::GetSetLayouts() const
 	{
 		AssertValid();
 		return m_setLayouts;
 	}
 
-	inline const std::vector<VkPushConstantRange>& PipelineLayout::GetPushConstantRanges() const
+	inline const vkd::vector<VkPushConstantRange>& PipelineLayout::GetPushConstantRanges() const
 	{
 		AssertValid();
 		return m_pushConstantRanges;

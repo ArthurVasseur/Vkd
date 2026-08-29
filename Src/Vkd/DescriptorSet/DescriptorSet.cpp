@@ -12,7 +12,7 @@ namespace vkd
 	{
 		AssertValid();
 
-		std::vector<BufferBinding>& bindings = m_bufferBindings[binding];
+		vkd::vector<BufferBinding>& bindings = m_bufferBindings.try_emplace(binding, ObjectAllocator<BufferBinding>(GetAllocationCallbacks())).first->second;
 		if (arrayElement >= bindings.size())
 			bindings.resize(arrayElement + 1);
 
@@ -34,7 +34,7 @@ namespace vkd
 	{
 		AssertValid();
 
-		std::vector<ImageBinding>& bindings = m_imageBindings[binding];
+		vkd::vector<ImageBinding>& bindings = m_imageBindings.try_emplace(binding, ObjectAllocator<ImageBinding>(GetAllocationCallbacks())).first->second;
 		if (arrayElement >= bindings.size())
 			bindings.resize(arrayElement + 1);
 

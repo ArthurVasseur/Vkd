@@ -54,7 +54,7 @@ namespace vkd
 		}
 
 	private:
-		std::vector<DispatchableObject<PhysicalDevice>*> m_physicalDevices;
+		vkd::vector<DispatchableObject<PhysicalDevice>*> m_physicalDevices;
 		bool m_physicalDevicesAlreadyEnumerated;
 
 		cct::Logger m_logger{cct::LogConfig{.FlushLevel = cct::LogLevel::Warning}};

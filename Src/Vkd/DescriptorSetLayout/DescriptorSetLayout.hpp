@@ -31,7 +31,7 @@ namespace vkd
 			VkDescriptorType descriptorType;
 			UInt32 descriptorCount;
 			VkShaderStageFlags stageFlags;
-			std::vector<VkSampler> immutableSamplers;
+			vkd::vector<VkSampler> immutableSamplers;
 		};
 
 		explicit DescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks);
@@ -41,13 +41,13 @@ namespace vkd
 
 		[[nodiscard]] inline Device* GetOwner() const;
 		[[nodiscard]] inline VkDescriptorSetLayoutCreateFlags GetFlags() const;
-		[[nodiscard]] inline const std::vector<Binding>& GetBindings() const;
+		[[nodiscard]] inline const vkd::vector<Binding>& GetBindings() const;
 		[[nodiscard]] const Binding* FindBinding(UInt32 bindingIndex) const noexcept;
 
 	protected:
 		Device* m_owner;
 		VkDescriptorSetLayoutCreateFlags m_flags;
-		std::vector<Binding> m_bindings;
+		vkd::vector<Binding> m_bindings;
 	};
 } // namespace vkd
 

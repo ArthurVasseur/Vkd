@@ -24,7 +24,7 @@ namespace vkd::software
 		VKD_AUTO_PROFILER_SCOPE();
 		VKD_CHECK(submitCount && pSubmits);
 
-		std::vector<vkd::CommandBuffer*> cmdBuffers;
+		vkd::vector<vkd::CommandBuffer*> cmdBuffers(CommandAllocator<vkd::CommandBuffer*>(GetAllocationCallbacks()));
 		for (uint32_t s = 0; s < submitCount; ++s)
 		{
 			const VkSubmitInfo& submit = pSubmits[s];
@@ -42,7 +42,7 @@ namespace vkd::software
 		std::lock_guard<std::mutex> lock(m_submitMutex);
 		auto previousSubmit = std::move(m_previousSubmit);
 
-		m_previousSubmit = threadPool.Submit([cmdBuffers = std::move(cmdBuffers), fence, previousSubmit = std::move(previousSubmit)]() mutable -> bool
+		m_previousSubmit = threadPool.Submit([cmdBuffers = std::move(cmdBuffers), fence, previousSubmit = std::move(previousSubmit), allocationCallbacks = &GetAllocationCallbacks()]() mutable -> bool
 											 {
 			// Wait for the previous submit to complete before starting the new one
 			if (previousSubmit.valid())
@@ -52,7 +52,7 @@ namespace vkd::software
 
 			for (auto* cmdBufferObj : cmdBuffers)
 			{
-				CpuContext cpuContext;
+				CpuContext cpuContext(*allocationCallbacks);
 				CommandDispatcher commandDispatcher(cpuContext);
 				commandDispatcher.Execute(*cmdBufferObj);
 			}

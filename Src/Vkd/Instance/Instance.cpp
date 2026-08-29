@@ -16,7 +16,8 @@ namespace vkd
 {
 	Instance::Instance(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
-		m_physicalDevicesAlreadyEnumerated(false)
+		m_physicalDevicesAlreadyEnumerated(false),
+		m_physicalDevices(InstanceAllocator<DispatchableObject<PhysicalDevice>*>(allocationCallbacks))
 	{
 	}
 

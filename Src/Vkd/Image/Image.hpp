@@ -28,7 +28,7 @@ namespace vkd
 		{
 			Image* src;
 			Image* dst;
-			std::vector<VkImageCopy> regions;
+			vkd::vector<VkImageCopy> regions;
 		};
 
 		struct OpClearColorImage
@@ -36,7 +36,7 @@ namespace vkd
 			Image* image;
 			VkImageLayout layout;
 			VkClearColorValue clearColor;
-			std::vector<VkImageSubresourceRange> ranges;
+			vkd::vector<VkImageSubresourceRange> ranges;
 		};
 
 		using Op = Nz::TypeList<OpCopy, OpClearColorImage>;

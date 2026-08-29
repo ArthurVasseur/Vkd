@@ -13,7 +13,15 @@ namespace vkd
 {
 	inline RenderPass::RenderPass(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
-		m_owner(nullptr)
+		m_owner(nullptr),
+		m_attachments(ObjectAllocator<VkAttachmentDescription>(allocationCallbacks)),
+		m_subpasses(ObjectAllocator<VkSubpassDescription>(allocationCallbacks)),
+		m_dependencies(ObjectAllocator<VkSubpassDependency>(allocationCallbacks)),
+		m_subpassInputAttachments(ObjectAllocator<vkd::vector<VkAttachmentReference>>(allocationCallbacks)),
+		m_subpassColorAttachments(ObjectAllocator<vkd::vector<VkAttachmentReference>>(allocationCallbacks)),
+		m_subpassResolveAttachments(ObjectAllocator<vkd::vector<VkAttachmentReference>>(allocationCallbacks)),
+		m_subpassDepthStencilAttachments(ObjectAllocator<VkAttachmentReference>(allocationCallbacks)),
+		m_subpassPreserveAttachments(ObjectAllocator<vkd::vector<UInt32>>(allocationCallbacks))
 	{
 	}
 
@@ -28,11 +36,14 @@ namespace vkd
 		{
 			m_subpasses.assign(info.pSubpasses, info.pSubpasses + info.subpassCount);
 
-			m_subpassInputAttachments.resize(info.subpassCount);
-			m_subpassColorAttachments.resize(info.subpassCount);
-			m_subpassResolveAttachments.resize(info.subpassCount);
+			const vkd::vector<VkAttachmentReference> emptyReferences(ObjectAllocator<VkAttachmentReference>(allocationCallbacks));
+			const vkd::vector<UInt32> emptyIndices(ObjectAllocator<UInt32>(allocationCallbacks));
+
+			m_subpassInputAttachments.resize(info.subpassCount, emptyReferences);
+			m_subpassColorAttachments.resize(info.subpassCount, emptyReferences);
+			m_subpassResolveAttachments.resize(info.subpassCount, emptyReferences);
 			m_subpassDepthStencilAttachments.resize(info.subpassCount);
-			m_subpassPreserveAttachments.resize(info.subpassCount);
+			m_subpassPreserveAttachments.resize(info.subpassCount, emptyIndices);
 
 			for (UInt32 i = 0; i < info.subpassCount; ++i)
 			{
@@ -84,19 +95,19 @@ namespace vkd
 		return m_owner;
 	}
 
-	inline const std::vector<VkAttachmentDescription>& RenderPass::GetAttachments() const
+	inline const vkd::vector<VkAttachmentDescription>& RenderPass::GetAttachments() const
 	{
 		AssertValid();
 		return m_attachments;
 	}
 
-	inline const std::vector<VkSubpassDescription>& RenderPass::GetSubpasses() const
+	inline const vkd::vector<VkSubpassDescription>& RenderPass::GetSubpasses() const
 	{
 		AssertValid();
 		return m_subpasses;
 	}
 
-	inline const std::vector<VkSubpassDependency>& RenderPass::GetDependencies() const
+	inline const vkd::vector<VkSubpassDependency>& RenderPass::GetDependencies() const
 	{
 		AssertValid();
 		return m_dependencies;

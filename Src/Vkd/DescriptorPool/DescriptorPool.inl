@@ -14,7 +14,8 @@ namespace vkd
 	inline DescriptorPool::DescriptorPool(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
-		m_flags(0)
+		m_flags(0),
+		m_allocatedSets(ObjectAllocator<DescriptorSet*>(allocationCallbacks))
 	{
 	}
 

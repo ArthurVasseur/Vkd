@@ -30,23 +30,23 @@ namespace vkd::software
 	class Pipeline : public vkd::Pipeline
 	{
 	public:
-		using vkd::Pipeline::Pipeline;
+		explicit Pipeline(const VkAllocationCallbacks& allocationCallbacks);
 		~Pipeline() override = default;
 
 		VkResult CreateGraphicsPipeline(Device& owner, const VkGraphicsPipelineCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;
 		VkResult CreateComputePipeline(Device& owner, const VkComputePipelineCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks) override;
 
-		[[nodiscard]] inline const std::vector<ShaderStageState>& GetStages() const;
+		[[nodiscard]] inline const vkd::vector<ShaderStageState>& GetStages() const;
 		[[nodiscard]] inline see::ShaderHandle GetShaderHandle(VkShaderStageFlagBits stage) const;
 
-		[[nodiscard]] inline const std::vector<VkVertexInputBindingDescription>& GetVertexBindings() const;
-		[[nodiscard]] inline const std::vector<VkVertexInputAttributeDescription>& GetVertexAttributes() const;
+		[[nodiscard]] inline const vkd::vector<VkVertexInputBindingDescription>& GetVertexBindings() const;
+		[[nodiscard]] inline const vkd::vector<VkVertexInputAttributeDescription>& GetVertexAttributes() const;
 
 		[[nodiscard]] inline VkPrimitiveTopology GetTopology() const;
 		[[nodiscard]] inline VkBool32 GetPrimitiveRestartEnable() const;
 
-		[[nodiscard]] inline const std::vector<VkViewport>& GetViewports() const;
-		[[nodiscard]] inline const std::vector<VkRect2D>& GetScissors() const;
+		[[nodiscard]] inline const vkd::vector<VkViewport>& GetViewports() const;
+		[[nodiscard]] inline const vkd::vector<VkRect2D>& GetScissors() const;
 		[[nodiscard]] inline bool IsViewportDynamic() const;
 		[[nodiscard]] inline bool IsScissorDynamic() const;
 
@@ -54,7 +54,7 @@ namespace vkd::software
 		[[nodiscard]] inline VkFrontFace GetFrontFace() const;
 		[[nodiscard]] inline VkPolygonMode GetPolygonMode() const;
 
-		[[nodiscard]] inline const std::vector<VkPipelineColorBlendAttachmentState>& GetColorBlendAttachments() const;
+		[[nodiscard]] inline const vkd::vector<VkPipelineColorBlendAttachmentState>& GetColorBlendAttachments() const;
 
 		[[nodiscard]] inline VkSampleCountFlagBits GetRasterizationSamples() const;
 
@@ -65,16 +65,16 @@ namespace vkd::software
 		[[nodiscard]] inline UInt32 GetSubpass() const;
 
 	private:
-		std::vector<ShaderStageState> m_stages;
+		vkd::vector<ShaderStageState> m_stages;
 
-		std::vector<VkVertexInputBindingDescription> m_vertexBindings;
-		std::vector<VkVertexInputAttributeDescription> m_vertexAttributes;
+		vkd::vector<VkVertexInputBindingDescription> m_vertexBindings;
+		vkd::vector<VkVertexInputAttributeDescription> m_vertexAttributes;
 
 		VkPrimitiveTopology m_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		VkBool32 m_primitiveRestartEnable = VK_FALSE;
 
-		std::vector<VkViewport> m_viewports;
-		std::vector<VkRect2D> m_scissors;
+		vkd::vector<VkViewport> m_viewports;
+		vkd::vector<VkRect2D> m_scissors;
 		bool m_viewportDynamic = false;
 		bool m_scissorDynamic = false;
 
@@ -82,7 +82,7 @@ namespace vkd::software
 		VkFrontFace m_frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		VkPolygonMode m_polygonMode = VK_POLYGON_MODE_FILL;
 
-		std::vector<VkPipelineColorBlendAttachmentState> m_colorBlendAttachments;
+		vkd::vector<VkPipelineColorBlendAttachmentState> m_colorBlendAttachments;
 
 		VkSampleCountFlagBits m_rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 

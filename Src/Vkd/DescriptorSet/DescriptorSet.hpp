@@ -60,8 +60,8 @@ namespace vkd
 	protected:
 		Device* m_owner;
 		DescriptorSetLayout* m_layout;
-		std::unordered_map<UInt32, std::vector<BufferBinding>> m_bufferBindings;
-		std::unordered_map<UInt32, std::vector<ImageBinding>> m_imageBindings;
+		vkd::unordered_map<UInt32, vkd::vector<BufferBinding>> m_bufferBindings;
+		vkd::unordered_map<UInt32, vkd::vector<ImageBinding>> m_imageBindings;
 	};
 } // namespace vkd
 

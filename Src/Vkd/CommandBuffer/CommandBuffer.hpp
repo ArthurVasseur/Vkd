@@ -121,7 +121,7 @@ namespace vkd
 		CommandPool* m_owner;
 		VkCommandBufferLevel m_level;
 		State m_state;
-		std::vector<Op> m_ops;
+		vkd::vector<Op> m_ops;
 	};
 } // namespace vkd
 

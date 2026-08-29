@@ -44,7 +44,7 @@ namespace vkd
 	protected:
 		Device* m_owner;
 		VkDescriptorPoolCreateFlags m_flags;
-		std::vector<DescriptorSet*> m_allocatedSets;
+		vkd::vector<DescriptorSet*> m_allocatedSets;
 	};
 } // namespace vkd
 

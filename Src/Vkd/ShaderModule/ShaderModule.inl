@@ -2,7 +2,8 @@ namespace vkd
 {
 	inline ShaderModule::ShaderModule(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
-		m_owner(nullptr)
+		m_owner(nullptr),
+		m_code(ObjectAllocator<cct::UInt32>(allocationCallbacks))
 	{
 	}
 
@@ -11,7 +12,7 @@ namespace vkd
 		return m_owner;
 	}
 
-	inline const std::vector<cct::UInt32>& ShaderModule::GetCode() const
+	inline const vkd::vector<cct::UInt32>& ShaderModule::GetCode() const
 	{
 		return m_code;
 	}

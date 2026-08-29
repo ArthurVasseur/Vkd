@@ -31,7 +31,7 @@ namespace vkd
 
 		[[nodiscard]] inline Device* GetOwner() const;
 		[[nodiscard]] inline VkRenderPass GetRenderPass() const;
-		[[nodiscard]] inline const std::vector<VkImageView>& GetAttachments() const;
+		[[nodiscard]] inline const vkd::vector<VkImageView>& GetAttachments() const;
 		[[nodiscard]] inline cct::UInt32 GetWidth() const;
 		[[nodiscard]] inline cct::UInt32 GetHeight() const;
 		[[nodiscard]] inline cct::UInt32 GetLayers() const;
@@ -39,7 +39,7 @@ namespace vkd
 	protected:
 		Device* m_owner;
 		VkRenderPass m_renderPass;
-		std::vector<VkImageView> m_attachments;
+		vkd::vector<VkImageView> m_attachments;
 		cct::UInt32 m_width;
 		cct::UInt32 m_height;
 		cct::UInt32 m_layers;

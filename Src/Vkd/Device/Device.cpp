@@ -36,7 +36,7 @@ namespace vkd
 	Device::Device(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
-		m_queues()
+		m_queues(DeviceAllocator<std::pair<const UInt32, vkd::vector<DispatchableObject<Queue>*>>>(allocationCallbacks))
 	{
 	}
 
@@ -76,7 +76,7 @@ namespace vkd
 		if (pCreateInfo.queueCreateInfoCount == 0)
 			return VK_SUCCESS;
 
-		std::unordered_map<uint32_t, uint32_t> totalPerFamily;
+		vkd::unordered_map<uint32_t, uint32_t> totalPerFamily(DeviceAllocator<std::pair<const uint32_t, uint32_t>>(GetAllocationCallbacks()));
 		for (uint32_t i = 0; i < pCreateInfo.queueCreateInfoCount; ++i)
 		{
 			const auto& queueCreateInfo = pCreateInfo.pQueueCreateInfos[i];
@@ -92,12 +92,12 @@ namespace vkd
 
 		for (const auto& [family, total] : totalPerFamily)
 		{
-			auto& vec = m_queues[family];
+			auto& vec = m_queues.try_emplace(family, DeviceAllocator<DispatchableObject<Queue>*>(GetAllocationCallbacks())).first->second;
 			vec.clear();
 			vec.resize(total);
 		}
 
-		std::unordered_map<uint32_t, uint32_t> nextOffset;
+		vkd::unordered_map<uint32_t, uint32_t> nextOffset(DeviceAllocator<std::pair<const uint32_t, uint32_t>>(GetAllocationCallbacks()));
 		for (uint32_t i = 0; i < pCreateInfo.queueCreateInfoCount; ++i)
 		{
 			const auto& queueCreateInfo = pCreateInfo.pQueueCreateInfos[i];
@@ -105,7 +105,7 @@ namespace vkd
 			const uint32_t count = queueCreateInfo.queueCount;
 			const VkDeviceQueueCreateFlags flags = queueCreateInfo.flags;
 
-			auto& vec = m_queues[family];
+			auto& vec = m_queues.try_emplace(family, DeviceAllocator<DispatchableObject<Queue>*>(GetAllocationCallbacks())).first->second;
 			uint32_t& at = nextOffset[family];
 
 			for (uint32_t q = 0; q < count; ++q)
@@ -268,7 +268,7 @@ namespace vkd
 
 #define VKD_ENTRYPOINT_LOOKUP(klass, name) \
 	if (strcmp(pName, "vk" #name) == 0)    \
-	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(klass::name)
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyDevice);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
@@ -1458,7 +1458,7 @@ namespace vkd
 		VKD_FROM_HANDLE(DescriptorPool, poolObj, pAllocateInfo->descriptorPool);
 		const VkAllocationCallbacks& allocationCallbacks = poolObj->GetAllocationCallbacks();
 
-		std::vector<DescriptorSet*> allocated;
+		vkd::vector<DescriptorSet*> allocated(ObjectAllocator<DescriptorSet*>(allocationCallbacks));
 		allocated.reserve(pAllocateInfo->descriptorSetCount);
 
 		for (UInt32 i = 0; i < pAllocateInfo->descriptorSetCount; ++i)

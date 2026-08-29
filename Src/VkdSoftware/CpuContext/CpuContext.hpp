@@ -24,7 +24,7 @@ namespace vkd::software
 	class CpuContext
 	{
 	public:
-		CpuContext();
+		explicit CpuContext(const VkAllocationCallbacks& allocationCallbacks);
 		~CpuContext() = default;
 
 		VkResult BindPipeline(OpBindPipeline op);
@@ -51,15 +51,16 @@ namespace vkd::software
 		// Restricted to `area` if given (clamped to the image bounds); nullptr clears the whole image.
 		static VkResult ClearImageWithColor(vkd::Image* image, const VkClearColorValue& color, const VkRect2D* area = nullptr);
 
+		const VkAllocationCallbacks* m_allocationCallbacks;
 		vkd::Pipeline* m_boundPipeline = nullptr;
-		std::vector<Buffer*> m_boundVertexBuffers;
-		std::vector<VkDeviceSize> m_vertexBufferOffsets;
+		vkd::vector<Buffer*> m_boundVertexBuffers;
+		vkd::vector<VkDeviceSize> m_vertexBufferOffsets;
 		Buffer* m_boundIndexBuffer = nullptr;
 		VkDeviceSize m_indexBufferOffset = 0;
 		VkIndexType m_indexType = VK_INDEX_TYPE_UINT32;
-		std::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
-		std::vector<VkViewport> m_dynamicViewports;
-		std::vector<VkRect2D> m_dynamicScissors;
+		vkd::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
+		vkd::vector<VkViewport> m_dynamicViewports;
+		vkd::vector<VkRect2D> m_dynamicScissors;
 
 		vkd::RenderPass* m_currentRenderPass = nullptr;
 		vkd::Framebuffer* m_currentFramebuffer = nullptr;

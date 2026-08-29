@@ -14,7 +14,8 @@ namespace vkd
 	inline DescriptorSetLayout::DescriptorSetLayout(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
-		m_flags(0)
+		m_flags(0),
+		m_bindings(ObjectAllocator<Binding>(allocationCallbacks))
 	{
 	}
 
@@ -29,7 +30,7 @@ namespace vkd
 			for (UInt32 i = 0; i < info.bindingCount; ++i)
 			{
 				const VkDescriptorSetLayoutBinding& src = info.pBindings[i];
-				Binding dst;
+				Binding dst{.immutableSamplers = vkd::vector<VkSampler>(ObjectAllocator<VkSampler>(allocationCallbacks))};
 				dst.binding = src.binding;
 				dst.descriptorType = src.descriptorType;
 				dst.descriptorCount = src.descriptorCount;
@@ -59,7 +60,7 @@ namespace vkd
 		return m_flags;
 	}
 
-	inline const std::vector<DescriptorSetLayout::Binding>& DescriptorSetLayout::GetBindings() const
+	inline const vkd::vector<DescriptorSetLayout::Binding>& DescriptorSetLayout::GetBindings() const
 	{
 		AssertValid();
 		return m_bindings;

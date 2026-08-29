@@ -6,10 +6,9 @@
 
 #pragma once
 
-#include <vector>
-
 #include <Concerto/Core/Types/Types.hpp>
 
+#include "Vkd/Memory/Stl.hpp"
 #include "Vkd/ObjectBase/ObjectBase.hpp"
 
 namespace vkd
@@ -28,12 +27,12 @@ namespace vkd
 		virtual VkResult Create(Device& owner, const VkShaderModuleCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);
 
 		[[nodiscard]] inline Device* GetOwner() const;
-		[[nodiscard]] inline const std::vector<cct::UInt32>& GetCode() const;
+		[[nodiscard]] inline const vkd::vector<cct::UInt32>& GetCode() const;
 		[[nodiscard]] inline cct::UInt32 GetCodeSize() const;
 
 	protected:
 		Device* m_owner;
-		std::vector<cct::UInt32> m_code;
+		vkd::vector<cct::UInt32> m_code;
 	};
 } // namespace vkd
 

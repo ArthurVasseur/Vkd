@@ -1,6 +1,6 @@
 namespace vkd::software
 {
-	inline const std::vector<ShaderStageState>& Pipeline::GetStages() const
+	inline const vkd::vector<ShaderStageState>& Pipeline::GetStages() const
 	{
 		return m_stages;
 	}
@@ -14,12 +14,12 @@ namespace vkd::software
 		return see::InvalidShaderHandle;
 	}
 
-	inline const std::vector<VkVertexInputBindingDescription>& Pipeline::GetVertexBindings() const
+	inline const vkd::vector<VkVertexInputBindingDescription>& Pipeline::GetVertexBindings() const
 	{
 		return m_vertexBindings;
 	}
 
-	inline const std::vector<VkVertexInputAttributeDescription>& Pipeline::GetVertexAttributes() const
+	inline const vkd::vector<VkVertexInputAttributeDescription>& Pipeline::GetVertexAttributes() const
 	{
 		return m_vertexAttributes;
 	}
@@ -34,12 +34,12 @@ namespace vkd::software
 		return m_primitiveRestartEnable;
 	}
 
-	inline const std::vector<VkViewport>& Pipeline::GetViewports() const
+	inline const vkd::vector<VkViewport>& Pipeline::GetViewports() const
 	{
 		return m_viewports;
 	}
 
-	inline const std::vector<VkRect2D>& Pipeline::GetScissors() const
+	inline const vkd::vector<VkRect2D>& Pipeline::GetScissors() const
 	{
 		return m_scissors;
 	}
@@ -69,7 +69,7 @@ namespace vkd::software
 		return m_polygonMode;
 	}
 
-	inline const std::vector<VkPipelineColorBlendAttachmentState>& Pipeline::GetColorBlendAttachments() const
+	inline const vkd::vector<VkPipelineColorBlendAttachmentState>& Pipeline::GetColorBlendAttachments() const
 	{
 		return m_colorBlendAttachments;
 	}

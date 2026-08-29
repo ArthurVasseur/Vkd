@@ -35,21 +35,21 @@ namespace vkd
 		{
 			Buffer* src;
 			Buffer* dst;
-			std::vector<VkBufferCopy> regions;
+			vkd::vector<VkBufferCopy> regions;
 		};
 
 		struct OpCopy2
 		{
 			Buffer* src;
 			Buffer* dst;
-			std::vector<VkBufferCopy2> regions;
+			vkd::vector<VkBufferCopy2> regions;
 		};
 
 		struct OpUpdate
 		{
 			Buffer* dst;
 			VkDeviceSize offset;
-			std::vector<UInt8> data;
+			vkd::vector<UInt8> data;
 		};
 
 		struct OpCopyBufferToImage
@@ -57,7 +57,7 @@ namespace vkd
 			Buffer* src;
 			Image* dst;
 			VkImageLayout dstLayout;
-			std::vector<VkBufferImageCopy> regions;
+			vkd::vector<VkBufferImageCopy> regions;
 		};
 
 		struct OpCopyImageToBuffer
@@ -65,7 +65,7 @@ namespace vkd
 			Image* src;
 			VkImageLayout srcLayout;
 			Buffer* dst;
-			std::vector<VkBufferImageCopy> regions;
+			vkd::vector<VkBufferImageCopy> regions;
 		};
 
 		using Op = Nz::TypeList<OpFill, OpCopy, OpCopy2, OpUpdate, OpCopyBufferToImage, OpCopyImageToBuffer>;

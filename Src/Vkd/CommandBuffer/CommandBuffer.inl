@@ -19,7 +19,8 @@ namespace vkd
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_level(VK_COMMAND_BUFFER_LEVEL_PRIMARY),
-		m_state(State::Initial)
+		m_state(State::Initial),
+		m_ops(CommandAllocator<Op>(allocationCallbacks))
 	{
 	}
 
@@ -79,7 +80,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Buffer, srcBufferObj, srcBuffer);
 		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
 
-		std::vector<VkBufferCopy> regions;
+		vkd::vector<VkBufferCopy> regions(CommandAllocator<VkBufferCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy));
 		m_ops.emplace_back(Buffer::OpCopy{srcBufferObj, dstBufferObj, std::move(regions)});
@@ -90,7 +91,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Buffer, srcBufferObj, srcBuffer);
 		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
 
-		std::vector<VkBufferCopy2> regions;
+		vkd::vector<VkBufferCopy2> regions(CommandAllocator<VkBufferCopy2>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy2));
 		m_ops.emplace_back(Buffer::OpCopy2{srcBufferObj, dstBufferObj, std::move(regions)});
@@ -100,7 +101,7 @@ namespace vkd
 	{
 		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
 
-		std::vector<UInt8> data;
+		vkd::vector<UInt8> data(CommandAllocator<UInt8>(GetAllocationCallbacks()));
 		data.resize(dataSize);
 		std::memcpy(data.data(), pData, dataSize);
 		m_ops.emplace_back(Buffer::OpUpdate{dstBufferObj, dstOffset, std::move(data)});
@@ -111,7 +112,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Image, srcImageObj, srcImage);
 		VKD_FROM_HANDLE(Image, dstImageObj, dstImage);
 
-		std::vector<VkImageCopy> regions;
+		vkd::vector<VkImageCopy> regions(CommandAllocator<VkImageCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkImageCopy));
 		m_ops.emplace_back(Image::OpCopy{srcImageObj, dstImageObj, std::move(regions)});
@@ -122,7 +123,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Buffer, srcBufferObj, srcBuffer);
 		VKD_FROM_HANDLE(Image, dstImageObj, dstImage);
 
-		std::vector<VkBufferImageCopy> regions;
+		vkd::vector<VkBufferImageCopy> regions(CommandAllocator<VkBufferImageCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
 		m_ops.emplace_back(Buffer::OpCopyBufferToImage{srcBufferObj, dstImageObj, dstImageLayout, std::move(regions)});
@@ -133,7 +134,7 @@ namespace vkd
 		VKD_FROM_HANDLE(Image, srcImageObj, srcImage);
 		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
 
-		std::vector<VkBufferImageCopy> regions;
+		vkd::vector<VkBufferImageCopy> regions(CommandAllocator<VkBufferImageCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
 		m_ops.emplace_back(Buffer::OpCopyImageToBuffer{srcImageObj, srcImageLayout, dstBufferObj, std::move(regions)});
@@ -143,7 +144,7 @@ namespace vkd
 	{
 		VKD_FROM_HANDLE(Image, imageObj, image);
 
-		std::vector<VkImageSubresourceRange> ranges;
+		vkd::vector<VkImageSubresourceRange> ranges(CommandAllocator<VkImageSubresourceRange>(GetAllocationCallbacks()));
 		ranges.resize(rangeCount);
 		std::memcpy(ranges.data(), pRanges, ranges.size() * sizeof(VkImageSubresourceRange));
 		m_ops.emplace_back(Image::OpClearColorImage{imageObj, imageLayout, *pColor, std::move(ranges)});
@@ -161,8 +162,8 @@ namespace vkd
 
 	inline void CommandBuffer::PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, UInt32 firstBinding)
 	{
-		std::vector<Buffer*> buffers;
-		std::vector<VkDeviceSize> offsets;
+		vkd::vector<Buffer*> buffers(CommandAllocator<Buffer*>(GetAllocationCallbacks()));
+		vkd::vector<VkDeviceSize> offsets(CommandAllocator<VkDeviceSize>(GetAllocationCallbacks()));
 		buffers.resize(pBuffers.size());
 		offsets.resize(pBuffers.size());
 
@@ -193,7 +194,7 @@ namespace vkd
 
 	inline void CommandBuffer::PushBindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, UInt32 firstSet, std::span<const VkDescriptorSet> pDescriptorSets)
 	{
-		std::vector<DescriptorSet*> descriptorSets;
+		vkd::vector<DescriptorSet*> descriptorSets(CommandAllocator<DescriptorSet*>(GetAllocationCallbacks()));
 		descriptorSets.resize(pDescriptorSets.size());
 
 		for (std::size_t i = 0; i < pDescriptorSets.size(); ++i)
@@ -233,7 +234,7 @@ namespace vkd
 	inline void CommandBuffer::PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport)
 	{
 		m_ops.emplace_back(OpSetViewport{
-			.Viewports = std::vector<VkViewport>(pViewports.begin(), pViewports.end()),
+			.Viewports = vkd::vector<VkViewport>(pViewports.begin(), pViewports.end(), CommandAllocator<VkViewport>(GetAllocationCallbacks())),
 			.FirstViewport = firstViewport,
 		});
 	}
@@ -241,7 +242,7 @@ namespace vkd
 	inline void CommandBuffer::PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor)
 	{
 		m_ops.emplace_back(OpSetScissor{
-			.Scissors = std::vector<VkRect2D>(pScissors.begin(), pScissors.end()),
+			.Scissors = vkd::vector<VkRect2D>(pScissors.begin(), pScissors.end(), CommandAllocator<VkRect2D>(GetAllocationCallbacks())),
 			.FirstScissor = firstScissor,
 		});
 	}
@@ -251,7 +252,7 @@ namespace vkd
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, beginInfo.renderPass);
 		VKD_FROM_HANDLE(Framebuffer, framebufferObj, beginInfo.framebuffer);
 
-		std::vector<VkClearValue> clearValues;
+		vkd::vector<VkClearValue> clearValues(CommandAllocator<VkClearValue>(GetAllocationCallbacks()));
 		if (beginInfo.clearValueCount > 0 && beginInfo.pClearValues != nullptr)
 			clearValues.assign(beginInfo.pClearValues, beginInfo.pClearValues + beginInfo.clearValueCount);
 

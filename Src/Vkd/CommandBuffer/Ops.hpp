@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <vector>
-
 #include <Concerto/Core/Types/Types.hpp>
+
+#include "Vkd/Memory/Stl.hpp"
 
 #include <NazaraUtils/TypeList.hpp>
 #include <vulkan/vulkan.h>
@@ -27,8 +27,8 @@ namespace vkd
 
 	struct OpBindVertexBuffer
 	{
-		std::vector<Buffer*> Buffers;
-		std::vector<VkDeviceSize> Offsets;
+		vkd::vector<Buffer*> Buffers;
+		vkd::vector<VkDeviceSize> Offsets;
 		UInt32 FirstBinding;
 	};
 
@@ -43,7 +43,7 @@ namespace vkd
 	{
 		VkPipelineBindPoint BindPoint;
 		UInt32 FirstSet;
-		std::vector<DescriptorSet*> DescriptorSets;
+		vkd::vector<DescriptorSet*> DescriptorSets;
 	};
 
 	struct OpBeginRenderPass
@@ -51,7 +51,7 @@ namespace vkd
 		RenderPass* RenderPassObject;
 		Framebuffer* FramebufferObject;
 		VkRect2D RenderArea;
-		std::vector<VkClearValue> ClearValues;
+		vkd::vector<VkClearValue> ClearValues;
 		VkSubpassContents Contents;
 	};
 
@@ -100,13 +100,13 @@ namespace vkd
 
 	struct OpSetViewport
 	{
-		std::vector<VkViewport> Viewports;
+		vkd::vector<VkViewport> Viewports;
 		UInt32 FirstViewport;
 	};
 
 	struct OpSetScissor
 	{
-		std::vector<VkRect2D> Scissors;
+		vkd::vector<VkRect2D> Scissors;
 		UInt32 FirstScissor;
 	};
 

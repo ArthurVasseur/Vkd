@@ -6,7 +6,8 @@ namespace vkd
 		m_renderPass(VK_NULL_HANDLE),
 		m_width(0),
 		m_height(0),
-		m_layers(0)
+		m_layers(0),
+		m_attachments(ObjectAllocator<VkImageView>(allocationCallbacks))
 	{
 	}
 
@@ -20,7 +21,7 @@ namespace vkd
 		return m_renderPass;
 	}
 
-	inline const std::vector<VkImageView>& Framebuffer::GetAttachments() const
+	inline const vkd::vector<VkImageView>& Framebuffer::GetAttachments() const
 	{
 		return m_attachments;
 	}

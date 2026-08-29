@@ -14,7 +14,9 @@ namespace vkd
 	inline DescriptorSet::DescriptorSet(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
-		m_layout(nullptr)
+		m_layout(nullptr),
+		m_bufferBindings(ObjectAllocator<std::pair<const UInt32, vkd::vector<BufferBinding>>>(allocationCallbacks)),
+		m_imageBindings(ObjectAllocator<std::pair<const UInt32, vkd::vector<ImageBinding>>>(allocationCallbacks))
 	{
 	}
 
