@@ -1632,3 +1632,72 @@ TEST_CASE("see::exec::Run - OpCompositeExtract walks a column then a component",
 
 	CHECK(result->find(outId)->second.GetFloat() == 5.0f);
 }
+
+TEST_CASE("see::exec::Run - MatrixStride pads the columns of a mat3 in a uniform block", "[see][exec]")
+{
+	static constexpr const char* Source =
+		"OpCapability Shader\n"
+		"OpMemoryModel Logical GLSL450\n"
+		"OpEntryPoint GLCompute %main \"main\"\n"
+		"OpExecutionMode %main LocalSize 1 1 1\n"
+		"OpDecorate %Ubo Block\n"
+		"OpMemberDecorate %Ubo 0 ColMajor\n"
+		"OpMemberDecorate %Ubo 0 MatrixStride 16\n"
+		"OpMemberDecorate %Ubo 0 Offset 0\n"
+		"%int = OpTypeInt 32 1\n"
+		"%float = OpTypeFloat 32\n"
+		"%v3float = OpTypeVector %float 3\n"
+		"%mat3 = OpTypeMatrix %v3float 3\n"
+		"%Ubo = OpTypeStruct %mat3\n"
+		"%_ptr_Uniform_Ubo = OpTypePointer Uniform %Ubo\n"
+		"%_ptr_Uniform_mat3 = OpTypePointer Uniform %mat3\n"
+		"%_ptr_Uniform_v3float = OpTypePointer Uniform %v3float\n"
+		"%_ptr_Output_mat3 = OpTypePointer Output %mat3\n"
+		"%_ptr_Output_v3float = OpTypePointer Output %v3float\n"
+		"%ubo = OpVariable %_ptr_Uniform_Ubo Uniform\n"
+		"%outMatrix = OpVariable %_ptr_Output_mat3 Output\n"
+		"%outColumn = OpVariable %_ptr_Output_v3float Output\n"
+		"%int_0 = OpConstant %int 0\n"
+		"%int_2 = OpConstant %int 2\n"
+		"%void = OpTypeVoid\n"
+		"%voidfn = OpTypeFunction %void\n"
+		"%main = OpFunction %void None %voidfn\n"
+		"%entry = OpLabel\n"
+		"%pm = OpAccessChain %_ptr_Uniform_mat3 %ubo %int_0\n"
+		"%m = OpLoad %mat3 %pm\n"
+		"OpStore %outMatrix %m\n"
+		"%pc = OpAccessChain %_ptr_Uniform_v3float %ubo %int_0 %int_2\n"
+		"%c = OpLoad %v3float %pc\n"
+		"OpStore %outColumn %c\n"
+		"OpReturn\n"
+		"OpFunctionEnd\n";
+
+	const see::ir::Module module = ParseAndConvert(Source);
+	const cct::UInt32 uboId = module.m_globalInstructions[0].m_id;
+	const cct::UInt32 outMatrixId = module.m_globalInstructions[1].m_id;
+	const cct::UInt32 outColumnId = module.m_globalInstructions[2].m_id;
+
+	std::array<cct::UInt32, 12> uboWords{};
+	for (cct::UInt32 column = 0; column < 3; ++column)
+		for (cct::UInt32 row = 0; row < 3; ++row)
+		{
+			const float value = static_cast<float>(column * 3 + row);
+			std::memcpy(&uboWords[column * 4 + row], &value, sizeof(float));
+		}
+
+	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
+
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {}, externalBuffers);
+	REQUIRE(result.has_value());
+
+	const see::exec::Value& matrix = result->find(outMatrixId)->second;
+	REQUIRE(matrix.m_rows == 3);
+	REQUIRE(matrix.m_columns == 3);
+	for (cct::UInt32 i = 0; i < 9; ++i)
+		CHECK(matrix.GetFloat(i) == static_cast<float>(i));
+
+	const see::exec::Value& column = result->find(outColumnId)->second;
+	CHECK(column.GetFloat(0) == 6.0f);
+	CHECK(column.GetFloat(1) == 7.0f);
+	CHECK(column.GetFloat(2) == 8.0f);
+}

@@ -74,7 +74,10 @@ namespace vkd::software
 			see::exec::Value result;
 			result.m_scalar = a.m_scalar;
 			result.m_rows = a.m_rows;
-			for (UInt32 i = 0; i < a.m_rows; ++i)
+			result.m_columns = a.m_columns;
+			result.m_structType = a.m_structType;
+			const UInt32 wordCount = a.m_rows * a.m_columns;
+			for (UInt32 i = 0; i < wordCount; ++i)
 				result.SetFloat(i, l0 * a.GetFloat(i) + l1 * b.GetFloat(i) + l2 * c.GetFloat(i));
 			return result;
 		}

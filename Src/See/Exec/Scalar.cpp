@@ -58,6 +58,7 @@ namespace see::exec
 			cct::UInt32 m_baseVariable = 0;
 			cct::UInt32 m_wordOffset = 0;
 			cct::UInt32 m_pointeeType = 0; // ir type id of what this pointer currently points to
+			cct::UInt32 m_matrixStride = 0; // words between matrix columns in memory, 0 when naturally packed
 		};
 
 		struct RuntimeState
@@ -92,6 +93,7 @@ namespace see::exec
 		{
 			cct::UInt32 m_offset = 0;
 			cct::UInt32 m_wordCount = 0;
+			cct::UInt32 m_matrixStride = 0;
 		};
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
@@ -108,18 +110,26 @@ namespace see::exec
 			for (cct::UInt32 memberIndex = 0; memberIndex < structType.m_memberTypes.size(); ++memberIndex)
 			{
 				std::optional<Value> memberShape = MakeZeroValue(module, structType.m_memberTypes[memberIndex]);
-				const cct::UInt32 wordCount = memberShape ? memberShape->m_rows * memberShape->m_columns : 0;
 
 				cct::UInt32 offset = packedOffset;
+				cct::UInt32 matrixStride = 0;
 				if (memberDecorations)
 					for (const ir::MemberDecoration& decoration : *memberDecorations)
-						if (decoration.m_member == memberIndex && decoration.m_kind == SpvDecorationOffset && !decoration.m_literals.empty())
-						{
-							offset = decoration.m_literals[0] / 4; // byte offset -> word offset
-							break;
-						}
+					{
+						if (decoration.m_member != memberIndex || decoration.m_literals.empty())
+							continue;
 
-				layout.push_back(MemberLayout{.m_offset = offset, .m_wordCount = wordCount});
+						if (decoration.m_kind == SpvDecorationOffset)
+							offset = decoration.m_literals[0] / 4; // byte offset -> word offset
+						else if (decoration.m_kind == SpvDecorationMatrixStride)
+							matrixStride = decoration.m_literals[0] / 4;
+					}
+
+				cct::UInt32 wordCount = memberShape ? memberShape->m_rows * memberShape->m_columns : 0;
+				if (matrixStride != 0 && memberShape && memberShape->m_columns > 1)
+					wordCount = matrixStride * memberShape->m_columns;
+
+				layout.push_back(MemberLayout{.m_offset = offset, .m_wordCount = wordCount, .m_matrixStride = matrixStride});
 				packedOffset = offset + wordCount;
 			}
 			return layout;
@@ -232,6 +242,18 @@ namespace see::exec
 					state.m_variables[id] = *zero;
 		}
 
+		cct::UInt32 StridedMatrixColumnStride(const RuntimeState& state, const PointerInfo& pointer, const Value& shape)
+		{
+			if (pointer.m_matrixStride == 0 || pointer.m_matrixStride == shape.m_rows || shape.m_columns <= 1)
+				return 0;
+
+			auto typeIt = state.m_module.m_types.find(pointer.m_pointeeType);
+			if (typeIt == state.m_module.m_types.end() || typeIt->second.m_kind != ir::TypeKind::Matrix)
+				return 0;
+
+			return pointer.m_matrixStride;
+		}
+
 		bool ExecuteLoad(RuntimeState& state, const ir::Instruction& instruction)
 		{
 			if (instruction.m_args.empty())
@@ -256,12 +278,23 @@ namespace see::exec
 				return false;
 
 			const cct::UInt32 wordCount = result->m_rows * result->m_columns;
-			const cct::UInt32* source = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, wordCount);
+			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *result);
+			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (result->m_columns - 1) + result->m_rows : wordCount;
+			const cct::UInt32* source = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, spannedWords);
 			if (!source)
 				return false;
 
-			for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
-				result->m_bits[i] = source[i];
+			if (columnStride != 0)
+			{
+				for (cct::UInt32 column = 0; column < result->m_columns; ++column)
+					for (cct::UInt32 row = 0; row < result->m_rows; ++row)
+						result->m_bits[column * result->m_rows + row] = source[column * columnStride + row];
+			}
+			else
+			{
+				for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
+					result->m_bits[i] = source[i];
+			}
 
 			state.m_ssaValues[instruction.m_id] = *result;
 			return true;
@@ -281,12 +314,23 @@ namespace see::exec
 				return false;
 
 			const cct::UInt32 wordCount = value->m_rows * value->m_columns;
-			cct::UInt32* target = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, wordCount);
+			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *value);
+			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (value->m_columns - 1) + value->m_rows : wordCount;
+			cct::UInt32* target = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, spannedWords);
 			if (!target)
 				return false;
 
-			for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
-				target[i] = value->m_bits[i];
+			if (columnStride != 0)
+			{
+				for (cct::UInt32 column = 0; column < value->m_columns; ++column)
+					for (cct::UInt32 row = 0; row < value->m_rows; ++row)
+						target[column * columnStride + row] = value->m_bits[column * value->m_rows + row];
+			}
+			else
+			{
+				for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
+					target[i] = value->m_bits[i];
+			}
 
 			return true;
 		}
@@ -341,6 +385,7 @@ namespace see::exec
 					if (!layout || indexValue >= layout->size())
 						return false;
 					info.m_wordOffset += (*layout)[indexValue].m_offset;
+					info.m_matrixStride = (*layout)[indexValue].m_matrixStride;
 					info.m_pointeeType = typeIt->second.m_memberTypes[indexValue];
 				}
 				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Array)
@@ -357,7 +402,9 @@ namespace see::exec
 					auto columnIt = state.m_module.m_types.find(typeIt->second.m_pointee);
 					if (columnIt == state.m_module.m_types.end())
 						return false;
-					info.m_wordOffset += indexValue * columnIt->second.m_componentCount;
+					const cct::UInt32 columnStride = info.m_matrixStride != 0 ? info.m_matrixStride : columnIt->second.m_componentCount;
+					info.m_wordOffset += indexValue * columnStride;
+					info.m_matrixStride = 0;
 					info.m_pointeeType = typeIt->second.m_pointee;
 				}
 				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Vector)
@@ -1684,7 +1731,23 @@ namespace see::exec
 			return std::nullopt;
 
 		const MemberLayout& member = (*layout)[memberIndex];
-		for (cct::UInt32 i = 0; i < member.m_wordCount && i < Value::MaxWords; ++i)
+		if (member.m_matrixStride != 0 && result->m_columns > 1 && member.m_matrixStride != result->m_rows)
+		{
+			for (cct::UInt32 column = 0; column < result->m_columns; ++column)
+				for (cct::UInt32 row = 0; row < result->m_rows; ++row)
+				{
+					const cct::UInt32 source = member.m_offset + column * member.m_matrixStride + row;
+					if (source >= Value::MaxWords)
+						return std::nullopt;
+
+					result->m_bits[column * result->m_rows + row] = composite.m_bits[source];
+				}
+
+			return result;
+		}
+
+		const cct::UInt32 packedWords = result->m_rows * result->m_columns;
+		for (cct::UInt32 i = 0; i < packedWords && member.m_offset + i < Value::MaxWords; ++i)
 			result->m_bits[i] = composite.m_bits[member.m_offset + i];
 
 		return result;
