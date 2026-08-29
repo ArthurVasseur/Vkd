@@ -33,6 +33,9 @@ namespace see::ir
 		std::unordered_map<cct::UInt32, std::vector<MemberDecoration>> m_memberDecorations; // keyed by struct type id
 		std::vector<Instruction> m_globalInstructions; // mostly OpVariable
 		std::vector<Function> m_functions;
+		std::vector<ValueRef> m_valueRefs; // indexed by SPIR-V id
+		cct::UInt32 m_ssaSlotCount = 0;
+		cct::UInt32 m_constantSlotCount = 0;
 	};
 
 	[[nodiscard]] std::optional<Module> Convert(const see::spirv::Module& spirvModule);

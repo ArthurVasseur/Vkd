@@ -384,7 +384,7 @@ namespace vkd::software
 			const float absArea = std::fabs(area);
 
 			// `interpolated` is reused across pixels: its location set comes from the three vertices, not from the pixel.
-			auto rasterizeRow = [&](int y, std::unordered_map<UInt32, see::exec::Value>& interpolated)
+			auto rasterizeRow = [&](int y, std::unordered_map<UInt32, see::exec::Value>& interpolated, see::exec::RegisterFile& registers)
 			{
 				for (int x = minX; x < maxX; ++x)
 				{
@@ -433,7 +433,7 @@ namespace vkd::software
 
 					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs =
 						see::exec::RunFragmentStage(*context.m_fragmentModule, *context.m_fragmentFunction, *context.m_fragmentLocations, interpolated, *context.m_fragmentUniforms,
-													*context.m_fragmentImages, *context.m_fragmentConstants);
+													*context.m_fragmentImages, *context.m_fragmentConstants, registers);
 					if (!fragmentOutputs)
 						continue;
 
@@ -461,8 +461,9 @@ namespace vkd::software
 			if (workerCount <= 1 || rowCount * (maxX - minX) < MinParallelRasterPixels)
 			{
 				std::unordered_map<UInt32, see::exec::Value> interpolated;
+				see::exec::RegisterFile registers;
 				for (int y = minY; y < maxY; ++y)
-					rasterizeRow(y, interpolated);
+					rasterizeRow(y, interpolated, registers);
 				return;
 			}
 
@@ -471,8 +472,9 @@ namespace vkd::software
 			auto consumeRows = [&]()
 			{
 				std::unordered_map<UInt32, see::exec::Value> interpolated;
+				see::exec::RegisterFile registers;
 				for (int y = nextRow.fetch_add(1, std::memory_order_relaxed); y < maxY; y = nextRow.fetch_add(1, std::memory_order_relaxed))
-					rasterizeRow(y, interpolated);
+					rasterizeRow(y, interpolated, registers);
 			};
 
 			std::vector<std::future<void>> pendingRows;
@@ -820,6 +822,7 @@ namespace vkd::software
 		const std::unordered_map<UInt32, see::exec::ExternalImage> fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedMemories);
 		const std::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories);
 		const see::exec::StageLocations fragmentLocations = see::exec::BuildStageLocations(*fragmentModule);
+		see::exec::RegisterFile vertexRegisters;
 		const see::exec::ConstantTable vertexConstants = see::exec::BuildConstantTable(*vertexModule);
 		const see::exec::ConstantTable fragmentConstants = see::exec::BuildConstantTable(*fragmentModule);
 
@@ -851,7 +854,7 @@ namespace vkd::software
 					const UInt32 vertexIndex = resolveVertexIndex(base + i);
 					const std::unordered_map<UInt32, see::exec::Value> vertexAttributes = FetchVertexAttributes(*pipeline, mappedVertexBuffers, vertexIndex, instance);
 					std::optional<see::exec::VertexStageOutput> output =
-						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages, vertexConstants);
+						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages, vertexConstants, vertexRegisters);
 					if (!output)
 					{
 						allValid = false;

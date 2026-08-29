@@ -62,18 +62,38 @@ namespace see::exec
 	class ConstantTable
 	{
 	public:
-		[[nodiscard]] const Value* Find(cct::UInt32 id) const noexcept;
+		[[nodiscard]] const Value* Get(cct::UInt32 slot) const noexcept;
 
 	private:
-		static constexpr cct::UInt32 InvalidSlot = 0xFFFFFFFFu;
-
 		friend ConstantTable BuildConstantTable(const ir::Module& module);
 
-		std::vector<cct::UInt32> m_slotOf;
 		std::vector<Value> m_values;
+		std::vector<cct::UInt8> m_valid;
 	};
 
 	[[nodiscard]] ConstantTable BuildConstantTable(const ir::Module& module);
+
+	class RegisterFile
+	{
+	public:
+		void Reset(cct::UInt32 slotCount);
+
+		[[nodiscard]] const Value* Find(cct::UInt32 slot) const noexcept
+		{
+			return m_slotEpoch[slot] == m_epoch ? &m_values[slot] : nullptr;
+		}
+
+		[[nodiscard]] Value& Emplace(cct::UInt32 slot) noexcept
+		{
+			m_slotEpoch[slot] = m_epoch;
+			return m_values[slot];
+		}
+
+	private:
+		std::vector<Value> m_values;
+		std::vector<cct::UInt32> m_slotEpoch;
+		cct::UInt32 m_epoch = 0;
+	};
 
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
@@ -84,4 +104,9 @@ namespace see::exec
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable);
+
+	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
+		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
+		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable, RegisterFile& registers);
 } // namespace see::exec

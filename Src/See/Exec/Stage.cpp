@@ -171,6 +171,16 @@ namespace see::exec
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable)
 	{
+		RegisterFile registers;
+		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, constantTable, registers);
+	}
+
+	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
+													const std::unordered_map<cct::UInt32, Value>& locationInputs,
+													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable,
+													RegisterFile& registers)
+	{
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
@@ -193,7 +203,7 @@ namespace see::exec
 			inputs[instanceIndexVar->m_variable] = value;
 		}
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable, registers);
 		if (!result)
 			return std::nullopt;
 
@@ -246,13 +256,23 @@ namespace see::exec
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable)
 	{
+		RegisterFile registers;
+		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, constantTable, registers);
+	}
+
+	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
+		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
+		const std::unordered_map<cct::UInt32, Value>& locationInputs,
+		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable, RegisterFile& registers)
+	{
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : locations.m_inputs)
 			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
 				inputs[variableId] = *gathered;
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable, registers);
 		if (!result)
 			return std::nullopt;
 

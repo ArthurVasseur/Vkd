@@ -414,6 +414,57 @@ namespace see::ir
 
 			return result;
 		}
+
+		bool ProducesSsaValue(Op op, cct::UInt32 id)
+		{
+			if (id == 0)
+				return false;
+
+			return op != Op::Variable && op != Op::AccessChain && op != Op::Store && op != Op::CopyMemory;
+		}
+
+		void AssignValueRefs(Module& module)
+		{
+			cct::UInt32 maxId = 0;
+			const auto note = [&maxId](cct::UInt32 id)
+			{ maxId = std::max(maxId, id); };
+
+			for (const auto& [id, type] : module.m_types)
+				note(id);
+			for (const auto& [id, constant] : module.m_constants)
+				note(id);
+			for (const Instruction& global : module.m_globalInstructions)
+				note(global.m_id);
+			for (const Function& function : module.m_functions)
+			{
+				note(function.m_id);
+				for (cct::UInt32 parameter : function.m_parameters)
+					note(parameter);
+				for (const BasicBlock& block : function.m_blocks)
+				{
+					note(block.m_label);
+					for (const Instruction& instruction : block.m_instructions)
+						note(instruction.m_id);
+				}
+			}
+
+			module.m_valueRefs.assign(static_cast<std::size_t>(maxId) + 1, ValueRef{});
+
+			for (const auto& [id, constant] : module.m_constants)
+				module.m_valueRefs[id] = MakeValueRef(ValueKind::Constant, module.m_constantSlotCount++);
+
+			for (const Function& function : module.m_functions)
+			{
+				for (cct::UInt32 parameter : function.m_parameters)
+					if (GetKind(module.m_valueRefs[parameter]) == ValueKind::None)
+						module.m_valueRefs[parameter] = MakeValueRef(ValueKind::Ssa, module.m_ssaSlotCount++);
+
+				for (const BasicBlock& block : function.m_blocks)
+					for (const Instruction& instruction : block.m_instructions)
+						if (ProducesSsaValue(instruction.m_op, instruction.m_id) && GetKind(module.m_valueRefs[instruction.m_id]) == ValueKind::None)
+							module.m_valueRefs[instruction.m_id] = MakeValueRef(ValueKind::Ssa, module.m_ssaSlotCount++);
+			}
+		}
 	} // namespace
 
 	std::optional<Module> Convert(const see::spirv::Module& spirvModule)
@@ -482,6 +533,7 @@ namespace see::ir
 			module.m_functions.push_back(std::move(function));
 		}
 
+		AssignValueRefs(module);
 		return module;
 	}
 } // namespace see::ir

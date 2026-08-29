@@ -65,10 +65,10 @@ namespace see::exec
 		{
 			const ir::Module& m_module;
 			const ConstantTable& m_constantTable;
+			RegisterFile& m_registers;
 			std::unordered_map<cct::UInt32, Value> m_variables;
 			const std::unordered_map<cct::UInt32, ExternalBuffer>& m_externalBuffers;
 			const std::unordered_map<cct::UInt32, ExternalImage>& m_externalImages;
-			std::unordered_map<cct::UInt32, Value> m_ssaValues;
 			std::unordered_map<cct::UInt32, PointerInfo> m_pointers;
 		};
 
@@ -206,10 +206,43 @@ namespace see::exec
 
 		const Value* ResolveValue(const RuntimeState& state, cct::UInt32 id)
 		{
-			if (auto it = state.m_ssaValues.find(id); it != state.m_ssaValues.end())
-				return &it->second;
+			if (id >= state.m_module.m_valueRefs.size())
+				return nullptr;
 
-			return state.m_constantTable.Find(id);
+			const ir::ValueRef ref = state.m_module.m_valueRefs[id];
+			switch (ir::GetKind(ref))
+			{
+				case ir::ValueKind::Ssa:
+					return state.m_registers.Find(ir::GetSlot(ref));
+				case ir::ValueKind::Constant:
+					return state.m_constantTable.Get(ir::GetSlot(ref));
+				case ir::ValueKind::Pointer:
+				case ir::ValueKind::None:
+					return nullptr;
+			}
+			return nullptr;
+		}
+
+		Value* SsaSlot(RuntimeState& state, cct::UInt32 id)
+		{
+			if (id >= state.m_module.m_valueRefs.size())
+				return nullptr;
+
+			const ir::ValueRef ref = state.m_module.m_valueRefs[id];
+			if (ir::GetKind(ref) != ir::ValueKind::Ssa)
+				return nullptr;
+
+			return &state.m_registers.Emplace(ir::GetSlot(ref));
+		}
+
+		bool StoreSsa(RuntimeState& state, cct::UInt32 id, const Value& value)
+		{
+			Value* slot = SsaSlot(state, id);
+			if (!slot)
+				return false;
+
+			*slot = value;
+			return true;
 		}
 
 		void RegisterVariable(RuntimeState& state, cct::UInt32 id, cct::UInt32 pointerTypeId)
@@ -251,8 +284,7 @@ namespace see::exec
 			if (auto typeIt = state.m_module.m_types.find(pointerIt->second.m_pointeeType);
 				typeIt != state.m_module.m_types.end() && (typeIt->second.m_kind == ir::TypeKind::Image || typeIt->second.m_kind == ir::TypeKind::SampledImage))
 			{
-				state.m_ssaValues[instruction.m_id] = Value{.m_imageVariable = pointerIt->second.m_baseVariable};
-				return true;
+				return StoreSsa(state, instruction.m_id, Value{.m_imageVariable = pointerIt->second.m_baseVariable});
 			}
 
 			std::optional<Value> result = MakeZeroValue(state.m_module, pointerIt->second.m_pointeeType);
@@ -278,8 +310,7 @@ namespace see::exec
 					result->m_bits[i] = source[i];
 			}
 
-			state.m_ssaValues[instruction.m_id] = *result;
-			return true;
+			return StoreSsa(state, instruction.m_id, *result);
 		}
 
 		bool ExecuteStore(RuntimeState& state, const ir::Instruction& instruction)
@@ -428,8 +459,7 @@ namespace see::exec
 			if (writeIndex != totalWords)
 				return false;
 
-			state.m_ssaValues[instruction.m_id] = *result;
-			return true;
+			return StoreSsa(state, instruction.m_id, *result);
 		}
 
 		bool ExecuteCompositeExtract(RuntimeState& state, const ir::Instruction& instruction)
@@ -480,8 +510,7 @@ namespace see::exec
 				current = component;
 			}
 
-			state.m_ssaValues[instruction.m_id] = current;
-			return true;
+			return StoreSsa(state, instruction.m_id, current);
 		}
 
 		bool ExecuteVectorExtractDynamic(RuntimeState& state, const ir::Instruction& instruction)
@@ -502,8 +531,7 @@ namespace see::exec
 			result.m_scalar = vector->m_scalar;
 			result.m_bits[0] = vector->m_bits[indexValue];
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteVectorInsertDynamic(RuntimeState& state, const ir::Instruction& instruction)
@@ -524,8 +552,7 @@ namespace see::exec
 			Value result = *vector;
 			result.m_bits[indexValue] = component->m_bits[0];
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		static constexpr cct::UInt32 UndefinedShuffleComponent = 0xFFFFFFFF;
@@ -564,8 +591,7 @@ namespace see::exec
 					return false;
 			}
 
-			state.m_ssaValues[instruction.m_id] = *result;
-			return true;
+			return StoreSsa(state, instruction.m_id, *result);
 		}
 
 		bool ExecuteArithmetic(RuntimeState& state, const ir::Instruction& instruction)
@@ -670,8 +696,7 @@ namespace see::exec
 				}
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteNegate(RuntimeState& state, const ir::Instruction& instruction)
@@ -692,8 +717,7 @@ namespace see::exec
 					result.SetFloat(i, -operand->GetFloat(i));
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		cct::UInt32 ReverseBits(cct::UInt32 value)
@@ -734,8 +758,7 @@ namespace see::exec
 				}
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteBitField(RuntimeState& state, const ir::Instruction& instruction)
@@ -765,8 +788,7 @@ namespace see::exec
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
 						result.SetInt32(i, 0);
 
-				state.m_ssaValues[instruction.m_id] = result;
-				return true;
+				return StoreSsa(state, instruction.m_id, result);
 			}
 
 			const cct::UInt32 mask = countValue == 32 ? 0xFFFFFFFFu : ((1u << countValue) - 1u);
@@ -793,8 +815,7 @@ namespace see::exec
 				result.SetInt32(i, static_cast<cct::Int32>(value));
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteBitcast(RuntimeState& state, const ir::Instruction& instruction)
@@ -817,8 +838,7 @@ namespace see::exec
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
 				result->m_bits[i] = operand->m_bits[i];
 
-			state.m_ssaValues[instruction.m_id] = *result;
-			return true;
+			return StoreSsa(state, instruction.m_id, *result);
 		}
 
 		bool ExecuteConvert(RuntimeState& state, const ir::Instruction& instruction)
@@ -853,8 +873,7 @@ namespace see::exec
 				}
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteDot(RuntimeState& state, const ir::Instruction& instruction)
@@ -873,8 +892,7 @@ namespace see::exec
 
 			Value result;
 			result.SetFloat(0, sum);
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteMatrixTimesVector(RuntimeState& state, const ir::Instruction& instruction)
@@ -898,8 +916,7 @@ namespace see::exec
 				result.SetFloat(row, sum);
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteVectorTimesMatrix(RuntimeState& state, const ir::Instruction& instruction)
@@ -923,8 +940,7 @@ namespace see::exec
 				result.SetFloat(col, sum);
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteMatrixTimesMatrix(RuntimeState& state, const ir::Instruction& instruction)
@@ -952,8 +968,7 @@ namespace see::exec
 				}
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteVectorTimesScalar(RuntimeState& state, const ir::Instruction& instruction)
@@ -971,8 +986,7 @@ namespace see::exec
 			for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
 				result.SetFloat(i, composite->GetFloat(i) * factor);
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteCompare(RuntimeState& state, const ir::Instruction& instruction)
@@ -1038,8 +1052,7 @@ namespace see::exec
 				result.SetBool(i, comparisonResult);
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteLogicalBinary(RuntimeState& state, const ir::Instruction& instruction)
@@ -1078,8 +1091,7 @@ namespace see::exec
 				}
 			}
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteLogicalNot(RuntimeState& state, const ir::Instruction& instruction)
@@ -1097,8 +1109,7 @@ namespace see::exec
 			for (cct::UInt32 i = 0; i < result.m_rows; ++i)
 				result.SetBool(i, !operand->GetBool(i));
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteAllAny(RuntimeState& state, const ir::Instruction& instruction)
@@ -1122,8 +1133,7 @@ namespace see::exec
 			Value result;
 			result.m_scalar = ir::ScalarKind::Bool;
 			result.SetBool(0, accumulator);
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteSelect(RuntimeState& state, const ir::Instruction& instruction)
@@ -1144,12 +1154,10 @@ namespace see::exec
 				Value result = *whenTrue;
 				for (cct::UInt32 i = 0; i < result.m_rows * result.m_columns; ++i)
 					result.m_bits[i] = condition->GetBool(i) ? whenTrue->m_bits[i] : whenFalse->m_bits[i];
-				state.m_ssaValues[instruction.m_id] = result;
-				return true;
+				return StoreSsa(state, instruction.m_id, result);
 			}
 
-			state.m_ssaValues[instruction.m_id] = condition->GetBool() ? *whenTrue : *whenFalse;
-			return true;
+			return StoreSsa(state, instruction.m_id, condition->GetBool() ? *whenTrue : *whenFalse);
 		}
 
 		bool ExecuteImageSample(RuntimeState& state, const ir::Instruction& instruction)
@@ -1183,8 +1191,7 @@ namespace see::exec
 			for (cct::UInt32 i = 0; i < 4; ++i)
 				result.SetFloat(i, static_cast<float>(texel[i]) / 255.0f);
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteGlslStd450(RuntimeState& state, const ir::Instruction& instruction)
@@ -1468,8 +1475,7 @@ namespace see::exec
 			if (!ok)
 				return false;
 
-			state.m_ssaValues[instruction.m_id] = result;
-			return true;
+			return StoreSsa(state, instruction.m_id, result);
 		}
 
 		bool ExecuteInstruction(RuntimeState& state, const ir::Instruction& instruction)
@@ -1660,7 +1666,8 @@ namespace see::exec
 
 				if (const Value* argument = ResolveValue(state, argId))
 				{
-					state.m_ssaValues[paramId] = *argument;
+					if (!StoreSsa(state, paramId, *argument))
+						return false;
 					continue;
 				}
 
@@ -1688,8 +1695,8 @@ namespace see::exec
 			if (!outcome.m_success)
 				return false;
 
-			if (outcome.m_returnValue)
-				state.m_ssaValues[instruction.m_id] = *outcome.m_returnValue;
+			if (outcome.m_returnValue && !StoreSsa(state, instruction.m_id, *outcome.m_returnValue))
+				return false;
 
 			return true;
 		}
@@ -1735,13 +1742,9 @@ namespace see::exec
 		return result;
 	}
 
-	const Value* ConstantTable::Find(cct::UInt32 id) const noexcept
+	const Value* ConstantTable::Get(cct::UInt32 slot) const noexcept
 	{
-		if (id >= m_slotOf.size())
-			return nullptr;
-
-		const cct::UInt32 slot = m_slotOf[id];
-		if (slot == InvalidSlot)
+		if (slot >= m_values.size() || !m_valid[slot])
 			return nullptr;
 
 		return &m_values[slot];
@@ -1751,18 +1754,14 @@ namespace see::exec
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		ConstantTable table;
-		if (module.m_constants.empty())
-			return table;
-
-		cct::UInt32 maxId = 0;
-		for (const auto& [id, constant] : module.m_constants)
-			maxId = std::max(maxId, id);
-
-		table.m_slotOf.assign(static_cast<std::size_t>(maxId) + 1, ConstantTable::InvalidSlot);
-		table.m_values.reserve(module.m_constants.size());
+		table.m_values.assign(module.m_constantSlotCount, Value{});
+		table.m_valid.assign(module.m_constantSlotCount, 0);
 
 		for (const auto& [id, constant] : module.m_constants)
 		{
+			if (id >= module.m_valueRefs.size() || ir::GetKind(module.m_valueRefs[id]) != ir::ValueKind::Constant)
+				continue;
+
 			std::optional<Value> value = MakeZeroValue(module, constant.m_type);
 			if (!value)
 				continue;
@@ -1773,11 +1772,29 @@ namespace see::exec
 				for (cct::UInt32 i = 0; i < constant.m_words.size() && i < Value::MaxWords; ++i)
 					value->m_bits[i] = constant.m_words[i];
 
-			table.m_slotOf[id] = static_cast<cct::UInt32>(table.m_values.size());
-			table.m_values.push_back(*value);
+			const cct::UInt32 slot = ir::GetSlot(module.m_valueRefs[id]);
+			table.m_values[slot] = *value;
+			table.m_valid[slot] = 1;
 		}
 
 		return table;
+	}
+
+	void RegisterFile::Reset(cct::UInt32 slotCount)
+	{
+		if (m_slotEpoch.size() < slotCount)
+		{
+			m_values.resize(slotCount);
+			m_slotEpoch.resize(slotCount, 0);
+		}
+
+		if (m_epoch == 0xFFFFFFFFu)
+		{
+			std::fill(m_slotEpoch.begin(), m_slotEpoch.end(), 0u);
+			m_epoch = 0;
+		}
+
+		++m_epoch;
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
@@ -1791,8 +1808,18 @@ namespace see::exec
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable)
 	{
+		RegisterFile registers;
+		return Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable, registers);
+	}
+
+	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
+															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable,
+															  RegisterFile& registers)
+	{
 		SEE_AUTO_PROFILER_SCOPE();
-		RuntimeState state{.m_module = module, .m_constantTable = constantTable, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
+		registers.Reset(module.m_ssaSlotCount);
+		RuntimeState state{.m_module = module, .m_constantTable = constantTable, .m_registers = registers, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)
