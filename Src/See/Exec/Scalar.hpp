@@ -59,19 +59,34 @@ namespace see::exec
 
 	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex);
 
-	class ConstantTable
+	struct MemberLayout
 	{
-	public:
-		[[nodiscard]] const Value* Get(cct::UInt32 slot) const noexcept;
-
-	private:
-		friend ConstantTable BuildConstantTable(const ir::Module& module);
-
-		std::vector<Value> m_values;
-		std::vector<cct::UInt8> m_valid;
+		cct::UInt32 m_offset = 0;
+		cct::UInt32 m_wordCount = 0;
+		cct::UInt32 m_matrixStride = 0;
 	};
 
-	[[nodiscard]] ConstantTable BuildConstantTable(const ir::Module& module);
+	class PreparedModule
+	{
+	public:
+		[[nodiscard]] const Value* GetConstant(cct::UInt32 slot) const noexcept;
+		[[nodiscard]] const Value* GetZeroValue(cct::UInt32 typeId) const noexcept;
+		[[nodiscard]] const std::vector<MemberLayout>* GetMemberLayout(cct::UInt32 typeId) const noexcept;
+		[[nodiscard]] cct::UInt32 GetArrayStride(cct::UInt32 typeId) const noexcept;
+
+	private:
+		friend PreparedModule BuildPreparedModule(const ir::Module& module);
+
+		std::vector<Value> m_constants;
+		std::vector<cct::UInt8> m_constantValid;
+		std::vector<Value> m_zeroValues;
+		std::vector<cct::UInt8> m_zeroValid;
+		std::vector<std::vector<MemberLayout>> m_memberLayouts;
+		std::vector<cct::UInt8> m_memberLayoutValid;
+		std::vector<cct::UInt32> m_arrayStrides;
+	};
+
+	[[nodiscard]] PreparedModule BuildPreparedModule(const ir::Module& module);
 
 	class RegisterFile
 	{
@@ -103,10 +118,10 @@ namespace see::exec
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable);
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared);
 
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable, RegisterFile& registers);
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, RegisterFile& registers);
 } // namespace see::exec

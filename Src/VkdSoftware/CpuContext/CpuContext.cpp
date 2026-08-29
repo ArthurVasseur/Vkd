@@ -350,7 +350,7 @@ namespace vkd::software
 			const see::ir::Module* m_fragmentModule;
 			const see::ir::Function* m_fragmentFunction;
 			const see::exec::StageLocations* m_fragmentLocations;
-			const see::exec::ConstantTable* m_fragmentConstants;
+			const see::exec::PreparedModule* m_fragmentPrepared;
 			const std::unordered_map<UInt32, see::exec::ExternalBuffer>* m_fragmentUniforms;
 			const std::unordered_map<UInt32, see::exec::ExternalImage>* m_fragmentImages;
 			cct::ThreadPool* m_rasterPool;
@@ -433,7 +433,7 @@ namespace vkd::software
 
 					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs =
 						see::exec::RunFragmentStage(*context.m_fragmentModule, *context.m_fragmentFunction, *context.m_fragmentLocations, interpolated, *context.m_fragmentUniforms,
-													*context.m_fragmentImages, *context.m_fragmentConstants, registers);
+													*context.m_fragmentImages, *context.m_fragmentPrepared, registers);
 					if (!fragmentOutputs)
 						continue;
 
@@ -823,8 +823,8 @@ namespace vkd::software
 		const std::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories);
 		const see::exec::StageLocations fragmentLocations = see::exec::BuildStageLocations(*fragmentModule);
 		see::exec::RegisterFile vertexRegisters;
-		const see::exec::ConstantTable vertexConstants = see::exec::BuildConstantTable(*vertexModule);
-		const see::exec::ConstantTable fragmentConstants = see::exec::BuildConstantTable(*fragmentModule);
+		const see::exec::PreparedModule vertexPrepared = see::exec::BuildPreparedModule(*vertexModule);
+		const see::exec::PreparedModule fragmentPrepared = see::exec::BuildPreparedModule(*fragmentModule);
 
 		const RasterContext rasterContext{.m_pixels = pixels,
 										  .m_format = format,
@@ -835,7 +835,7 @@ namespace vkd::software
 										  .m_fragmentModule = fragmentModule,
 										  .m_fragmentFunction = fragmentFunction,
 										  .m_fragmentLocations = &fragmentLocations,
-										  .m_fragmentConstants = &fragmentConstants,
+										  .m_fragmentPrepared = &fragmentPrepared,
 										  .m_fragmentUniforms = &fragmentUniforms,
 										  .m_fragmentImages = &fragmentImages,
 										  .m_rasterPool = &device->GetRasterThreadPool()};
@@ -854,7 +854,7 @@ namespace vkd::software
 					const UInt32 vertexIndex = resolveVertexIndex(base + i);
 					const std::unordered_map<UInt32, see::exec::Value> vertexAttributes = FetchVertexAttributes(*pipeline, mappedVertexBuffers, vertexIndex, instance);
 					std::optional<see::exec::VertexStageOutput> output =
-						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages, vertexConstants, vertexRegisters);
+						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages, vertexPrepared, vertexRegisters);
 					if (!output)
 					{
 						allValid = false;

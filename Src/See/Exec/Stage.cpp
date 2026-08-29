@@ -163,22 +163,22 @@ namespace see::exec
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
-		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, BuildConstantTable(module));
+		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, BuildPreparedModule(module));
 	}
 
 	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
 													const std::unordered_map<cct::UInt32, Value>& locationInputs,
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable)
+													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
 	{
 		RegisterFile registers;
-		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, constantTable, registers);
+		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, prepared, registers);
 	}
 
 	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
 													const std::unordered_map<cct::UInt32, Value>& locationInputs,
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable,
+													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
 													RegisterFile& registers)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
@@ -203,7 +203,7 @@ namespace see::exec
 			inputs[instanceIndexVar->m_variable] = value;
 		}
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable, registers);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
 		if (!result)
 			return std::nullopt;
 
@@ -247,24 +247,24 @@ namespace see::exec
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
-		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, BuildConstantTable(module));
+		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, BuildPreparedModule(module));
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable)
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
 	{
 		RegisterFile registers;
-		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, constantTable, registers);
+		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, prepared, registers);
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable, RegisterFile& registers)
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, RegisterFile& registers)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
@@ -272,7 +272,7 @@ namespace see::exec
 			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
 				inputs[variableId] = *gathered;
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable, registers);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
 		if (!result)
 			return std::nullopt;
 

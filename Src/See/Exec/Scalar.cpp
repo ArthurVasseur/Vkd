@@ -64,7 +64,7 @@ namespace see::exec
 		struct RuntimeState
 		{
 			const ir::Module& m_module;
-			const ConstantTable& m_constantTable;
+			const PreparedModule& m_prepared;
 			RegisterFile& m_registers;
 			std::unordered_map<cct::UInt32, Value> m_variables;
 			const std::unordered_map<cct::UInt32, ExternalBuffer>& m_externalBuffers;
@@ -89,13 +89,6 @@ namespace see::exec
 				return nullptr;
 			return variableIt->second.m_bits.data() + wordOffset;
 		}
-
-		struct MemberLayout
-		{
-			cct::UInt32 m_offset = 0;
-			cct::UInt32 m_wordCount = 0;
-			cct::UInt32 m_matrixStride = 0;
-		};
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
 		bool ExecuteFunctionCall(RuntimeState& state, const ir::Instruction& instruction);
@@ -215,7 +208,7 @@ namespace see::exec
 				case ir::ValueKind::Ssa:
 					return state.m_registers.Find(ir::GetSlot(ref));
 				case ir::ValueKind::Constant:
-					return state.m_constantTable.Get(ir::GetSlot(ref));
+					return state.m_prepared.GetConstant(ir::GetSlot(ref));
 				case ir::ValueKind::Pointer:
 				case ir::ValueKind::None:
 					return nullptr;
@@ -253,7 +246,7 @@ namespace see::exec
 
 			state.m_pointers[id] = PointerInfo{.m_baseVariable = id, .m_wordOffset = 0, .m_pointeeType = pointeeType};
 			if (state.m_externalBuffers.find(id) == state.m_externalBuffers.end() && state.m_variables.find(id) == state.m_variables.end())
-				if (std::optional<Value> zero = MakeZeroValue(state.m_module, pointerTypeId))
+				if (const Value* zero = state.m_prepared.GetZeroValue(pointerTypeId))
 					state.m_variables[id] = *zero;
 		}
 
@@ -287,9 +280,11 @@ namespace see::exec
 				return StoreSsa(state, instruction.m_id, Value{.m_imageVariable = pointerIt->second.m_baseVariable});
 			}
 
-			std::optional<Value> result = MakeZeroValue(state.m_module, pointerIt->second.m_pointeeType);
-			if (!result)
+			const Value* resultShape = state.m_prepared.GetZeroValue(pointerIt->second.m_pointeeType);
+			if (!resultShape)
 				return false;
+
+			std::optional<Value> result = *resultShape;
 
 			const cct::UInt32 wordCount = result->m_rows * result->m_columns;
 			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *result);
@@ -358,7 +353,7 @@ namespace see::exec
 			if (targetIt == state.m_pointers.end() || sourceIt == state.m_pointers.end())
 				return false;
 
-			std::optional<Value> shape = MakeZeroValue(state.m_module, targetIt->second.m_pointeeType);
+			const Value* shape = state.m_prepared.GetZeroValue(targetIt->second.m_pointeeType);
 			if (!shape)
 				return false;
 
@@ -394,7 +389,7 @@ namespace see::exec
 				auto typeIt = state.m_module.m_types.find(info.m_pointeeType);
 				if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Struct)
 				{
-					std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(state.m_module, typeIt->second, info.m_pointeeType);
+					const std::vector<MemberLayout>* layout = state.m_prepared.GetMemberLayout(info.m_pointeeType);
 					if (!layout || indexValue >= layout->size())
 						return false;
 					info.m_wordOffset += (*layout)[indexValue].m_offset;
@@ -403,10 +398,9 @@ namespace see::exec
 				}
 				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Array)
 				{
-					std::optional<Value> elementShape = MakeZeroValue(state.m_module, typeIt->second.m_pointee);
-					if (!elementShape)
+					const cct::UInt32 stride = state.m_prepared.GetArrayStride(info.m_pointeeType);
+					if (stride == 0)
 						return false;
-					const cct::UInt32 stride = GetArrayStride(state.m_module, info.m_pointeeType, elementShape->m_rows * elementShape->m_columns);
 					info.m_wordOffset += indexValue * stride;
 					info.m_pointeeType = typeIt->second.m_pointee;
 				}
@@ -437,9 +431,11 @@ namespace see::exec
 
 		bool ExecuteCompositeConstruct(RuntimeState& state, const ir::Instruction& instruction)
 		{
-			std::optional<Value> result = MakeZeroValue(state.m_module, instruction.m_type);
-			if (!result)
+			const Value* resultShape = state.m_prepared.GetZeroValue(instruction.m_type);
+			if (!resultShape)
 				return false;
+
+			std::optional<Value> result = *resultShape;
 
 			// Each arg contributes its own word count, concatenated in order - covers scalars-into-vector,
 			// vectors-into-matrix-columns, and mixed scalar/vector args (e.g. vec4 built from a vec3 + a float).
@@ -567,9 +563,11 @@ namespace see::exec
 			if (!first || !second || first->m_scalar != second->m_scalar)
 				return false;
 
-			std::optional<Value> result = MakeZeroValue(state.m_module, instruction.m_type);
-			if (!result)
+			const Value* resultShape = state.m_prepared.GetZeroValue(instruction.m_type);
+			if (!resultShape)
 				return false;
+
+			std::optional<Value> result = *resultShape;
 
 			const cct::UInt32 componentCount = static_cast<cct::UInt32>(instruction.m_args.size() - 2);
 			if (componentCount != result->m_rows * result->m_columns)
@@ -827,9 +825,11 @@ namespace see::exec
 			if (!operand)
 				return false;
 
-			std::optional<Value> result = MakeZeroValue(state.m_module, instruction.m_type);
-			if (!result)
+			const Value* resultShape = state.m_prepared.GetZeroValue(instruction.m_type);
+			if (!resultShape)
 				return false;
+
+			std::optional<Value> result = *resultShape;
 
 			const cct::UInt32 componentCount = operand->m_rows * operand->m_columns;
 			if (result->m_rows * result->m_columns != componentCount)
@@ -1675,9 +1675,11 @@ namespace see::exec
 				if (argPointerIt == state.m_pointers.end())
 					return false;
 
-				std::optional<Value> copy = MakeZeroValue(state.m_module, argPointerIt->second.m_pointeeType);
-				if (!copy)
+				const Value* copyShape = state.m_prepared.GetZeroValue(argPointerIt->second.m_pointeeType);
+				if (!copyShape)
 					return false;
+
+				std::optional<Value> copy = *copyShape;
 
 				const cct::UInt32 wordCount = copy->m_rows * copy->m_columns;
 				const cct::UInt32* source = ResolveWords(state, argPointerIt->second.m_baseVariable, argPointerIt->second.m_wordOffset, wordCount);
@@ -1742,20 +1744,76 @@ namespace see::exec
 		return result;
 	}
 
-	const Value* ConstantTable::Get(cct::UInt32 slot) const noexcept
+	const Value* PreparedModule::GetConstant(cct::UInt32 slot) const noexcept
 	{
-		if (slot >= m_values.size() || !m_valid[slot])
+		if (slot >= m_constants.size() || !m_constantValid[slot])
 			return nullptr;
 
-		return &m_values[slot];
+		return &m_constants[slot];
 	}
 
-	ConstantTable BuildConstantTable(const ir::Module& module)
+	const Value* PreparedModule::GetZeroValue(cct::UInt32 typeId) const noexcept
+	{
+		if (typeId >= m_zeroValues.size() || !m_zeroValid[typeId])
+			return nullptr;
+
+		return &m_zeroValues[typeId];
+	}
+
+	const std::vector<MemberLayout>* PreparedModule::GetMemberLayout(cct::UInt32 typeId) const noexcept
+	{
+		if (typeId >= m_memberLayouts.size() || !m_memberLayoutValid[typeId])
+			return nullptr;
+
+		return &m_memberLayouts[typeId];
+	}
+
+	cct::UInt32 PreparedModule::GetArrayStride(cct::UInt32 typeId) const noexcept
+	{
+		return typeId < m_arrayStrides.size() ? m_arrayStrides[typeId] : 0;
+	}
+
+	PreparedModule BuildPreparedModule(const ir::Module& module)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
-		ConstantTable table;
-		table.m_values.assign(module.m_constantSlotCount, Value{});
-		table.m_valid.assign(module.m_constantSlotCount, 0);
+		PreparedModule prepared;
+
+		cct::UInt32 maxTypeId = 0;
+		for (const auto& [typeId, type] : module.m_types)
+			maxTypeId = std::max(maxTypeId, typeId);
+
+		const std::size_t typeCount = static_cast<std::size_t>(maxTypeId) + 1;
+		prepared.m_zeroValues.assign(typeCount, Value{});
+		prepared.m_zeroValid.assign(typeCount, 0);
+		prepared.m_memberLayouts.assign(typeCount, {});
+		prepared.m_memberLayoutValid.assign(typeCount, 0);
+		prepared.m_arrayStrides.assign(typeCount, 0);
+
+		for (const auto& [typeId, type] : module.m_types)
+		{
+			if (std::optional<Value> zero = MakeZeroValue(module, typeId))
+			{
+				prepared.m_zeroValues[typeId] = *zero;
+				prepared.m_zeroValid[typeId] = 1;
+			}
+
+			if (type.m_kind == ir::TypeKind::Struct)
+			{
+				if (std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(module, type, typeId))
+				{
+					prepared.m_memberLayouts[typeId] = std::move(*layout);
+					prepared.m_memberLayoutValid[typeId] = 1;
+				}
+			}
+			else if (type.m_kind == ir::TypeKind::Array)
+			{
+				if (std::optional<Value> elementShape = MakeZeroValue(module, type.m_pointee))
+					prepared.m_arrayStrides[typeId] = GetArrayStride(module, typeId, elementShape->m_rows * elementShape->m_columns);
+			}
+		}
+
+		prepared.m_constants.assign(module.m_constantSlotCount, Value{});
+		prepared.m_constantValid.assign(module.m_constantSlotCount, 0);
 
 		for (const auto& [id, constant] : module.m_constants)
 		{
@@ -1773,11 +1831,11 @@ namespace see::exec
 					value->m_bits[i] = constant.m_words[i];
 
 			const cct::UInt32 slot = ir::GetSlot(module.m_valueRefs[id]);
-			table.m_values[slot] = *value;
-			table.m_valid[slot] = 1;
+			prepared.m_constants[slot] = *value;
+			prepared.m_constantValid[slot] = 1;
 		}
 
-		return table;
+		return prepared;
 	}
 
 	void RegisterFile::Reset(cct::UInt32 slotCount)
@@ -1801,25 +1859,25 @@ namespace see::exec
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
-		return Run(module, function, std::move(inputs), externalBuffers, externalImages, BuildConstantTable(module));
+		return Run(module, function, std::move(inputs), externalBuffers, externalImages, BuildPreparedModule(module));
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable)
+															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
 	{
 		RegisterFile registers;
-		return Run(module, function, std::move(inputs), externalBuffers, externalImages, constantTable, registers);
+		return Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable,
+															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
 															  RegisterFile& registers)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		registers.Reset(module.m_ssaSlotCount);
-		RuntimeState state{.m_module = module, .m_constantTable = constantTable, .m_registers = registers, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
+		RuntimeState state{.m_module = module, .m_prepared = prepared, .m_registers = registers, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)

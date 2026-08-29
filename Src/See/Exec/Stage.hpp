@@ -33,12 +33,12 @@ namespace see::exec
 	[[nodiscard]] std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
 																  cct::UInt32 instanceIndex, const std::unordered_map<cct::UInt32, Value>& locationInputs,
 																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable);
+																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared);
 
 	[[nodiscard]] std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
 																  cct::UInt32 instanceIndex, const std::unordered_map<cct::UInt32, Value>& locationInputs,
 																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable,
+																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
 																  RegisterFile& registers);
 
 	struct StageLocations
@@ -60,13 +60,13 @@ namespace see::exec
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable);
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared);
 
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable, RegisterFile& registers);
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, RegisterFile& registers);
 
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
