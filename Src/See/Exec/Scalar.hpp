@@ -9,6 +9,7 @@
 #include <array>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include <Concerto/Core/Types/Types.hpp>
 
@@ -58,8 +59,29 @@ namespace see::exec
 
 	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex);
 
+	class ConstantTable
+	{
+	public:
+		[[nodiscard]] const Value* Find(cct::UInt32 id) const noexcept;
+
+	private:
+		static constexpr cct::UInt32 InvalidSlot = 0xFFFFFFFFu;
+
+		friend ConstantTable BuildConstantTable(const ir::Module& module);
+
+		std::vector<cct::UInt32> m_slotOf;
+		std::vector<Value> m_values;
+	};
+
+	[[nodiscard]] ConstantTable BuildConstantTable(const ir::Module& module);
+
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
+
+	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
+		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
+		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable);
 } // namespace see::exec

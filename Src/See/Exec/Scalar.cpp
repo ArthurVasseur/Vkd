@@ -64,6 +64,7 @@ namespace see::exec
 		struct RuntimeState
 		{
 			const ir::Module& m_module;
+			const ConstantTable& m_constantTable;
 			std::unordered_map<cct::UInt32, Value> m_variables;
 			const std::unordered_map<cct::UInt32, ExternalBuffer>& m_externalBuffers;
 			const std::unordered_map<cct::UInt32, ExternalImage>& m_externalImages;
@@ -203,31 +204,15 @@ namespace see::exec
 			}
 		}
 
-		std::optional<Value> ResolveConstant(const ir::Module& module, cct::UInt32 id)
-		{
-			auto constantIt = module.m_constants.find(id);
-			if (constantIt == module.m_constants.end())
-				return std::nullopt;
-
-			std::optional<Value> value = MakeZeroValue(module, constantIt->second.m_type);
-			if (!value)
-				return std::nullopt;
-
-			if (constantIt->second.m_words.empty())
-				value->m_bits[0] = constantIt->second.m_bits;
-			else
-				for (cct::UInt32 i = 0; i < constantIt->second.m_words.size() && i < Value::MaxWords; ++i)
-					value->m_bits[i] = constantIt->second.m_words[i];
-
-			return value;
-		}
-
 		std::optional<Value> ResolveValue(const RuntimeState& state, cct::UInt32 id)
 		{
 			if (auto it = state.m_ssaValues.find(id); it != state.m_ssaValues.end())
 				return it->second;
 
-			return ResolveConstant(state.m_module, id);
+			if (const Value* constant = state.m_constantTable.Find(id))
+				return *constant;
+
+			return std::nullopt;
 		}
 
 		void RegisterVariable(RuntimeState& state, cct::UInt32 id, cct::UInt32 pointerTypeId)
@@ -1753,12 +1738,64 @@ namespace see::exec
 		return result;
 	}
 
+	const Value* ConstantTable::Find(cct::UInt32 id) const noexcept
+	{
+		if (id >= m_slotOf.size())
+			return nullptr;
+
+		const cct::UInt32 slot = m_slotOf[id];
+		if (slot == InvalidSlot)
+			return nullptr;
+
+		return &m_values[slot];
+	}
+
+	ConstantTable BuildConstantTable(const ir::Module& module)
+	{
+		SEE_AUTO_PROFILER_SCOPE();
+		ConstantTable table;
+		if (module.m_constants.empty())
+			return table;
+
+		cct::UInt32 maxId = 0;
+		for (const auto& [id, constant] : module.m_constants)
+			maxId = std::max(maxId, id);
+
+		table.m_slotOf.assign(static_cast<std::size_t>(maxId) + 1, ConstantTable::InvalidSlot);
+		table.m_values.reserve(module.m_constants.size());
+
+		for (const auto& [id, constant] : module.m_constants)
+		{
+			std::optional<Value> value = MakeZeroValue(module, constant.m_type);
+			if (!value)
+				continue;
+
+			if (constant.m_words.empty())
+				value->m_bits[0] = constant.m_bits;
+			else
+				for (cct::UInt32 i = 0; i < constant.m_words.size() && i < Value::MaxWords; ++i)
+					value->m_bits[i] = constant.m_words[i];
+
+			table.m_slotOf[id] = static_cast<cct::UInt32>(table.m_values.size());
+			table.m_values.push_back(*value);
+		}
+
+		return table;
+	}
+
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
+		return Run(module, function, std::move(inputs), externalBuffers, externalImages, BuildConstantTable(module));
+	}
+
+	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
+															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const ConstantTable& constantTable)
+	{
 		SEE_AUTO_PROFILER_SCOPE();
-		RuntimeState state{.m_module = module, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
+		RuntimeState state{.m_module = module, .m_constantTable = constantTable, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)
