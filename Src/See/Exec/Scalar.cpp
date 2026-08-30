@@ -250,6 +250,15 @@ namespace see::exec
 			value.m_imageVariable = 0;
 		}
 
+		void CopyHeader(Value& destination, const Value& source)
+		{
+			destination.m_scalar = source.m_scalar;
+			destination.m_rows = source.m_rows;
+			destination.m_columns = source.m_columns;
+			destination.m_structType = source.m_structType;
+			destination.m_imageVariable = source.m_imageVariable;
+		}
+
 		Value* EmplaceResult(RuntimeState& state, cct::UInt32 id)
 		{
 			Value* slot = SsaSlot(state, id);
@@ -316,15 +325,18 @@ namespace see::exec
 			if (!resultShape)
 				return false;
 
-			std::optional<Value> result = *resultShape;
-
-			const cct::UInt32 wordCount = result->WordCount();
-			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *result);
-			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (result->m_columns - 1) + result->m_rows : wordCount;
+			const cct::UInt32 wordCount = resultShape->WordCount();
+			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *resultShape);
+			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (resultShape->m_columns - 1) + resultShape->m_rows : wordCount;
 			const cct::UInt32* source = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, spannedWords);
 			if (!source)
 				return false;
 
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			CopyHeader(*result, *resultShape);
 			const std::span<cct::UInt32> words = result->Words();
 			if (columnStride != 0)
 			{
@@ -338,7 +350,7 @@ namespace see::exec
 					words[i] = source[i];
 			}
 
-			return StoreSsa(state, instruction.m_id, *result);
+			return true;
 		}
 
 		bool ExecuteStore(RuntimeState& state, const ir::Instruction& instruction)
@@ -469,7 +481,11 @@ namespace see::exec
 			if (!resultShape)
 				return false;
 
-			std::optional<Value> result = *resultShape;
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			CopyHeader(*result, *resultShape);
 
 			// Each arg contributes its own word count, concatenated in order - covers scalars-into-vector,
 			// vectors-into-matrix-columns, and mixed scalar/vector args (e.g. vec4 built from a vec3 + a float).
@@ -490,7 +506,7 @@ namespace see::exec
 			if (writeIndex != totalWords)
 				return false;
 
-			return StoreSsa(state, instruction.m_id, *result);
+			return true;
 		}
 
 		bool ExecuteCompositeExtract(RuntimeState& state, const ir::Instruction& instruction)
@@ -609,29 +625,40 @@ namespace see::exec
 			if (!resultShape)
 				return false;
 
-			std::optional<Value> result = *resultShape;
-
 			const cct::UInt32 componentCount = static_cast<cct::UInt32>(instruction.m_args.size() - 2);
-			if (componentCount != result->WordCount())
+			if (componentCount != resultShape->WordCount())
 				return false;
 
 			const cct::UInt32 firstWords = first->WordCount();
 			const cct::UInt32 secondWords = second->WordCount();
+			const std::span<const cct::UInt32> firstValue = first->Words();
+			const std::span<const cct::UInt32> secondValue = second->Words();
+
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			CopyHeader(*result, *resultShape);
+			const std::span<cct::UInt32> words = result->Words();
+
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
 			{
 				const cct::UInt32 selector = instruction.m_args[i + 2];
 				if (selector == UndefinedShuffleComponent)
+				{
+					words[i] = 0;
 					continue;
+				}
 
 				if (selector < firstWords)
-					result->Words()[i] = first->Words()[selector];
+					words[i] = firstValue[selector];
 				else if (selector - firstWords < secondWords)
-					result->Words()[i] = second->Words()[selector - firstWords];
+					words[i] = secondValue[selector - firstWords];
 				else
 					return false;
 			}
 
-			return StoreSsa(state, instruction.m_id, *result);
+			return true;
 		}
 
 		bool ExecuteArithmetic(RuntimeState& state, const ir::Instruction& instruction)
@@ -886,16 +913,22 @@ namespace see::exec
 			if (!resultShape)
 				return false;
 
-			std::optional<Value> result = *resultShape;
-
 			const cct::UInt32 componentCount = operand->WordCount();
-			if (result->WordCount() != componentCount)
+			if (resultShape->WordCount() != componentCount)
 				return false;
 
-			for (cct::UInt32 i = 0; i < componentCount; ++i)
-				result->Words()[i] = operand->Words()[i];
+			const std::span<const cct::UInt32> operandWords = operand->Words();
 
-			return StoreSsa(state, instruction.m_id, *result);
+			Value* result = SsaSlot(state, instruction.m_id);
+			if (!result)
+				return false;
+
+			CopyHeader(*result, *resultShape);
+			const std::span<cct::UInt32> words = result->Words();
+			for (cct::UInt32 i = 0; i < componentCount; ++i)
+				words[i] = operandWords[i];
+
+			return true;
 		}
 
 		bool ExecuteConvert(RuntimeState& state, const ir::Instruction& instruction)
@@ -1779,19 +1812,18 @@ namespace see::exec
 				if (!copyShape)
 					return false;
 
-				std::optional<Value> copy = *copyShape;
-
-				const cct::UInt32 wordCount = copy->WordCount();
+				const cct::UInt32 wordCount = copyShape->WordCount();
 				const cct::UInt32* source = ResolveWords(state, argPointerIt->second.m_baseVariable, argPointerIt->second.m_wordOffset, wordCount);
 				if (!source)
 					return false;
 
-				const std::span<cct::UInt32> words = copy->Words();
+				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
+
+				Value& parameter = state.m_variables[paramId];
+				CopyHeader(parameter, *copyShape);
+				const std::span<cct::UInt32> words = parameter.Words();
 				for (cct::UInt32 w = 0; w < wordCount; ++w)
 					words[w] = source[w];
-
-				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
-				CopyValue(state.m_variables[paramId], *copy);
 			}
 
 			BlockWalkOutcome outcome = RunBlocks(state, *callee);
