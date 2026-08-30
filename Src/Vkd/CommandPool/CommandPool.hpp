@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "Vkd/Memory/Stl.hpp"
 #include "Vkd/ObjectBase/ObjectBase.hpp"
 
 #include <vulkan/vulkan.h>
@@ -24,7 +25,7 @@ namespace vkd
 		VKD_NON_DISPATCHABLE_HANDLE(CommandPool);
 
 		explicit CommandPool(const VkAllocationCallbacks& allocationCallbacks);
-		~CommandPool() override = default;
+		~CommandPool() override;
 
 		virtual VkResult Create(Device& owner, const VkCommandPoolCreateInfo& createInfo, const VkAllocationCallbacks& pAllocator);
 
@@ -33,16 +34,17 @@ namespace vkd
 		[[nodiscard]] inline UInt32 GetQueueFamilyIndex() const;
 
 		DispatchableObjectResult<CommandBuffer> AllocateCommandBuffer(VkCommandBufferLevel level);
+		void AddCommandBuffer(DispatchableObject<CommandBuffer>* commandBuffer);
+		void RemoveCommandBuffer(DispatchableObject<CommandBuffer>* commandBuffer);
 
-		// Vulkan API entry points
-
-		virtual VkResult Reset(VkCommandPoolResetFlags flags) = 0;
+		virtual VkResult Reset(VkCommandPoolResetFlags flags);
 		virtual DispatchableObjectResult<CommandBuffer> CreateCommandBuffer(VkCommandBufferLevel level) = 0;
 
 	private:
 		Device* m_owner;
 		VkCommandPoolCreateFlags m_flags;
 		UInt32 m_queueFamilyIndex;
+		vkd::vector<DispatchableObject<CommandBuffer>*> m_commandBuffers;
 	};
 } // namespace vkd
 

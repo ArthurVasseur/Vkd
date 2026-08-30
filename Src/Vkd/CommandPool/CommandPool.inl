@@ -15,7 +15,8 @@ namespace vkd
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
 		m_flags(0),
-		m_queueFamilyIndex(0)
+		m_queueFamilyIndex(0),
+		m_commandBuffers(ObjectAllocator<DispatchableObject<CommandBuffer>*>(allocationCallbacks))
 	{
 	}
 

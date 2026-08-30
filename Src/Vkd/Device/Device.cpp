@@ -488,21 +488,16 @@ namespace vkd
 		VKD_CHECK(pAllocateInfo && pCommandBuffers);
 		VKD_FROM_HANDLE(CommandPool, poolObj, pAllocateInfo->commandPool);
 
-		// Allocate command buffers from the pool
 		for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; ++i)
 		{
 			auto bufferResult = poolObj->AllocateCommandBuffer(pAllocateInfo->level);
 			if (bufferResult.IsError())
 			{
-				// Clean up any buffers allocated so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
-					VKD_FROM_HANDLE(CommandBuffer, bufferObj, pCommandBuffers[j]);
-					if (bufferObj)
-					{
-						auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
-						mem::DeleteDispatchable(dispatchable);
-					}
+					auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
+					poolObj->RemoveCommandBuffer(dispatchable);
+					mem::DeleteDispatchable(dispatchable);
 				}
 				return bufferResult.GetError();
 			}
@@ -512,19 +507,16 @@ namespace vkd
 			if (result != VK_SUCCESS)
 			{
 				mem::DeleteDispatchable(buffer);
-				// Clean up any buffers allocated so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
-					VKD_FROM_HANDLE(CommandBuffer, bufferObj, pCommandBuffers[j]);
-					if (bufferObj)
-					{
-						auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
-						mem::DeleteDispatchable(dispatchable);
-					}
+					auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
+					poolObj->RemoveCommandBuffer(dispatchable);
+					mem::DeleteDispatchable(dispatchable);
 				}
 				return result;
 			}
 
+			poolObj->AddCommandBuffer(buffer);
 			pCommandBuffers[i] = VKD_TO_HANDLE(VkCommandBuffer, buffer);
 		}
 
@@ -539,15 +531,13 @@ namespace vkd
 		VKD_FROM_HANDLE(CommandPool, commandPoolObj, commandPool);
 		VKD_CHECK(pCommandBuffers && commandBufferCount != 0);
 
-		// TODO: implement - free command buffers back to pool
 		for (uint32_t i = 0; i < commandBufferCount; ++i)
 		{
 			if (pCommandBuffers[i] == VK_NULL_HANDLE)
 				continue;
 
-			VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, pCommandBuffers[i]);
-
 			auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[i]);
+			commandPoolObj->RemoveCommandBuffer(dispatchable);
 			mem::DeleteDispatchable(dispatchable);
 		}
 	}

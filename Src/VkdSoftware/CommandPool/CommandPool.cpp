@@ -20,10 +20,7 @@ namespace vkd::software
 
 	VkResult CommandPool::Reset(VkCommandPoolResetFlags flags)
 	{
-		VKD_AUTO_PROFILER_SCOPE();
-
-		// TODO: implement CPU execution - reset all command buffers in pool
-		return VK_SUCCESS;
+		return vkd::CommandPool::Reset(flags);
 	}
 
 	DispatchableObjectResult<vkd::CommandBuffer> CommandPool::CreateCommandBuffer(VkCommandBufferLevel level)
