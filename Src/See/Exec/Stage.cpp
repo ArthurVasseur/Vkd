@@ -107,7 +107,7 @@ namespace see::exec
 				any = true;
 				result.m_scalar = it->second.m_scalar;
 				for (cct::UInt32 row = 0; row < shape.m_rows; ++row)
-					result.m_bits[column * shape.m_rows + row] = it->second.m_bits[row];
+					result.Words()[column * shape.m_rows + row] = it->second.Words()[row];
 			}
 
 			if (!any)
@@ -131,7 +131,7 @@ namespace see::exec
 				columnValue.m_scalar = value.m_scalar;
 				columnValue.m_rows = shape.m_rows;
 				for (cct::UInt32 row = 0; row < shape.m_rows; ++row)
-					columnValue.m_bits[row] = value.m_bits[column * shape.m_rows + row];
+					columnValue.Words()[row] = value.Words()[column * shape.m_rows + row];
 
 				outLocations[location + column] = columnValue;
 			}

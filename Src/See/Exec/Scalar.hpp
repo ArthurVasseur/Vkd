@@ -37,8 +37,6 @@ namespace see::exec
 			return m_rows * m_columns;
 		}
 
-		// A register slot outlives the value it held, so only the first WordCount() words are meaningful;
-		// the rest are whatever the previous occupant left behind. Iterate through Words(), never m_bits.
 		[[nodiscard]] std::span<const cct::UInt32> Words() const noexcept
 		{
 			return std::span<const cct::UInt32>(m_bits.data(), WordCount());

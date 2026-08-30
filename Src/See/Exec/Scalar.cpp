@@ -20,35 +20,35 @@ namespace see::exec
 	float Value::GetFloat(cct::UInt32 index) const
 	{
 		float value;
-		std::memcpy(&value, &m_bits[index], sizeof(float));
+		std::memcpy(&value, &Words()[index], sizeof(float));
 		return value;
 	}
 
 	void Value::SetFloat(cct::UInt32 index, float value)
 	{
-		std::memcpy(&m_bits[index], &value, sizeof(float));
+		std::memcpy(&Words()[index], &value, sizeof(float));
 	}
 
 	cct::Int32 Value::GetInt32(cct::UInt32 index) const
 	{
 		cct::Int32 value;
-		std::memcpy(&value, &m_bits[index], sizeof(cct::Int32));
+		std::memcpy(&value, &Words()[index], sizeof(cct::Int32));
 		return value;
 	}
 
 	void Value::SetInt32(cct::UInt32 index, cct::Int32 value)
 	{
-		std::memcpy(&m_bits[index], &value, sizeof(cct::Int32));
+		std::memcpy(&Words()[index], &value, sizeof(cct::Int32));
 	}
 
 	bool Value::GetBool(cct::UInt32 index) const
 	{
-		return m_bits[index] != 0;
+		return Words()[index] != 0;
 	}
 
 	void Value::SetBool(cct::UInt32 index, bool value)
 	{
-		m_bits[index] = value ? 1u : 0u;
+		Words()[index] = value ? 1u : 0u;
 	}
 
 	namespace
@@ -312,16 +312,17 @@ namespace see::exec
 			if (!source)
 				return false;
 
+			const std::span<cct::UInt32> words = result->Words();
 			if (columnStride != 0)
 			{
 				for (cct::UInt32 column = 0; column < result->m_columns; ++column)
 					for (cct::UInt32 row = 0; row < result->m_rows; ++row)
-						result->m_bits[column * result->m_rows + row] = source[column * columnStride + row];
+						words[column * result->m_rows + row] = source[column * columnStride + row];
 			}
 			else
 			{
-				for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
-					result->m_bits[i] = source[i];
+				for (cct::UInt32 i = 0; i < wordCount; ++i)
+					words[i] = source[i];
 			}
 
 			return StoreSsa(state, instruction.m_id, *result);
@@ -347,16 +348,17 @@ namespace see::exec
 			if (!target)
 				return false;
 
+			const std::span<const cct::UInt32> words = value->Words();
 			if (columnStride != 0)
 			{
 				for (cct::UInt32 column = 0; column < value->m_columns; ++column)
 					for (cct::UInt32 row = 0; row < value->m_rows; ++row)
-						target[column * columnStride + row] = value->m_bits[column * value->m_rows + row];
+						target[column * columnStride + row] = words[column * value->m_rows + row];
 			}
 			else
 			{
-				for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
-					target[i] = value->m_bits[i];
+				for (cct::UInt32 i = 0; i < wordCount; ++i)
+					target[i] = words[i];
 			}
 
 			return true;
@@ -458,6 +460,7 @@ namespace see::exec
 
 			// Each arg contributes its own word count, concatenated in order - covers scalars-into-vector,
 			// vectors-into-matrix-columns, and mixed scalar/vector args (e.g. vec4 built from a vec3 + a float).
+			const std::span<cct::UInt32> words = result->Words();
 			const cct::UInt32 totalWords = result->WordCount();
 			cct::UInt32 writeIndex = 0;
 			for (cct::UInt32 argId : instruction.m_args)
@@ -466,9 +469,9 @@ namespace see::exec
 				if (!component)
 					return false;
 
-				const cct::UInt32 componentWords = component->WordCount();
-				for (cct::UInt32 i = 0; i < componentWords && writeIndex < totalWords; ++i, ++writeIndex)
-					result->m_bits[writeIndex] = component->m_bits[i];
+				const std::span<const cct::UInt32> componentWords = component->Words();
+				for (cct::UInt32 i = 0; i < componentWords.size() && writeIndex < totalWords; ++i, ++writeIndex)
+					words[writeIndex] = componentWords[i];
 			}
 
 			if (writeIndex != totalWords)
@@ -510,7 +513,7 @@ namespace see::exec
 					column.m_scalar = current.m_scalar;
 					column.m_rows = current.m_rows;
 					for (cct::UInt32 word = 0; word < current.m_rows; ++word)
-						column.m_bits[word] = current.m_bits[index * current.m_rows + word];
+						column.Words()[word] = current.Words()[index * current.m_rows + word];
 
 					current = column;
 					continue;
@@ -521,7 +524,7 @@ namespace see::exec
 
 				Value component;
 				component.m_scalar = current.m_scalar;
-				component.m_bits[0] = current.m_bits[index];
+				component.Words()[0] = current.Words()[index];
 				current = component;
 			}
 
@@ -547,7 +550,7 @@ namespace see::exec
 				return false;
 
 			result->m_scalar = vector->m_scalar;
-			result->m_bits[0] = vector->m_bits[indexValue];
+			result->Words()[0] = vector->Words()[indexValue];
 
 			return true;
 		}
@@ -572,7 +575,7 @@ namespace see::exec
 				return false;
 
 			*result = *vector;
-			result->m_bits[indexValue] = component->m_bits[0];
+			result->Words()[indexValue] = component->Words()[0];
 
 			return true;
 		}
@@ -608,9 +611,9 @@ namespace see::exec
 					continue;
 
 				if (selector < firstWords)
-					result->m_bits[i] = first->m_bits[selector];
+					result->Words()[i] = first->Words()[selector];
 				else if (selector - firstWords < secondWords)
-					result->m_bits[i] = second->m_bits[selector - firstWords];
+					result->Words()[i] = second->Words()[selector - firstWords];
 				else
 					return false;
 			}
@@ -877,7 +880,7 @@ namespace see::exec
 				return false;
 
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
-				result->m_bits[i] = operand->m_bits[i];
+				result->Words()[i] = operand->Words()[i];
 
 			return StoreSsa(state, instruction.m_id, *result);
 		}
@@ -1230,7 +1233,7 @@ namespace see::exec
 
 				*result = *whenTrue;
 				for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
-					result->m_bits[i] = condition->GetBool(i) ? whenTrue->m_bits[i] : whenFalse->m_bits[i];
+					result->Words()[i] = condition->GetBool(i) ? whenTrue->Words()[i] : whenFalse->Words()[i];
 				return true;
 			}
 
@@ -1770,8 +1773,9 @@ namespace see::exec
 				if (!source)
 					return false;
 
-				for (cct::UInt32 w = 0; w < wordCount && w < Value::MaxWords; ++w)
-					copy->m_bits[w] = source[w];
+				const std::span<cct::UInt32> words = copy->Words();
+				for (cct::UInt32 w = 0; w < wordCount; ++w)
+					words[w] = source[w];
 
 				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
 				state.m_variables[paramId] = *copy;
@@ -1815,7 +1819,7 @@ namespace see::exec
 					if (source >= Value::MaxWords)
 						return std::nullopt;
 
-					result->m_bits[column * result->m_rows + row] = composite.m_bits[source];
+					result->Words()[column * result->m_rows + row] = composite.Words()[source];
 				}
 
 			return result;
@@ -1823,7 +1827,7 @@ namespace see::exec
 
 		const cct::UInt32 packedWords = result->WordCount();
 		for (cct::UInt32 i = 0; i < packedWords && member.m_offset + i < Value::MaxWords; ++i)
-			result->m_bits[i] = composite.m_bits[member.m_offset + i];
+			result->Words()[i] = composite.Words()[member.m_offset + i];
 
 		return result;
 	}
@@ -1908,11 +1912,12 @@ namespace see::exec
 			if (!value)
 				continue;
 
+			const std::span<cct::UInt32> words = value->Words();
 			if (constant.m_words.empty())
-				value->m_bits[0] = constant.m_bits;
+				words[0] = constant.m_bits;
 			else
-				for (cct::UInt32 i = 0; i < constant.m_words.size() && i < Value::MaxWords; ++i)
-					value->m_bits[i] = constant.m_words[i];
+				for (std::size_t i = 0; i < constant.m_words.size() && i < words.size(); ++i)
+					words[i] = constant.m_words[i];
 
 			const cct::UInt32 slot = ir::GetSlot(module.m_valueRefs[id]);
 			prepared.m_constants[slot] = *value;
