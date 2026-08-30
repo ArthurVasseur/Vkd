@@ -19,9 +19,14 @@ namespace vkd
 		return m_UsedSize;
 	}
 
+	inline std::size_t Allocator::GetCommitted() const noexcept
+	{
+		return m_CommittedSize;
+	}
+
 	inline UInt8* Allocator::GetPoolBase() noexcept
 	{
-		return m_Pool.data();
+		return m_Pool.Data();
 	}
 
 	inline bool Allocator::IsPow2(std::size_t x) noexcept

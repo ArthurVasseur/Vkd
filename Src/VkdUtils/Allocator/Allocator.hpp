@@ -21,6 +21,7 @@
 #include <vector>
 
 #include <Concerto/Core/Types/Types.hpp>
+#include <Concerto/Core/VirtualMemory/VirtualMemory.hpp>
 
 // Alignment macro
 #if defined(CCT_PLATFORM_WINDOWS)
@@ -237,6 +238,7 @@ namespace vkd
 
 		std::size_t GetTotal() const noexcept;
 		std::size_t GetUsed() const noexcept;
+		std::size_t GetCommitted() const noexcept;
 		std::size_t GetLargestFreeBlock() const noexcept;
 		double GetExternalFragmentation() const noexcept;
 		void DumpState(std::ostream& os) const;
@@ -249,6 +251,8 @@ namespace vkd
 		static std::size_t AlignUp(std::size_t x, std::size_t alignment) noexcept;
 		static UInt32 FindLastSet64(UInt64 x) noexcept;
 		static UInt32 CountLeadingZeros64(UInt64 x) noexcept;
+
+		bool EnsureCommitted(std::size_t offset, std::size_t size) noexcept;
 
 		void Mapping(std::size_t size, UInt32& outFirstLevelIndex, UInt32& outSecondLevelIndex) const noexcept;
 		void InsertFree(Block* b) noexcept;
@@ -282,7 +286,8 @@ namespace vkd
 	private:
 		std::size_t m_TotalSize;
 		std::size_t m_UsedSize;
-		std::vector<UInt8> m_Pool;
+		std::size_t m_CommittedSize;
+		VirtualMemory m_Pool;
 		UInt32 m_FirstLevelIndexBits;
 		UInt32 m_SecondLevelIndexBits;
 		UInt32 m_FirstLevelCount;

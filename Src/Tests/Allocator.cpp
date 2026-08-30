@@ -712,6 +712,28 @@ TEST_CASE("Allocator - ReallocateInPlace keeps offset aligned", "[allocator][rea
 	REQUIRE(allocator.GetUsed() == 0);
 }
 
+TEST_CASE("Allocator - Commits memory lazily", "[allocator][virtualmemory]")
+{
+	SECTION("A large pool stays mostly uncommitted after a few small allocations")
+	{
+		const std::size_t poolSize = std::size_t{8} * 1024 * 1024 * 1024;
+		Allocator allocator(poolSize);
+		REQUIRE(allocator.Init());
+
+		const std::size_t committedAfterInit = allocator.GetCommitted();
+		REQUIRE(committedAfterInit > 0);
+		REQUIRE(committedAfterInit < poolSize / 1000);
+
+		Allocation alloc;
+		REQUIRE(allocator.Allocate(4096, 16, alloc));
+
+		REQUIRE(allocator.GetCommitted() >= committedAfterInit);
+		REQUIRE(allocator.GetCommitted() < poolSize / 1000);
+
+		allocator.Free(alloc);
+	}
+}
+
 TEST_CASE("Allocator - Large pool sequential allocations", "[allocator][largepool]")
 {
 	SECTION("Mixed similar-size allocations in a multi-gigabyte pool")

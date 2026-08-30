@@ -94,6 +94,7 @@ namespace vkd
 		:
 		m_TotalSize(poolSizeBytes),
 		m_UsedSize(0),
+		m_CommittedSize(0),
 		m_Pool(),
 		m_FirstLevelIndexBits(DefaultFirstLevelIndexBits),
 		m_SecondLevelIndexBits(DefaultSecondLevelIndexBits),
@@ -122,13 +123,9 @@ namespace vkd
 			return false;
 		}
 
-		try
+		if (!m_Pool.Reserve(m_TotalSize))
 		{
-			m_Pool.resize(m_TotalSize);
-		}
-		catch (const std::exception& e)
-		{
-			CCT_ASSERT_FALSE("Failed to initialize allocator pool: {}", e.what());
+			CCT_ASSERT_FALSE("Failed to reserve allocator pool: {} bytes", m_TotalSize);
 			return false;
 		}
 
@@ -138,7 +135,7 @@ namespace vkd
 		}
 		catch (const std::exception& e)
 		{
-			m_Pool.clear();
+			m_Pool.Release();
 			CCT_ASSERT_FALSE("Failed to initialize allocator bitmaps: {}", e.what());
 			return false;
 		}
@@ -150,9 +147,18 @@ namespace vkd
 		}
 		catch (const std::exception& e)
 		{
-			m_Pool.clear();
+			m_Pool.Release();
 			m_SecondLevelBitmaps.clear();
 			CCT_ASSERT_FALSE("Failed to initialize allocator free lists: {}", e.what());
+			return false;
+		}
+
+		if (!EnsureCommitted(0, sizeof(Block)))
+		{
+			m_Pool.Release();
+			m_SecondLevelBitmaps.clear();
+			m_FreeLists.clear();
+			CCT_ASSERT_FALSE("Failed to commit the initial allocator block");
 			return false;
 		}
 
@@ -160,7 +166,7 @@ namespace vkd
 		std::memset(m_SecondLevelBitmaps.data(), 0, sizeof(UInt64) * m_FirstLevelCount);
 		std::memset(m_FreeLists.data(), 0, sizeof(Block*) * totalLists);
 
-		Block* initialBlock = reinterpret_cast<Block*>(m_Pool.data());
+		Block* initialBlock = reinterpret_cast<Block*>(m_Pool.Data());
 		initialBlock->size = m_TotalSize - sizeof(Block);
 		initialBlock->prevPhysicalSize = 0;
 		initialBlock->flags.Clear();
@@ -250,17 +256,33 @@ namespace vkd
 
 	std::size_t Allocator::GetBlockOffset(const Block* b) const noexcept
 	{
-		return reinterpret_cast<const UInt8*>(b) - m_Pool.data();
+		return reinterpret_cast<const UInt8*>(b) - m_Pool.Data();
 	}
 
 	Allocator::Block* Allocator::GetBlockFromOffset(std::size_t offset) noexcept
 	{
-		return reinterpret_cast<Block*>(m_Pool.data() + offset);
+		return reinterpret_cast<Block*>(m_Pool.Data() + offset);
 	}
 
 	const Allocator::Block* Allocator::GetBlockFromOffset(std::size_t offset) const noexcept
 	{
-		return reinterpret_cast<const Block*>(m_Pool.data() + offset);
+		return reinterpret_cast<const Block*>(m_Pool.Data() + offset);
+	}
+
+	bool Allocator::EnsureCommitted(std::size_t offset, std::size_t size) noexcept
+	{
+		const std::size_t requiredEnd = offset + size;
+		if (requiredEnd <= m_CommittedSize)
+			return true;
+
+		const std::size_t pageSize = VirtualMemory::GetPageSize();
+		const std::size_t alignedEnd = AlignUp(requiredEnd, pageSize);
+
+		if (!m_Pool.Commit(m_CommittedSize, alignedEnd - m_CommittedSize))
+			return false;
+
+		m_CommittedSize = alignedEnd;
+		return true;
 	}
 
 	std::size_t Allocator::GetPayloadOffset(const Block* b) const noexcept
@@ -514,6 +536,9 @@ namespace vkd
 		const std::size_t remainderSize = b->size - needed - sizeof(Block);
 		const std::size_t remainderOffset = GetBlockOffset(b) + sizeof(Block) + needed;
 
+		if (!EnsureCommitted(remainderOffset, sizeof(Block)))
+			return;
+
 		remainder = GetBlockFromOffset(remainderOffset);
 		remainder->size = remainderSize;
 		remainder->prevPhysicalSize = needed;
@@ -595,31 +620,43 @@ namespace vkd
 
 		if (alignmentPadding >= sizeof(Block) + MinBlockSize)
 		{
-			const std::size_t originalSize = block->size;
-
-			Block* paddingBlock = block;
 			const std::size_t paddingSize = alignmentPadding - sizeof(Block);
+			const std::size_t alignedBlockOffset = GetBlockOffset(block) + sizeof(Block) + paddingSize;
 
-			paddingBlock->size = paddingSize;
-			MarkFree(paddingBlock);
-			InsertFree(paddingBlock);
+			if (EnsureCommitted(alignedBlockOffset, sizeof(Block)))
+			{
+				const std::size_t originalSize = block->size;
 
-			const std::size_t alignedBlockOffset = GetBlockOffset(paddingBlock) + sizeof(Block) + paddingSize;
-			block = GetBlockFromOffset(alignedBlockOffset);
-			block->size = originalSize - sizeof(Block) - paddingSize;
-			block->prevPhysicalSize = paddingSize;
-			block->flags.Clear();
-			block->SetPrevFree(true);
+				Block* paddingBlock = block;
+				paddingBlock->size = paddingSize;
+				MarkFree(paddingBlock);
+				InsertFree(paddingBlock);
 
-			Block* next = GetNextPhysicalBlock(block);
-			if (next != nullptr)
-				next->prevPhysicalSize = block->size;
+				block = GetBlockFromOffset(alignedBlockOffset);
+				block->size = originalSize - sizeof(Block) - paddingSize;
+				block->prevPhysicalSize = paddingSize;
+				block->flags.Clear();
+				block->SetPrevFree(true);
 
-			alignmentPadding = 0;
+				Block* next = GetNextPhysicalBlock(block);
+				if (next != nullptr)
+					next->prevPhysicalSize = block->size;
+
+				alignmentPadding = 0;
+			}
+		}
+
+		const std::size_t needed = size + alignmentPadding;
+		const std::size_t commitBound = std::min(block->size, needed + sizeof(Block) + MinBlockSize);
+
+		if (!EnsureCommitted(GetBlockOffset(block), sizeof(Block) + commitBound))
+		{
+			Coalesce(block);
+			return false;
 		}
 
 		Block* remainder = nullptr;
-		SplitBlock(block, size + alignmentPadding, remainder);
+		SplitBlock(block, needed, remainder);
 
 		if (remainder != nullptr)
 			InsertFree(remainder);
@@ -704,6 +741,10 @@ namespace vkd
 
 		const std::size_t availableSize = currentSize + sizeof(Block) + next->size;
 		if (availableSize < newSize)
+			return false;
+
+		const std::size_t commitBound = std::min(availableSize, newSize + MinBlockSize);
+		if (!EnsureCommitted(GetBlockOffset(block), sizeof(Block) + commitBound))
 			return false;
 
 		RemoveFree(next);
@@ -833,6 +874,7 @@ namespace vkd
 
 		os << "=== Two-Level Segregate Fit Allocator State ===\n";
 		os << "Total Size: " << m_TotalSize << " bytes\n";
+		os << "Committed Size: " << m_CommittedSize << " bytes\n";
 		os << "Used Size: " << m_UsedSize << " bytes\n";
 		os << "Free Size: " << (m_TotalSize - m_UsedSize) << " bytes\n";
 		os << "Largest Free Block: " << largestFree << " bytes\n";
