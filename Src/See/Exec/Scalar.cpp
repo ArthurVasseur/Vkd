@@ -11,6 +11,8 @@
 #include <cmath>
 #include <cstring>
 
+#include <Concerto/Core/Assert.hpp>
+
 #include "See/Defines.hpp"
 #include <spirv/unified1/GLSL.std.450.h>
 #include <spirv/unified1/spirv.h>
@@ -24,6 +26,7 @@ namespace see::exec
 
 	float Value::GetFloat(cct::UInt32 index) const
 	{
+		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		float value;
 		std::memcpy(&value, &Words()[index], sizeof(float));
 		return value;
@@ -31,11 +34,13 @@ namespace see::exec
 
 	void Value::SetFloat(cct::UInt32 index, float value)
 	{
+		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		std::memcpy(&Words()[index], &value, sizeof(float));
 	}
 
 	cct::Int32 Value::GetInt32(cct::UInt32 index) const
 	{
+		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		cct::Int32 value;
 		std::memcpy(&value, &Words()[index], sizeof(cct::Int32));
 		return value;
@@ -43,16 +48,19 @@ namespace see::exec
 
 	void Value::SetInt32(cct::UInt32 index, cct::Int32 value)
 	{
+		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		std::memcpy(&Words()[index], &value, sizeof(cct::Int32));
 	}
 
 	bool Value::GetBool(cct::UInt32 index) const
 	{
+		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		return Words()[index] != 0;
 	}
 
 	void Value::SetBool(cct::UInt32 index, bool value)
 	{
+		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		Words()[index] = value ? 1u : 0u;
 	}
 
@@ -90,9 +98,9 @@ namespace see::exec
 			}
 
 			auto variableIt = state.m_variables.find(baseVariable);
-			if (variableIt == state.m_variables.end() || wordOffset + count > variableIt->second.m_bits.size())
+			if (variableIt == state.m_variables.end() || wordOffset + count > variableIt->second.WordCount())
 				return nullptr;
-			return variableIt->second.m_bits.data() + wordOffset;
+			return variableIt->second.Words().data() + wordOffset;
 		}
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
@@ -1821,7 +1829,7 @@ namespace see::exec
 				for (cct::UInt32 row = 0; row < result->m_rows; ++row)
 				{
 					const cct::UInt32 source = member.m_offset + column * member.m_matrixStride + row;
-					if (source >= Value::MaxWords)
+					if (source >= composite.WordCount())
 						return std::nullopt;
 
 					result->Words()[column * result->m_rows + row] = composite.Words()[source];
@@ -1831,7 +1839,7 @@ namespace see::exec
 		}
 
 		const cct::UInt32 packedWords = result->WordCount();
-		for (cct::UInt32 i = 0; i < packedWords && member.m_offset + i < Value::MaxWords; ++i)
+		for (cct::UInt32 i = 0; i < packedWords && member.m_offset + i < composite.WordCount(); ++i)
 			result->Words()[i] = composite.Words()[member.m_offset + i];
 
 		return result;
