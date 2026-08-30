@@ -29,6 +29,7 @@
 #include "Vkd/RenderPass/RenderPass.hpp"
 #include "Vkd/Sampler/Sampler.hpp"
 #include "Vkd/ShaderModule/ShaderModule.hpp"
+#include "Vkd/Synchronization/Event/Event.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 #include "Vkd/Synchronization/Semaphore/Semaphore.hpp"
 
@@ -1329,35 +1330,70 @@ namespace vkd
 	VkResult Device::CreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkEvent* pEvent)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreateEvent not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pEvent);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto eventResult = deviceObj->CreateEvent(*pAllocator);
+		if (eventResult.IsError())
+			return eventResult.GetError();
+
+		auto* eventObj = std::move(eventResult).GetValue();
+		VkResult result = eventObj->Create(*deviceObj, *pCreateInfo);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, eventObj);
+			return result;
+		}
+
+		*pEvent = VKD_TO_HANDLE(VkEvent, eventObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroyEvent(VkDevice device, VkEvent event, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroyEvent not implemented");
+
+		if (event == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Event, eventObj, event);
+
+		mem::Delete(pAllocator ? *pAllocator : eventObj->GetAllocationCallbacks(), eventObj);
 	}
 
 	VkResult Device::GetEventStatus(VkDevice device, VkEvent event)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetEventStatus not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Event, eventObj, event);
+
+		return eventObj->GetStatus();
 	}
 
 	VkResult Device::SetEvent(VkDevice device, VkEvent event)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkSetEvent not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Event, eventObj, event);
+
+		return eventObj->Set();
 	}
 
 	VkResult Device::ResetEvent(VkDevice device, VkEvent event)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkResetEvent not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Event, eventObj, event);
+
+		return eventObj->Reset();
 	}
 
 	VkResult Device::CreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)

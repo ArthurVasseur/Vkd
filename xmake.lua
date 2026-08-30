@@ -73,6 +73,7 @@ drivers = {
             "Synchronization",
             "Synchronization/Fence",
             "Synchronization/Semaphore",
+            "Synchronization/Event",
         },
         Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
         Deps = { "see" },
@@ -187,6 +188,7 @@ target("vkd")
         "Synchronization",
         "Synchronization/Fence",
         "Synchronization/Semaphore",
+        "Synchronization/Event",
     }
     for _, dir in ipairs(files) do
         add_files_to_target("Src/Vkd/" .. dir, false)

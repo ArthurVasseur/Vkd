@@ -21,6 +21,7 @@ namespace vkd
 	class CommandPool;
 	class Fence;
 	class Semaphore;
+	class Event;
 	class Buffer;
 	class BufferView;
 	class Image;
@@ -149,6 +150,7 @@ namespace vkd
 		virtual Result<CommandPool*, VkResult> CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Fence*, VkResult> CreateFence(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Semaphore*, VkResult> CreateSemaphore(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Event*, VkResult> CreateEvent(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Buffer*, VkResult> CreateBuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<BufferView*, VkResult> CreateBufferView(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) = 0;

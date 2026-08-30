@@ -24,6 +24,7 @@
 #include "VkdSoftware/Queue/Queue.hpp"
 #include "VkdSoftware/RenderPass/RenderPass.hpp"
 #include "VkdSoftware/ShaderModule/ShaderModule.hpp"
+#include "VkdSoftware/Synchronization/Event/Event.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
 #include "VkdSoftware/Synchronization/Semaphore/Semaphore.hpp"
 #include "VkdUtils/System/System.hpp"
@@ -128,6 +129,18 @@ namespace vkd::software
 		}
 
 		return semaphore;
+	}
+
+	Result<vkd::Event*, VkResult> SoftwareDevice::CreateEvent(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* event = mem::NewObject<Event>(allocationCallbacks);
+		if (!event)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Event");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return event;
 	}
 
 	Result<vkd::Buffer*, VkResult> SoftwareDevice::CreateBuffer(const VkAllocationCallbacks& allocationCallbacks)
