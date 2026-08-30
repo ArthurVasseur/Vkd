@@ -85,7 +85,6 @@ namespace see::exec
 		cct::UInt32 m_height = 0;
 	};
 
-	// Where a pointer id currently points: a base variable plus a word offset into its storage.
 	struct PointerInfo
 	{
 		cct::UInt32 m_baseVariable = 0;
@@ -324,8 +323,7 @@ namespace see::exec
 
 	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex, ExecutionStorage& storage);
 
-	// A variable is named by its ir id but stored by slot; these translate. Emplace returns nullptr for
-	// an id that owns no storage.
+	// Both return nullptr for an id that owns no storage - an access chain, or anything not a variable.
 	[[nodiscard]] const Value* FindVariable(const ir::Module& module, const ExecutionStorage& storage, cct::UInt32 variableId) noexcept;
 	[[nodiscard]] Value* EmplaceVariable(const ir::Module& module, ExecutionStorage& storage, cct::UInt32 variableId) noexcept;
 
