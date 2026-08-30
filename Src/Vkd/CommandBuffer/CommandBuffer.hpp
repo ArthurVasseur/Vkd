@@ -121,6 +121,8 @@ namespace vkd
 		CommandPool* m_owner;
 		VkCommandBufferLevel m_level;
 		State m_state;
+		VkCommandBufferUsageFlags m_usageFlags;
+		UInt32 m_pendingSubmits;
 		vkd::vector<Op> m_ops;
 	};
 } // namespace vkd

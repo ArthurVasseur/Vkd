@@ -20,6 +20,8 @@ namespace vkd
 		m_owner(nullptr),
 		m_level(VK_COMMAND_BUFFER_LEVEL_PRIMARY),
 		m_state(State::Initial),
+		m_usageFlags(0),
+		m_pendingSubmits(0),
 		m_ops(CommandAllocator<Op>(allocationCallbacks))
 	{
 	}
@@ -48,8 +50,33 @@ namespace vkd
 	inline VkResult CommandBuffer::Begin(const VkCommandBufferBeginInfo& beginInfo)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		Transition(State::Recording, {State::Initial});
 
+		if (m_state == State::Pending)
+		{
+			m_state = State::Invalid;
+			CCT_ASSERT_FALSE("Cannot begin a pending command buffer");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		const bool resetAllowed = m_owner && (m_owner->GetFlags() & VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+		if (m_state != State::Initial && !resetAllowed)
+		{
+			m_state = State::Invalid;
+			CCT_ASSERT_FALSE("Command buffer begin requires VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		if (m_state != State::Initial && m_state != State::Executable && m_state != State::Recording)
+		{
+			m_state = State::Invalid;
+			CCT_ASSERT_FALSE("Invalid command buffer state for begin");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		m_ops.clear();
+		m_usageFlags = beginInfo.flags;
+		m_pendingSubmits = 0;
+		m_state = State::Recording;
 		return VK_SUCCESS;
 	}
 
@@ -64,8 +91,19 @@ namespace vkd
 	inline VkResult CommandBuffer::Reset(VkCommandBufferResetFlags flags)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		Transition(State::Initial, {State::Executable, State::Pending});
+		(void)flags;
 
+		if (m_state == State::Pending)
+		{
+			m_state = State::Invalid;
+			CCT_ASSERT_FALSE("Cannot reset a pending command buffer");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		m_ops.clear();
+		m_usageFlags = 0;
+		m_pendingSubmits = 0;
+		m_state = State::Initial;
 		return VK_SUCCESS;
 	}
 
@@ -272,12 +310,46 @@ namespace vkd
 
 	inline VkResult CommandBuffer::MarkSubmitted()
 	{
-		return Transition(State::Pending, {State::Executable});
+		if (m_state == State::Pending)
+		{
+			if ((m_usageFlags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) == 0)
+			{
+				m_state = State::Invalid;
+				CCT_ASSERT_FALSE("Command buffer resubmitted without VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT");
+				return VK_ERROR_VALIDATION_FAILED_EXT;
+			}
+			++m_pendingSubmits;
+			return VK_SUCCESS;
+		}
+
+		const VkResult result = Transition(State::Pending, {State::Executable});
+		if (result == VK_SUCCESS)
+			m_pendingSubmits = 1;
+		return result;
 	}
 
 	inline VkResult CommandBuffer::MarkComplete()
 	{
-		return Transition(State::Executable, {State::Pending});
+		if (m_state != State::Pending || m_pendingSubmits == 0)
+		{
+			m_state = State::Invalid;
+			CCT_ASSERT_FALSE("Invalid command buffer complete");
+			return VK_ERROR_VALIDATION_FAILED_EXT;
+		}
+
+		--m_pendingSubmits;
+		if (m_pendingSubmits > 0)
+			return VK_SUCCESS;
+
+		if (m_usageFlags & VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT)
+		{
+			m_ops.clear();
+			m_state = State::Invalid;
+			return VK_SUCCESS;
+		}
+
+		m_state = State::Executable;
+		return VK_SUCCESS;
 	}
 
 	inline std::span<const CommandBuffer::Op> CommandBuffer::GetOps() const
@@ -287,7 +359,7 @@ namespace vkd
 
 	inline bool CommandBuffer::IsSealed() const
 	{
-		return m_state == State::Executable;
+		return m_state == State::Executable || m_state == State::Pending;
 	}
 
 	inline VkResult CommandBuffer::Transition(State to, std::initializer_list<State> allowed)

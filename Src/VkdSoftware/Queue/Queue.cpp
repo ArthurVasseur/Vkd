@@ -55,6 +55,18 @@ namespace vkd::software
 			for (uint32_t i = 0; i < submit.commandBufferCount; ++i)
 			{
 				VKD_FROM_HANDLE(vkd::CommandBuffer, cmdBufferObj, submit.pCommandBuffers[i]);
+				const VkResult markResult = cmdBufferObj->MarkSubmitted();
+				if (markResult != VK_SUCCESS)
+				{
+					for (auto& previous : batches)
+					{
+						for (auto* previousBuffer : previous.commandBuffers)
+							previousBuffer->MarkComplete();
+					}
+					for (auto* previousBuffer : batch.commandBuffers)
+						previousBuffer->MarkComplete();
+					return markResult;
+				}
 				batch.commandBuffers.push_back(cmdBufferObj);
 			}
 
@@ -89,6 +101,7 @@ namespace vkd::software
 					CpuContext cpuContext(*allocationCallbacks);
 					CommandDispatcher commandDispatcher(cpuContext);
 					commandDispatcher.Execute(*cmdBufferObj);
+					cmdBufferObj->MarkComplete();
 				}
 
 				for (auto* semaphore : batch.signalSemaphores)
