@@ -25,17 +25,6 @@ namespace see::exec
 	};
 
 	[[nodiscard]] std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
-																  cct::UInt32 instanceIndex = 0,
-																  const std::unordered_map<cct::UInt32, Value>& locationInputs = {},
-																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
-																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
-
-	[[nodiscard]] std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
-																  cct::UInt32 instanceIndex, const std::unordered_map<cct::UInt32, Value>& locationInputs,
-																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared);
-
-	[[nodiscard]] std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex,
 																  cct::UInt32 instanceIndex, const std::unordered_map<cct::UInt32, Value>& locationInputs,
 																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
@@ -53,23 +42,6 @@ namespace see::exec
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
-
-	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
-		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
-		const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared);
-
-	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
-		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
-		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage);
-
-	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
-		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
 } // namespace see::exec

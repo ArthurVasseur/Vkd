@@ -175,7 +175,7 @@ TEST_CASE("see::exec::RunVertexStage - seeds BuiltIn InstanceIndex", "[see][stag
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	REQUIRE(module.m_functions.size() == 1);
 
 	SECTION("instance 0 takes the positive-x branch")
@@ -248,7 +248,7 @@ TEST_CASE("see::exec::RunFragmentStage - reads a uniform block through an extern
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	REQUIRE(module.m_functions.size() == 1);
 	const cct::UInt32 uboId = module.m_globalInstructions[0].m_id;
 
@@ -299,7 +299,7 @@ TEST_CASE("see::exec::RunFragmentStage - a matrix input spans one Location per c
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 
 	std::unordered_map<cct::UInt32, see::exec::Value> locationInputs;
 	for (cct::UInt32 column = 0; column < 3; ++column)
@@ -356,7 +356,7 @@ TEST_CASE("see::exec::RunVertexStage - a matrix output is split across consecuti
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 
 	std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 0, {}, {}, {}, prepared, storage);
 	REQUIRE(output.has_value());

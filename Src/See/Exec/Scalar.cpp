@@ -107,24 +107,36 @@ namespace see::exec
 
 	namespace
 	{
-		struct PointerInfo
-		{
-			cct::UInt32 m_baseVariable = 0;
-			cct::UInt32 m_wordOffset = 0;
-			cct::UInt32 m_pointeeType = 0; // ir type id of what this pointer currently points to
-			cct::UInt32 m_matrixStride = 0; // words between matrix columns in memory, 0 when naturally packed
-		};
-
 		struct RuntimeState
 		{
 			const ir::Module& m_module;
 			const PreparedModule& m_prepared;
 			ExecutionStorage& m_storage;
-			std::unordered_map<cct::UInt32, Value> m_variables;
 			const std::unordered_map<cct::UInt32, ExternalBuffer>& m_externalBuffers;
 			const std::unordered_map<cct::UInt32, ExternalImage>& m_externalImages;
-			std::unordered_map<cct::UInt32, PointerInfo> m_pointers;
 		};
+
+		cct::UInt32 VariableSlot(const RuntimeState& state, cct::UInt32 id)
+		{
+			return id < state.m_module.m_variableSlots.size() ? state.m_module.m_variableSlots[id] : ir::InvalidSlot;
+		}
+
+		cct::UInt32 PointerSlot(const RuntimeState& state, cct::UInt32 id)
+		{
+			return id < state.m_module.m_pointerSlots.size() ? state.m_module.m_pointerSlots[id] : ir::InvalidSlot;
+		}
+
+		Value* FindVariableStorage(RuntimeState& state, cct::UInt32 id)
+		{
+			const cct::UInt32 slot = VariableSlot(state, id);
+			return slot == ir::InvalidSlot ? nullptr : state.m_storage.Variables().Find(slot);
+		}
+
+		const PointerInfo* FindPointer(RuntimeState& state, cct::UInt32 id)
+		{
+			const cct::UInt32 slot = PointerSlot(state, id);
+			return slot == ir::InvalidSlot ? nullptr : state.m_storage.Pointers().Find(slot);
+		}
 
 		// `count` contiguous words starting at wordOffset within baseVariable's storage - an external
 		// buffer if it's bound to one (e.g. a uniform block), otherwise the local Value register.
@@ -138,10 +150,10 @@ namespace see::exec
 				return externalIt->second.m_words + wordOffset;
 			}
 
-			auto variableIt = state.m_variables.find(baseVariable);
-			if (variableIt == state.m_variables.end() || wordOffset + count > variableIt->second.WordCount())
+			Value* variable = FindVariableStorage(state, baseVariable);
+			if (!variable || wordOffset + count > variable->WordCount())
 				return nullptr;
-			return variableIt->second.Words(state.m_storage).data() + wordOffset;
+			return variable->Words(state.m_storage).data() + wordOffset;
 		}
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
@@ -328,10 +340,19 @@ namespace see::exec
 			if (auto typeIt = state.m_module.m_types.find(pointerTypeId); typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Pointer)
 				pointeeType = typeIt->second.m_pointee;
 
-			state.m_pointers[id] = PointerInfo{.m_baseVariable = id, .m_wordOffset = 0, .m_pointeeType = pointeeType};
-			if (state.m_externalBuffers.find(id) == state.m_externalBuffers.end() && state.m_variables.find(id) == state.m_variables.end())
+			const cct::UInt32 pointerSlot = PointerSlot(state, id);
+			if (pointerSlot == ir::InvalidSlot)
+				return;
+
+			state.m_storage.Pointers().Emplace(pointerSlot) = PointerInfo{.m_baseVariable = id, .m_wordOffset = 0, .m_pointeeType = pointeeType};
+
+			const cct::UInt32 variableSlot = VariableSlot(state, id);
+			if (variableSlot == ir::InvalidSlot || state.m_storage.Variables().Find(variableSlot))
+				return;
+
+			if (state.m_externalBuffers.find(id) == state.m_externalBuffers.end())
 				if (const Value* zero = state.m_prepared.GetZeroValue(pointerTypeId))
-					CopyValue(state.m_variables[id], *zero, state.m_storage);
+					CopyValue(state.m_storage.Variables().Emplace(variableSlot), *zero, state.m_storage);
 		}
 
 		cct::UInt32 StridedMatrixColumnStride(const RuntimeState& state, const PointerInfo& pointer, const Value& shape)
@@ -351,27 +372,27 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			auto pointerIt = state.m_pointers.find(instruction.m_args[0]);
-			if (pointerIt == state.m_pointers.end())
+			const PointerInfo* pointer = FindPointer(state, instruction.m_args[0]);
+			if (!pointer)
 				return false;
 
 			// (Sampled) images aren't word-addressable data - loading one just produces a handle
 			// naming the variable it came from, for a later ImageSample to resolve against the
 			// bound ExternalImage.
-			if (auto typeIt = state.m_module.m_types.find(pointerIt->second.m_pointeeType);
+			if (auto typeIt = state.m_module.m_types.find(pointer->m_pointeeType);
 				typeIt != state.m_module.m_types.end() && (typeIt->second.m_kind == ir::TypeKind::Image || typeIt->second.m_kind == ir::TypeKind::SampledImage))
 			{
-				return StoreSsa(state, instruction.m_id, Value{.m_imageVariable = pointerIt->second.m_baseVariable});
+				return StoreSsa(state, instruction.m_id, Value{.m_imageVariable = pointer->m_baseVariable});
 			}
 
-			const Value* resultShape = state.m_prepared.GetZeroValue(pointerIt->second.m_pointeeType);
+			const Value* resultShape = state.m_prepared.GetZeroValue(pointer->m_pointeeType);
 			if (!resultShape)
 				return false;
 
 			const cct::UInt32 wordCount = resultShape->WordCount();
-			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *resultShape);
+			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, *pointer, *resultShape);
 			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (resultShape->m_columns - 1) + resultShape->m_rows : wordCount;
-			const cct::UInt32* source = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, spannedWords);
+			const cct::UInt32* source = ResolveWords(state, pointer->m_baseVariable, pointer->m_wordOffset, spannedWords);
 			if (!source)
 				return false;
 
@@ -401,8 +422,8 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			auto pointerIt = state.m_pointers.find(instruction.m_args[0]);
-			if (pointerIt == state.m_pointers.end())
+			const PointerInfo* pointer = FindPointer(state, instruction.m_args[0]);
+			if (!pointer)
 				return false;
 
 			const Value* value = ResolveValue(state, instruction.m_args[1]);
@@ -410,9 +431,9 @@ namespace see::exec
 				return false;
 
 			const cct::UInt32 wordCount = value->WordCount();
-			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, pointerIt->second, *value);
+			const cct::UInt32 columnStride = StridedMatrixColumnStride(state, *pointer, *value);
 			const cct::UInt32 spannedWords = columnStride != 0 ? columnStride * (value->m_columns - 1) + value->m_rows : wordCount;
-			cct::UInt32* target = ResolveWords(state, pointerIt->second.m_baseVariable, pointerIt->second.m_wordOffset, spannedWords);
+			cct::UInt32* target = ResolveWords(state, pointer->m_baseVariable, pointer->m_wordOffset, spannedWords);
 			if (!target)
 				return false;
 
@@ -437,18 +458,18 @@ namespace see::exec
 			if (instruction.m_args.size() < 2)
 				return false;
 
-			auto targetIt = state.m_pointers.find(instruction.m_args[0]);
-			auto sourceIt = state.m_pointers.find(instruction.m_args[1]);
-			if (targetIt == state.m_pointers.end() || sourceIt == state.m_pointers.end())
+			const PointerInfo* targetPointer = FindPointer(state, instruction.m_args[0]);
+			const PointerInfo* sourcePointer = FindPointer(state, instruction.m_args[1]);
+			if (!targetPointer || !sourcePointer)
 				return false;
 
-			const Value* shape = state.m_prepared.GetZeroValue(targetIt->second.m_pointeeType);
+			const Value* shape = state.m_prepared.GetZeroValue(targetPointer->m_pointeeType);
 			if (!shape)
 				return false;
 
 			const cct::UInt32 wordCount = shape->WordCount();
-			cct::UInt32* target = ResolveWords(state, targetIt->second.m_baseVariable, targetIt->second.m_wordOffset, wordCount);
-			const cct::UInt32* source = ResolveWords(state, sourceIt->second.m_baseVariable, sourceIt->second.m_wordOffset, wordCount);
+			cct::UInt32* target = ResolveWords(state, targetPointer->m_baseVariable, targetPointer->m_wordOffset, wordCount);
+			const cct::UInt32* source = ResolveWords(state, sourcePointer->m_baseVariable, sourcePointer->m_wordOffset, wordCount);
 			if (!target || !source)
 				return false;
 
@@ -463,11 +484,11 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			auto basePointerIt = state.m_pointers.find(instruction.m_args[0]);
-			if (basePointerIt == state.m_pointers.end())
+			const PointerInfo* basePointer = FindPointer(state, instruction.m_args[0]);
+			if (!basePointer)
 				return false;
 
-			PointerInfo info = basePointerIt->second;
+			PointerInfo info = *basePointer;
 			for (std::size_t argIndex = 1; argIndex < instruction.m_args.size(); ++argIndex)
 			{
 				const Value* index = ResolveValue(state, instruction.m_args[argIndex]);
@@ -514,7 +535,11 @@ namespace see::exec
 				}
 			}
 
-			state.m_pointers[instruction.m_id] = info;
+			const cct::UInt32 slot = PointerSlot(state, instruction.m_id);
+			if (slot == ir::InvalidSlot)
+				return false;
+
+			state.m_storage.Pointers().Emplace(slot) = info;
 			return true;
 		}
 
@@ -1380,18 +1405,18 @@ namespace see::exec
 			if (instruction.m_args.empty())
 				return false;
 
-			std::vector<const Value*> operands;
-			operands.reserve(instruction.m_args.size() - 1);
-			for (std::size_t i = 1; i < instruction.m_args.size(); ++i)
-			{
-				const Value* operand = ResolveValue(state, instruction.m_args[i]);
-				if (!operand)
-					return false;
-				operands.push_back(operand);
-			}
-
-			if (operands.empty())
+			static constexpr std::size_t MaxOperands = 3;
+			const std::size_t operandCount = instruction.m_args.size() - 1;
+			if (operandCount == 0 || operandCount > MaxOperands)
 				return false;
+
+			std::array<const Value*, MaxOperands> operands{};
+			for (std::size_t i = 0; i < operandCount; ++i)
+			{
+				operands[i] = ResolveValue(state, instruction.m_args[i + 1]);
+				if (!operands[i])
+					return false;
+			}
 
 			const cct::UInt32 componentCount = operands[0]->WordCount();
 			Value* result = SsaSlot(state, instruction.m_id);
@@ -1408,7 +1433,7 @@ namespace see::exec
 			};
 			const auto floatBinary = [&](auto&& f)
 			{
-				if (operands.size() < 2)
+				if (operandCount < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
 					result->SetFloat(state.m_storage, i, f(operands[0]->GetFloat(state.m_storage, i), operands[1]->GetFloat(state.m_storage, i)));
@@ -1416,7 +1441,7 @@ namespace see::exec
 			};
 			const auto floatTernary = [&](auto&& f)
 			{
-				if (operands.size() < 3)
+				if (operandCount < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
 					result->SetFloat(state.m_storage, i, f(operands[0]->GetFloat(state.m_storage, i), operands[1]->GetFloat(state.m_storage, i), operands[2]->GetFloat(state.m_storage, i)));
@@ -1430,7 +1455,7 @@ namespace see::exec
 			};
 			const auto intBinary = [&](auto&& f)
 			{
-				if (operands.size() < 2)
+				if (operandCount < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
 					result->SetInt32(state.m_storage, i, f(operands[0]->GetInt32(state.m_storage, i), operands[1]->GetInt32(state.m_storage, i)));
@@ -1438,7 +1463,7 @@ namespace see::exec
 			};
 			const auto intTernary = [&](auto&& f)
 			{
-				if (operands.size() < 3)
+				if (operandCount < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
 					result->SetInt32(state.m_storage, i, f(operands[0]->GetInt32(state.m_storage, i), operands[1]->GetInt32(state.m_storage, i), operands[2]->GetInt32(state.m_storage, i)));
@@ -1621,7 +1646,7 @@ namespace see::exec
 					break;
 				case GLSLstd450Distance:
 				{
-					if (operands.size() < 2)
+					if (operandCount < 2)
 						return false;
 					float sum = 0.0f;
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
@@ -1635,7 +1660,7 @@ namespace see::exec
 				}
 				case GLSLstd450Cross:
 				{
-					if (operands.size() < 2 || componentCount != 3)
+					if (operandCount < 2 || componentCount != 3)
 						return false;
 					const Value& a = *operands[0];
 					const Value& b = *operands[1];
@@ -1856,22 +1881,28 @@ namespace see::exec
 					continue;
 				}
 
-				auto argPointerIt = state.m_pointers.find(argId);
-				if (argPointerIt == state.m_pointers.end())
+				const PointerInfo* argPointer = FindPointer(state, argId);
+				if (!argPointer)
 					return false;
 
-				const Value* copyShape = state.m_prepared.GetZeroValue(argPointerIt->second.m_pointeeType);
+				const Value* copyShape = state.m_prepared.GetZeroValue(argPointer->m_pointeeType);
 				if (!copyShape)
 					return false;
 
 				const cct::UInt32 wordCount = copyShape->WordCount();
-				const cct::UInt32* source = ResolveWords(state, argPointerIt->second.m_baseVariable, argPointerIt->second.m_wordOffset, wordCount);
+				const cct::UInt32* source = ResolveWords(state, argPointer->m_baseVariable, argPointer->m_wordOffset, wordCount);
 				if (!source)
 					return false;
 
-				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
+				const cct::UInt32 parameterSlot = VariableSlot(state, paramId);
+				const cct::UInt32 parameterPointerSlot = PointerSlot(state, paramId);
+				if (parameterSlot == ir::InvalidSlot || parameterPointerSlot == ir::InvalidSlot)
+					return false;
 
-				Value& parameter = state.m_variables[paramId];
+				state.m_storage.Pointers().Emplace(parameterPointerSlot) =
+					PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointer->m_pointeeType};
+
+				Value& parameter = state.m_storage.Variables().Emplace(parameterSlot);
 				CopyHeader(parameter, *copyShape, state.m_storage);
 				const std::span<cct::UInt32> words = parameter.Words(state.m_storage);
 				for (cct::UInt32 w = 0; w < wordCount; ++w)
@@ -1898,15 +1929,16 @@ namespace see::exec
 		if (typeIt == module.m_types.end())
 			return std::nullopt;
 
-		std::optional<std::vector<MemberLayout>> layout = GetStructMemberLayout(module, typeIt->second, composite.m_structType);
+		const std::vector<MemberLayout>* layout = storage.Prepared().GetMemberLayout(composite.m_structType);
 		if (!layout || memberIndex >= layout->size())
 			return std::nullopt;
 
-		std::optional<Value> result = MakeZeroValue(module, typeIt->second.m_memberTypes[memberIndex]);
-		if (!result)
+		const Value* memberShape = storage.Prepared().GetZeroValue(typeIt->second.m_memberTypes[memberIndex]);
+		if (!memberShape)
 			return std::nullopt;
 
-		ReserveWords(*result, storage);
+		std::optional<Value> result = Value{};
+		CopyHeader(*result, *memberShape, storage);
 		const std::span<cct::UInt32> words = result->Words(storage);
 		const std::span<const cct::UInt32> compositeWords = composite.Words(storage);
 
@@ -1966,6 +1998,9 @@ namespace see::exec
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		PreparedModule prepared;
+		prepared.m_ssaSlotCount = module.m_ssaSlotCount;
+		prepared.m_variableSlotCount = module.m_variableSlotCount;
+		prepared.m_pointerSlotCount = module.m_pointerSlotCount;
 
 		cct::UInt32 maxTypeId = 0;
 		for (const auto& [typeId, type] : module.m_types)
@@ -2052,38 +2087,35 @@ namespace see::exec
 		return prepared;
 	}
 
-	void RegisterFile::Reset(cct::UInt32 slotCount)
+	const Value* FindVariable(const ir::Module& module, const ExecutionStorage& storage, cct::UInt32 variableId) noexcept
 	{
-		if (m_slotEpoch.size() < slotCount)
-		{
-			m_values.resize(slotCount);
-			m_slotEpoch.resize(slotCount, 0);
-		}
+		if (variableId >= module.m_variableSlots.size())
+			return nullptr;
 
-		if (m_epoch == 0xFFFFFFFFu)
-		{
-			std::fill(m_slotEpoch.begin(), m_slotEpoch.end(), 0u);
-			m_epoch = 0;
-		}
-
-		++m_epoch;
+		const cct::UInt32 slot = module.m_variableSlots[variableId];
+		return slot == ir::InvalidSlot ? nullptr : storage.Variables().Find(slot);
 	}
 
-	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
-															  ExecutionStorage& storage)
+	Value* EmplaceVariable(const ir::Module& module, ExecutionStorage& storage, cct::UInt32 variableId) noexcept
+	{
+		if (variableId >= module.m_variableSlots.size())
+			return nullptr;
+
+		const cct::UInt32 slot = module.m_variableSlots[variableId];
+		return slot == ir::InvalidSlot ? nullptr : &storage.Variables().Emplace(slot);
+	}
+
+	bool Run(const ir::Module& module, const ir::Function& function,
+			 const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+			 const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
-		RuntimeState state{.m_module = module, .m_prepared = prepared, .m_storage = storage, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
+		RuntimeState state{.m_module = module, .m_prepared = prepared, .m_storage = storage, .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)
 				RegisterVariable(state, global.m_id, global.m_type);
 
-		if (!RunBlocks(state, function).m_success)
-			return std::nullopt;
-
-		return state.m_variables;
+		return RunBlocks(state, function).m_success;
 	}
 } // namespace see::exec

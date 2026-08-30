@@ -34,8 +34,12 @@ namespace see::ir
 		std::vector<Instruction> m_globalInstructions; // mostly OpVariable
 		std::vector<Function> m_functions;
 		std::vector<ValueRef> m_valueRefs; // indexed by SPIR-V id
+		std::vector<cct::UInt32> m_pointerSlots; // indexed by SPIR-V id, InvalidSlot when the id names no address
+		std::vector<cct::UInt32> m_variableSlots; // indexed by SPIR-V id, InvalidSlot when the id owns no storage
 		cct::UInt32 m_ssaSlotCount = 0;
 		cct::UInt32 m_constantSlotCount = 0;
+		cct::UInt32 m_pointerSlotCount = 0;
+		cct::UInt32 m_variableSlotCount = 0;
 	};
 
 	[[nodiscard]] std::optional<Module> Convert(const see::spirv::Module& spirvModule);

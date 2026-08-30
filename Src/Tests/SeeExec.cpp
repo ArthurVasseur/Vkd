@@ -33,6 +33,11 @@ namespace
 		return code;
 	}
 
+	void SeedInput(const see::ir::Module& module, see::exec::ExecutionStorage& storage, cct::UInt32 variableId, const see::exec::Value& value)
+	{
+		see::exec::CopyValue(*see::exec::EmplaceVariable(module, storage, variableId), value, storage);
+	}
+
 	see::ir::Module ParseAndConvert(const char* source)
 	{
 		const std::vector<cct::UInt32> code = Assemble(source);
@@ -71,20 +76,20 @@ TEST_CASE("see::exec::Run - passthrough load/store", "[see][exec]")
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
 	see::exec::Value input;
 	input.SetFloat(storage, 0, 42.0f);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{inId, input}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.GetFloat(storage) == 42.0f);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->GetFloat(storage) == 42.0f);
 }
 
 TEST_CASE("see::exec::Run - scalar arithmetic", "[see][exec]")
@@ -115,7 +120,7 @@ TEST_CASE("see::exec::Run - scalar arithmetic", "[see][exec]")
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[2].m_id;
@@ -125,13 +130,14 @@ TEST_CASE("see::exec::Run - scalar arithmetic", "[see][exec]")
 	see::exec::Value b;
 	b.SetFloat(storage, 0, 4.0f);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, a}, {bId, b}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, aId, a);
+	SeedInput(module, storage, bId, b);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.GetFloat(storage) == 14.0f); // (3 + 4) * 2
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->GetFloat(storage) == 14.0f); // (3 + 4) * 2
 }
 
 TEST_CASE("see::exec::Run - OpFunctionCall passes arguments and returns a value", "[see][exec]")
@@ -165,20 +171,20 @@ TEST_CASE("see::exec::Run - OpFunctionCall passes arguments and returns a value"
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
 	see::exec::Value input;
 	input.SetFloat(storage, 0, 3.0f);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{inId, input}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.GetFloat(storage) == 6.0f);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->GetFloat(storage) == 6.0f);
 }
 
 TEST_CASE("see::exec::Run - conditional branch picks the right block", "[see][exec]")
@@ -216,7 +222,7 @@ TEST_CASE("see::exec::Run - conditional branch picks the right block", "[see][ex
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 condId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -226,9 +232,10 @@ TEST_CASE("see::exec::Run - conditional branch picks the right block", "[see][ex
 		cond.m_scalar = see::ir::ScalarKind::Bool;
 		cond.SetBool(storage, 0, true);
 
-		std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{condId, cond}}, {}, {}, prepared, storage);
-		REQUIRE(result.has_value());
-		CHECK(result->find(outId)->second.GetFloat(storage) == 1.0f);
+		SeedInput(module, storage, condId, cond);
+		const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+		REQUIRE(result);
+		CHECK(see::exec::FindVariable(module, storage, outId)->GetFloat(storage) == 1.0f);
 	}
 
 	SECTION("condition false takes the else branch")
@@ -237,9 +244,10 @@ TEST_CASE("see::exec::Run - conditional branch picks the right block", "[see][ex
 		cond.m_scalar = see::ir::ScalarKind::Bool;
 		cond.SetBool(storage, 0, false);
 
-		std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{condId, cond}}, {}, {}, prepared, storage);
-		REQUIRE(result.has_value());
-		CHECK(result->find(outId)->second.GetFloat(storage) == 2.0f);
+		SeedInput(module, storage, condId, cond);
+		const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+		REQUIRE(result);
+		CHECK(see::exec::FindVariable(module, storage, outId)->GetFloat(storage) == 2.0f);
 	}
 }
 
@@ -272,7 +280,7 @@ TEST_CASE("see::exec::Run - matrix times vector", "[see][exec]")
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 mId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 vId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[2].m_id;
@@ -290,10 +298,12 @@ TEST_CASE("see::exec::Run - matrix times vector", "[see][exec]")
 	for (cct::UInt32 i = 0; i < 4; ++i)
 		vector.SetFloat(storage, i, static_cast<float>(i + 1)); // (1, 2, 3, 4)
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{mId, matrix}, {vId, vector}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, mId, matrix);
+	SeedInput(module, storage, vId, vector);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& out = result->find(outId)->second;
+	const see::exec::Value& out = *see::exec::FindVariable(module, storage, outId);
 	CHECK(out.GetFloat(storage, 0) == 2.0f);
 	CHECK(out.GetFloat(storage, 1) == 4.0f);
 	CHECK(out.GetFloat(storage, 2) == 6.0f);
@@ -332,7 +342,7 @@ TEST_CASE("see::exec::Run - OpTypeArray indexed dynamically via OpAccessChain", 
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 arrId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 idxId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[2].m_id;
@@ -348,11 +358,12 @@ TEST_CASE("see::exec::Run - OpTypeArray indexed dynamically via OpAccessChain", 
 	idx.m_scalar = see::ir::ScalarKind::Int32;
 	idx.SetInt32(storage, 0, 2);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{arrId, arr}, {idxId, idx}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, arrId, arr);
+	SeedInput(module, storage, idxId, idx);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outId)->second.GetFloat(storage) == 30.0f);
+	CHECK(see::exec::FindVariable(module, storage, outId)->GetFloat(storage) == 30.0f);
 }
 
 TEST_CASE("see::exec::Run - struct-typed function locals (OpCopyMemory, member AccessChain, whole-struct Load/Extract)", "[see][exec]")
@@ -402,7 +413,7 @@ TEST_CASE("see::exec::Run - struct-typed function locals (OpCopyMemory, member A
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -410,14 +421,15 @@ TEST_CASE("see::exec::Run - struct-typed function locals (OpCopyMemory, member A
 	input.m_scalar = see::ir::ScalarKind::Int32;
 	input.SetInt32(storage, 0, 42);
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.GetFloat(storage, 0) == 1.0f);
-	CHECK(outIt->second.GetFloat(storage, 1) == 2.0f);
-	CHECK(outIt->second.GetFloat(storage, 2) == 3.0f);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->GetFloat(storage, 0) == 1.0f);
+	CHECK(outIt->GetFloat(storage, 1) == 2.0f);
+	CHECK(outIt->GetFloat(storage, 2) == 3.0f);
 }
 
 TEST_CASE("see::exec::Run - uniform block bigger than 16 words via an external buffer", "[see][exec]")
@@ -461,7 +473,7 @@ TEST_CASE("see::exec::Run - uniform block bigger than 16 words via an external b
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 uboId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outScalarId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outMatrixId = module.m_globalInstructions[2].m_id;
@@ -477,12 +489,12 @@ TEST_CASE("see::exec::Run - uniform block bigger than 16 words via an external b
 
 	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {}, externalBuffers, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	const bool result = see::exec::Run(module, module.m_functions[0], externalBuffers, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outScalarId)->second.GetFloat(storage) == 7.0f);
+	CHECK(see::exec::FindVariable(module, storage, outScalarId)->GetFloat(storage) == 7.0f);
 
-	const see::exec::Value& matrix = result->find(outMatrixId)->second;
+	const see::exec::Value& matrix = *see::exec::FindVariable(module, storage, outMatrixId);
 	for (cct::UInt32 i = 0; i < 4; ++i)
 		CHECK(matrix.GetFloat(storage, i * 4 + i) == static_cast<float>(i + 1));
 }
@@ -520,7 +532,7 @@ TEST_CASE("see::exec::Run - external buffer struct member offset from OpMemberDe
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 blockId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -532,10 +544,10 @@ TEST_CASE("see::exec::Run - external buffer struct member offset from OpMemberDe
 
 	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{blockId, see::exec::ExternalBuffer{blockWords.data(), static_cast<cct::UInt32>(blockWords.size())}}};
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {}, externalBuffers, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	const bool result = see::exec::Run(module, module.m_functions[0], externalBuffers, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outId)->second.GetFloat(storage) == 22.0f);
+	CHECK(see::exec::FindVariable(module, storage, outId)->GetFloat(storage) == 22.0f);
 }
 
 TEST_CASE("see::exec::Run - nearest-neighbor image sampling through an external image", "[see][exec]")
@@ -575,7 +587,7 @@ TEST_CASE("see::exec::Run - nearest-neighbor image sampling through an external 
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 texId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 uvId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outColorId = module.m_globalInstructions[2].m_id;
@@ -592,10 +604,11 @@ TEST_CASE("see::exec::Run - nearest-neighbor image sampling through an external 
 
 	std::unordered_map<cct::UInt32, see::exec::ExternalImage> externalImages{{texId, see::exec::ExternalImage{texels.data(), 2, 2}}};
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{uvId, uv}}, {}, externalImages, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, uvId, uv);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, externalImages, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& color = result->find(outColorId)->second;
+	const see::exec::Value& color = *see::exec::FindVariable(module, storage, outColorId);
 	CHECK(color.GetFloat(storage, 0) == 1.0f);
 	CHECK(color.GetFloat(storage, 1) == 1.0f);
 	CHECK(color.GetFloat(storage, 2) == 0.0f);
@@ -631,7 +644,7 @@ TEST_CASE("see::exec::Run - OpLogicalEqual on a bool3 reduced by OpAll", "[see][
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 lhsId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 rhsId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[2].m_id;
@@ -649,18 +662,20 @@ TEST_CASE("see::exec::Run - OpLogicalEqual on a bool3 reduced by OpAll", "[see][
 
 	SECTION("all components equal")
 	{
-		std::unordered_map<cct::UInt32, see::exec::Value> inputs{{lhsId, makeBool3(true, false, true)}, {rhsId, makeBool3(true, false, true)}};
-		std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-		REQUIRE(result.has_value());
-		CHECK(result->find(outId)->second.GetBool(storage));
+		SeedInput(module, storage, lhsId, makeBool3(true, false, true));
+		SeedInput(module, storage, rhsId, makeBool3(true, false, true));
+		const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+		REQUIRE(result);
+		CHECK(see::exec::FindVariable(module, storage, outId)->GetBool(storage));
 	}
 
 	SECTION("one component differs")
 	{
-		std::unordered_map<cct::UInt32, see::exec::Value> inputs{{lhsId, makeBool3(true, false, true)}, {rhsId, makeBool3(true, true, true)}};
-		std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-		REQUIRE(result.has_value());
-		CHECK_FALSE(result->find(outId)->second.GetBool(storage));
+		SeedInput(module, storage, lhsId, makeBool3(true, false, true));
+		SeedInput(module, storage, rhsId, makeBool3(true, true, true));
+		const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+		REQUIRE(result);
+		CHECK_FALSE(see::exec::FindVariable(module, storage, outId)->GetBool(storage));
 	}
 }
 
@@ -696,7 +711,7 @@ TEST_CASE("see::exec::Run - OpLogicalAnd/OpLogicalOr/OpLogicalNot on scalar bool
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outAndId = module.m_globalInstructions[2].m_id;
@@ -711,13 +726,14 @@ TEST_CASE("see::exec::Run - OpLogicalAnd/OpLogicalOr/OpLogicalNot on scalar bool
 	falseValue.m_scalar = see::ir::ScalarKind::Bool;
 	falseValue.SetBool(storage, 0, false);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, trueValue}, {bId, falseValue}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, aId, trueValue);
+	SeedInput(module, storage, bId, falseValue);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK_FALSE(result->find(outAndId)->second.GetBool(storage));
-	CHECK(result->find(outOrId)->second.GetBool(storage));
-	CHECK_FALSE(result->find(outNotAId)->second.GetBool(storage));
+	CHECK_FALSE(see::exec::FindVariable(module, storage, outAndId)->GetBool(storage));
+	CHECK(see::exec::FindVariable(module, storage, outOrId)->GetBool(storage));
+	CHECK_FALSE(see::exec::FindVariable(module, storage, outNotAId)->GetBool(storage));
 }
 
 TEST_CASE("see::exec::Run - OpConstantComposite resolves a vector constant", "[see][exec]")
@@ -746,13 +762,13 @@ TEST_CASE("see::exec::Run - OpConstantComposite resolves a vector constant", "[s
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 outId = module.m_globalInstructions[0].m_id;
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& out = result->find(outId)->second;
+	const see::exec::Value& out = *see::exec::FindVariable(module, storage, outId);
 	CHECK(out.GetFloat(storage, 0) == 1.0f);
 	CHECK(out.GetFloat(storage, 1) == 2.0f);
 	CHECK(out.GetFloat(storage, 2) == 3.0f);
@@ -788,7 +804,7 @@ TEST_CASE("see::exec::Run - OpINotEqual compares vector operands component-wise"
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[2].m_id;
@@ -807,11 +823,12 @@ TEST_CASE("see::exec::Run - OpINotEqual compares vector operands component-wise"
 	b.SetInt32(storage, 1, 3);
 	b.SetInt32(storage, 2, 7);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, a}, {bId, b}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, aId, a);
+	SeedInput(module, storage, bId, b);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& out = result->find(outId)->second;
+	const see::exec::Value& out = *see::exec::FindVariable(module, storage, outId);
 	CHECK_FALSE(out.GetBool(storage, 0));
 	CHECK_FALSE(out.GetBool(storage, 1));
 	CHECK(out.GetBool(storage, 2));
@@ -858,7 +875,7 @@ TEST_CASE("see::exec::Run - OpAccessChain on a vector narrows to the scalar comp
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 vId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -869,11 +886,11 @@ TEST_CASE("see::exec::Run - OpAccessChain on a vector narrows to the scalar comp
 	v.SetBool(storage, 1, true);
 	v.SetBool(storage, 2, false);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{vId, v}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, vId, v);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& out = result->find(outId)->second;
+	const see::exec::Value& out = *see::exec::FindVariable(module, storage, outId);
 	CHECK_FALSE(out.GetBool(storage, 0)); // v.z
 	CHECK(out.GetBool(storage, 1)); // v.x
 	CHECK(out.GetBool(storage, 2)); // v.y
@@ -908,7 +925,7 @@ TEST_CASE("see::exec::Run - OpFRem/OpFMod sign conventions on negative operands"
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outRemId = module.m_globalInstructions[2].m_id;
@@ -919,12 +936,13 @@ TEST_CASE("see::exec::Run - OpFRem/OpFMod sign conventions on negative operands"
 	see::exec::Value b;
 	b.SetFloat(storage, 0, 2.0f);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, a}, {bId, b}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, aId, a);
+	SeedInput(module, storage, bId, b);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outRemId)->second.GetFloat(storage) == -1.5f); // sign of the dividend
-	CHECK(result->find(outModId)->second.GetFloat(storage) == 0.5f); // sign of the divisor
+	CHECK(see::exec::FindVariable(module, storage, outRemId)->GetFloat(storage) == -1.5f); // sign of the dividend
+	CHECK(see::exec::FindVariable(module, storage, outModId)->GetFloat(storage) == 0.5f); // sign of the divisor
 }
 
 TEST_CASE("see::exec::Run - OpSRem/OpSMod/OpUMod integer remainder semantics", "[see][exec]")
@@ -965,7 +983,7 @@ TEST_CASE("see::exec::Run - OpSRem/OpSMod/OpUMod integer remainder semantics", "
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 aId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 bId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 uaId = module.m_globalInstructions[2].m_id;
@@ -989,13 +1007,16 @@ TEST_CASE("see::exec::Run - OpSRem/OpSMod/OpUMod integer remainder semantics", "
 	ub.m_scalar = see::ir::ScalarKind::Int32;
 	ub.SetInt32(storage, 0, 5);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{aId, a}, {bId, b}, {uaId, ua}, {ubId, ub}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, aId, a);
+	SeedInput(module, storage, bId, b);
+	SeedInput(module, storage, uaId, ua);
+	SeedInput(module, storage, ubId, ub);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outRemId)->second.GetInt32(storage) == -1); // sign of the dividend
-	CHECK(result->find(outModId)->second.GetInt32(storage) == 2); // sign of the divisor
-	CHECK(result->find(outUModId)->second.GetInt32(storage) == 4);
+	CHECK(see::exec::FindVariable(module, storage, outRemId)->GetInt32(storage) == -1); // sign of the dividend
+	CHECK(see::exec::FindVariable(module, storage, outModId)->GetInt32(storage) == 2); // sign of the divisor
+	CHECK(see::exec::FindVariable(module, storage, outUModId)->GetInt32(storage) == 4);
 }
 
 TEST_CASE("see::exec::Run - OpFNegate/OpSNegate and int<->float conversions", "[see][exec]")
@@ -1040,7 +1061,7 @@ TEST_CASE("see::exec::Run - OpFNegate/OpSNegate and int<->float conversions", "[
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 fId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 iId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outNegFId = module.m_globalInstructions[2].m_id;
@@ -1055,15 +1076,16 @@ TEST_CASE("see::exec::Run - OpFNegate/OpSNegate and int<->float conversions", "[
 	i.m_scalar = see::ir::ScalarKind::Int32;
 	i.SetInt32(storage, 0, -3);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{fId, f}, {iId, i}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, fId, f);
+	SeedInput(module, storage, iId, i);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outNegFId)->second.GetFloat(storage) == -2.75f);
-	CHECK(result->find(outNegIId)->second.GetInt32(storage) == 3);
-	CHECK(result->find(outSToFId)->second.GetFloat(storage) == -3.0f);
-	CHECK(result->find(outUToFId)->second.GetFloat(storage) == 4294967296.0f); // 0xFFFFFFFD as unsigned, rounded to float
-	CHECK(result->find(outFToSId)->second.GetInt32(storage) == 2); // truncation toward zero
+	CHECK(see::exec::FindVariable(module, storage, outNegFId)->GetFloat(storage) == -2.75f);
+	CHECK(see::exec::FindVariable(module, storage, outNegIId)->GetInt32(storage) == 3);
+	CHECK(see::exec::FindVariable(module, storage, outSToFId)->GetFloat(storage) == -3.0f);
+	CHECK(see::exec::FindVariable(module, storage, outUToFId)->GetFloat(storage) == 4294967296.0f); // 0xFFFFFFFD as unsigned, rounded to float
+	CHECK(see::exec::FindVariable(module, storage, outFToSId)->GetInt32(storage) == 2); // truncation toward zero
 }
 
 TEST_CASE("see::exec::Run - GLSL.std.450 FAbs/FClamp/FMix and vector Normalize", "[see][exec]")
@@ -1108,7 +1130,7 @@ TEST_CASE("see::exec::Run - GLSL.std.450 FAbs/FClamp/FMix and vector Normalize",
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 xId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 vId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outAbsId = module.m_globalInstructions[2].m_id;
@@ -1125,14 +1147,15 @@ TEST_CASE("see::exec::Run - GLSL.std.450 FAbs/FClamp/FMix and vector Normalize",
 	v.SetFloat(storage, 1, 0.0f);
 	v.SetFloat(storage, 2, 4.0f);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{xId, x}, {vId, v}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, xId, x);
+	SeedInput(module, storage, vId, v);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outAbsId)->second.GetFloat(storage) == 2.5f);
-	CHECK(result->find(outClampId)->second.GetFloat(storage) == 0.0f);
-	CHECK(result->find(outMixId)->second.GetFloat(storage) == 2.5f);
-	const see::exec::Value& norm = result->find(outNormId)->second;
+	CHECK(see::exec::FindVariable(module, storage, outAbsId)->GetFloat(storage) == 2.5f);
+	CHECK(see::exec::FindVariable(module, storage, outClampId)->GetFloat(storage) == 0.0f);
+	CHECK(see::exec::FindVariable(module, storage, outMixId)->GetFloat(storage) == 2.5f);
+	const see::exec::Value& norm = *see::exec::FindVariable(module, storage, outNormId);
 	CHECK(norm.GetFloat(storage, 0) == 0.6f);
 	CHECK(norm.GetFloat(storage, 1) == 0.0f);
 	CHECK(norm.GetFloat(storage, 2) == 0.8f);
@@ -1172,7 +1195,7 @@ TEST_CASE("see::exec::Run - OpVectorTimesScalar and OpFUnordNotEqual", "[see][ex
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 vId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 sId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outScaledId = module.m_globalInstructions[2].m_id;
@@ -1187,15 +1210,16 @@ TEST_CASE("see::exec::Run - OpVectorTimesScalar and OpFUnordNotEqual", "[see][ex
 	see::exec::Value s;
 	s.SetFloat(storage, 0, 3.0f);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{vId, v}, {sId, s}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, vId, v);
+	SeedInput(module, storage, sId, s);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& scaled = result->find(outScaledId)->second;
+	const see::exec::Value& scaled = *see::exec::FindVariable(module, storage, outScaledId);
 	CHECK(scaled.GetFloat(storage, 0) == 3.0f);
 	CHECK(scaled.GetFloat(storage, 1) == -6.0f);
 	CHECK(scaled.GetFloat(storage, 2) == 1.5f);
-	CHECK(result->find(outCompareId)->second.GetBool(storage)); // 3.0 != 2.0
+	CHECK(see::exec::FindVariable(module, storage, outCompareId)->GetBool(storage)); // 3.0 != 2.0
 }
 
 TEST_CASE("see::exec::Run - OpSelect with a vector condition selects component-wise", "[see][exec]")
@@ -1230,7 +1254,7 @@ TEST_CASE("see::exec::Run - OpSelect with a vector condition selects component-w
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 condId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1241,11 +1265,11 @@ TEST_CASE("see::exec::Run - OpSelect with a vector condition selects component-w
 	cond.SetBool(storage, 1, false);
 	cond.SetBool(storage, 2, true);
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{condId, cond}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, condId, cond);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& out = result->find(outId)->second;
+	const see::exec::Value& out = *see::exec::FindVariable(module, storage, outId);
 	CHECK(out.GetInt32(storage, 0) == 1);
 	CHECK(out.GetInt32(storage, 1) == 0);
 	CHECK(out.GetInt32(storage, 2) == 1);
@@ -1281,7 +1305,7 @@ TEST_CASE("see::exec::Run - OpAccessChain indexes a matrix by column then compon
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 mId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1292,12 +1316,12 @@ TEST_CASE("see::exec::Run - OpAccessChain indexes a matrix by column then compon
 	for (cct::UInt32 i = 0; i < 9; ++i)
 		m.SetFloat(storage, i, static_cast<float>(i));
 
-	std::unordered_map<cct::UInt32, see::exec::Value> inputs{{mId, m}};
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], inputs, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, mId, m);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
 	// Column 2, component 0 = word 2*3+0 = 6
-	CHECK(result->find(outId)->second.GetFloat(storage) == 6.0f);
+	CHECK(see::exec::FindVariable(module, storage, outId)->GetFloat(storage) == 6.0f);
 }
 
 TEST_CASE("see::exec::Run - OpVectorShuffle swizzle from a single vector", "[see][exec]")
@@ -1326,7 +1350,7 @@ TEST_CASE("see::exec::Run - OpVectorShuffle swizzle from a single vector", "[see
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1337,16 +1361,17 @@ TEST_CASE("see::exec::Run - OpVectorShuffle swizzle from a single vector", "[see
 	input.SetFloat(storage, 2, 30.0f);
 	input.SetFloat(storage, 3, 40.0f);
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.m_rows == 4);
-	CHECK(outIt->second.GetFloat(storage, 0) == 40.0f);
-	CHECK(outIt->second.GetFloat(storage, 1) == 30.0f);
-	CHECK(outIt->second.GetFloat(storage, 2) == 20.0f);
-	CHECK(outIt->second.GetFloat(storage, 3) == 10.0f);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->m_rows == 4);
+	CHECK(outIt->GetFloat(storage, 0) == 40.0f);
+	CHECK(outIt->GetFloat(storage, 1) == 30.0f);
+	CHECK(outIt->GetFloat(storage, 2) == 20.0f);
+	CHECK(outIt->GetFloat(storage, 3) == 10.0f);
 }
 
 TEST_CASE("see::exec::Run - OpVectorShuffle across operands of different lengths", "[see][exec]")
@@ -1379,7 +1404,7 @@ TEST_CASE("see::exec::Run - OpVectorShuffle across operands of different lengths
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1390,15 +1415,16 @@ TEST_CASE("see::exec::Run - OpVectorShuffle across operands of different lengths
 	input.SetFloat(storage, 2, 30.0f);
 	input.SetFloat(storage, 3, 40.0f);
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.GetFloat(storage, 0) == 30.0f);
-	CHECK(outIt->second.GetFloat(storage, 1) == 2.0f);
-	CHECK(outIt->second.GetFloat(storage, 2) == 10.0f);
-	CHECK(outIt->second.GetFloat(storage, 3) == 0.0f);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->GetFloat(storage, 0) == 30.0f);
+	CHECK(outIt->GetFloat(storage, 1) == 2.0f);
+	CHECK(outIt->GetFloat(storage, 2) == 10.0f);
+	CHECK(outIt->GetFloat(storage, 3) == 0.0f);
 }
 
 TEST_CASE("see::exec::Run - bitwise and shift opcodes", "[see][exec]")
@@ -1433,7 +1459,7 @@ TEST_CASE("see::exec::Run - bitwise and shift opcodes", "[see][exec]")
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1441,15 +1467,16 @@ TEST_CASE("see::exec::Run - bitwise and shift opcodes", "[see][exec]")
 	input.m_scalar = see::ir::ScalarKind::Int32;
 	input.SetInt32(storage, 0, 12);
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.GetInt32(storage, 0) == (12 & 5));
-	CHECK(outIt->second.GetInt32(storage, 1) == (12 ^ 5));
-	CHECK(outIt->second.GetInt32(storage, 2) == (3 << 5));
-	CHECK(outIt->second.GetInt32(storage, 3) == ~12);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->GetInt32(storage, 0) == (12 & 5));
+	CHECK(outIt->GetInt32(storage, 1) == (12 ^ 5));
+	CHECK(outIt->GetInt32(storage, 2) == (3 << 5));
+	CHECK(outIt->GetInt32(storage, 3) == ~12);
 }
 
 TEST_CASE("see::exec::Run - unsigned division and comparison do not use signed semantics", "[see][exec]")
@@ -1485,7 +1512,7 @@ TEST_CASE("see::exec::Run - unsigned division and comparison do not use signed s
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1493,13 +1520,14 @@ TEST_CASE("see::exec::Run - unsigned division and comparison do not use signed s
 	input.m_scalar = see::ir::ScalarKind::Int32;
 	input.SetInt32(storage, 0, static_cast<cct::Int32>(0xFFFFFFFEu));
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(static_cast<cct::UInt32>(outIt->second.GetInt32(storage, 0)) == 0x7FFFFFFFu);
-	CHECK(outIt->second.GetInt32(storage, 1) == 0);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(static_cast<cct::UInt32>(outIt->GetInt32(storage, 0)) == 0x7FFFFFFFu);
+	CHECK(outIt->GetInt32(storage, 1) == 0);
 }
 
 TEST_CASE("see::exec::Run - OpBitCount, OpBitReverse and bitfield extraction", "[see][exec]")
@@ -1535,7 +1563,7 @@ TEST_CASE("see::exec::Run - OpBitCount, OpBitReverse and bitfield extraction", "
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1543,15 +1571,16 @@ TEST_CASE("see::exec::Run - OpBitCount, OpBitReverse and bitfield extraction", "
 	input.m_scalar = see::ir::ScalarKind::Int32;
 	input.SetInt32(storage, 0, static_cast<cct::Int32>(0x0000ABCDu));
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.GetInt32(storage, 0) == 10);
-	CHECK(static_cast<cct::UInt32>(outIt->second.GetInt32(storage, 1)) == 0xB3D50000u);
-	CHECK(static_cast<cct::UInt32>(outIt->second.GetInt32(storage, 2)) == 0xBCu);
-	CHECK(static_cast<cct::UInt32>(outIt->second.GetInt32(storage, 3)) == 0x0000AFFDu);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->GetInt32(storage, 0) == 10);
+	CHECK(static_cast<cct::UInt32>(outIt->GetInt32(storage, 1)) == 0xB3D50000u);
+	CHECK(static_cast<cct::UInt32>(outIt->GetInt32(storage, 2)) == 0xBCu);
+	CHECK(static_cast<cct::UInt32>(outIt->GetInt32(storage, 3)) == 0x0000AFFDu);
 }
 
 TEST_CASE("see::exec::Run - OpBitFieldSExtract sign-extends the extracted field", "[see][exec]")
@@ -1580,7 +1609,7 @@ TEST_CASE("see::exec::Run - OpBitFieldSExtract sign-extends the extracted field"
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1588,10 +1617,11 @@ TEST_CASE("see::exec::Run - OpBitFieldSExtract sign-extends the extracted field"
 	input.m_scalar = see::ir::ScalarKind::Int32;
 	input.SetInt32(storage, 0, static_cast<cct::Int32>(0x000000F0u));
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outId)->second.GetInt32(storage) == -1);
+	CHECK(see::exec::FindVariable(module, storage, outId)->GetInt32(storage) == -1);
 }
 
 TEST_CASE("see::exec::Run - OpBitcast reinterprets the bits without converting", "[see][exec]")
@@ -1620,20 +1650,21 @@ TEST_CASE("see::exec::Run - OpBitcast reinterprets the bits without converting",
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
 	see::exec::Value input;
 	input.SetFloat(storage, 0, 1.0f);
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.m_scalar == see::ir::ScalarKind::Int32);
-	CHECK(static_cast<cct::UInt32>(outIt->second.GetInt32(storage)) == 0x3F800000u);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->m_scalar == see::ir::ScalarKind::Int32);
+	CHECK(static_cast<cct::UInt32>(outIt->GetInt32(storage)) == 0x3F800000u);
 }
 
 TEST_CASE("see::exec::Run - OpCompositeExtract pulls a whole column out of a matrix", "[see][exec]")
@@ -1663,7 +1694,7 @@ TEST_CASE("see::exec::Run - OpCompositeExtract pulls a whole column out of a mat
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1674,16 +1705,17 @@ TEST_CASE("see::exec::Run - OpCompositeExtract pulls a whole column out of a mat
 	for (cct::UInt32 i = 0; i < 9; ++i)
 		input.SetFloat(storage, i, static_cast<float>(i));
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	auto outIt = result->find(outId);
-	REQUIRE(outIt != result->end());
-	CHECK(outIt->second.m_rows == 3);
-	CHECK(outIt->second.m_columns == 1);
-	CHECK(outIt->second.GetFloat(storage, 0) == 6.0f);
-	CHECK(outIt->second.GetFloat(storage, 1) == 7.0f);
-	CHECK(outIt->second.GetFloat(storage, 2) == 8.0f);
+	const see::exec::Value* outIt = see::exec::FindVariable(module, storage, outId);
+	REQUIRE(outIt);
+	CHECK(outIt->m_rows == 3);
+	CHECK(outIt->m_columns == 1);
+	CHECK(outIt->GetFloat(storage, 0) == 6.0f);
+	CHECK(outIt->GetFloat(storage, 1) == 7.0f);
+	CHECK(outIt->GetFloat(storage, 2) == 8.0f);
 }
 
 TEST_CASE("see::exec::Run - OpCompositeExtract walks a column then a component", "[see][exec]")
@@ -1713,7 +1745,7 @@ TEST_CASE("see::exec::Run - OpCompositeExtract walks a column then a component",
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 inId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outId = module.m_globalInstructions[1].m_id;
 
@@ -1724,10 +1756,11 @@ TEST_CASE("see::exec::Run - OpCompositeExtract walks a column then a component",
 	for (cct::UInt32 i = 0; i < 9; ++i)
 		input.SetFloat(storage, i, static_cast<float>(i));
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {{inId, input}}, {}, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	SeedInput(module, storage, inId, input);
+	const bool result = see::exec::Run(module, module.m_functions[0], {}, {}, prepared, storage);
+	REQUIRE(result);
 
-	CHECK(result->find(outId)->second.GetFloat(storage) == 5.0f);
+	CHECK(see::exec::FindVariable(module, storage, outId)->GetFloat(storage) == 5.0f);
 }
 
 TEST_CASE("see::exec::Run - MatrixStride pads the columns of a mat3 in a uniform block", "[see][exec]")
@@ -1772,7 +1805,7 @@ TEST_CASE("see::exec::Run - MatrixStride pads the columns of a mat3 in a uniform
 	const see::ir::Module module = ParseAndConvert(Source);
 	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
 	see::exec::ExecutionStorage storage;
-	storage.Reset(prepared, module.m_ssaSlotCount);
+	storage.Reset(prepared);
 	const cct::UInt32 uboId = module.m_globalInstructions[0].m_id;
 	const cct::UInt32 outMatrixId = module.m_globalInstructions[1].m_id;
 	const cct::UInt32 outColumnId = module.m_globalInstructions[2].m_id;
@@ -1787,16 +1820,16 @@ TEST_CASE("see::exec::Run - MatrixStride pads the columns of a mat3 in a uniform
 
 	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> result = see::exec::Run(module, module.m_functions[0], {}, externalBuffers, {}, prepared, storage);
-	REQUIRE(result.has_value());
+	const bool result = see::exec::Run(module, module.m_functions[0], externalBuffers, {}, prepared, storage);
+	REQUIRE(result);
 
-	const see::exec::Value& matrix = result->find(outMatrixId)->second;
+	const see::exec::Value& matrix = *see::exec::FindVariable(module, storage, outMatrixId);
 	REQUIRE(matrix.m_rows == 3);
 	REQUIRE(matrix.m_columns == 3);
 	for (cct::UInt32 i = 0; i < 9; ++i)
 		CHECK(matrix.GetFloat(storage, i) == static_cast<float>(i));
 
-	const see::exec::Value& column = result->find(outColumnId)->second;
+	const see::exec::Value& column = *see::exec::FindVariable(module, storage, outColumnId);
 	CHECK(column.GetFloat(storage, 0) == 6.0f);
 	CHECK(column.GetFloat(storage, 1) == 7.0f);
 	CHECK(column.GetFloat(storage, 2) == 8.0f);

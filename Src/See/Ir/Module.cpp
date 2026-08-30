@@ -464,6 +464,51 @@ namespace see::ir
 						if (ProducesSsaValue(instruction.m_op, instruction.m_id) && GetKind(module.m_valueRefs[instruction.m_id]) == ValueKind::None)
 							module.m_valueRefs[instruction.m_id] = MakeValueRef(ValueKind::Ssa, module.m_ssaSlotCount++);
 			}
+
+			module.m_pointerSlots.assign(static_cast<std::size_t>(maxId) + 1, InvalidSlot);
+			module.m_variableSlots.assign(static_cast<std::size_t>(maxId) + 1, InvalidSlot);
+
+			const auto assignPointerSlot = [&module](cct::UInt32 id)
+			{
+				if (id != 0 && module.m_pointerSlots[id] == InvalidSlot)
+					module.m_pointerSlots[id] = module.m_pointerSlotCount++;
+			};
+
+			// Only ids that own words get one: an access chain names an offset into someone else's storage.
+			const auto assignVariableSlot = [&module](cct::UInt32 id)
+			{
+				if (id != 0 && module.m_variableSlots[id] == InvalidSlot)
+					module.m_variableSlots[id] = module.m_variableSlotCount++;
+			};
+
+			for (const Instruction& global : module.m_globalInstructions)
+				if (global.m_op == Op::Variable)
+				{
+					assignPointerSlot(global.m_id);
+					assignVariableSlot(global.m_id);
+				}
+
+			for (const Function& function : module.m_functions)
+			{
+				// A pointer argument is copied into the parameter, which then owns its own words.
+				for (cct::UInt32 parameter : function.m_parameters)
+				{
+					assignPointerSlot(parameter);
+					assignVariableSlot(parameter);
+				}
+
+				for (const BasicBlock& block : function.m_blocks)
+					for (const Instruction& instruction : block.m_instructions)
+					{
+						if (instruction.m_op == Op::Variable)
+						{
+							assignPointerSlot(instruction.m_id);
+							assignVariableSlot(instruction.m_id);
+						}
+						else if (instruction.m_op == Op::AccessChain)
+							assignPointerSlot(instruction.m_id);
+					}
+			}
 		}
 	} // namespace
 

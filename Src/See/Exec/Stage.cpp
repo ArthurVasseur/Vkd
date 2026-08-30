@@ -166,79 +166,60 @@ namespace see::exec
 	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
 													const std::unordered_map<cct::UInt32, Value>& locationInputs,
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
-	{
-		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, BuildPreparedModule(module));
-	}
-
-	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
-													const std::unordered_map<cct::UInt32, Value>& locationInputs,
-													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
-	{
-		ExecutionStorage storage;
-		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, prepared, storage);
-	}
-
-	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
-													const std::unordered_map<cct::UInt32, Value>& locationInputs,
-													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
 													ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
-		storage.Reset(prepared, module.m_ssaSlotCount);
+		storage.Reset(prepared);
 
-		std::unordered_map<cct::UInt32, Value> inputs;
+		const auto seedBuiltin = [&](std::optional<BuiltinLocation> builtin, cct::UInt32 index)
+		{
+			if (!builtin)
+				return;
+
+			Value* variable = EmplaceVariable(module, storage, builtin->m_variable);
+			if (!variable)
+				return;
+
+			Value value;
+			value.m_scalar = ir::ScalarKind::Int32;
+			value.SetInt32(storage, 0, static_cast<cct::Int32>(index));
+			CopyValue(*variable, value, storage);
+		};
+
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
 			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs, storage))
-				CopyValue(inputs[variableId], *gathered, storage);
+				if (Value* variable = EmplaceVariable(module, storage, variableId))
+					CopyValue(*variable, *gathered, storage);
 
-		if (std::optional<BuiltinLocation> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
-		{
-			Value value;
-			value.m_scalar = ir::ScalarKind::Int32;
-			value.SetInt32(storage, 0, static_cast<cct::Int32>(vertexIndex));
-			CopyValue(inputs[vertexIndexVar->m_variable], value, storage);
-		}
+		seedBuiltin(FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex), vertexIndex);
+		seedBuiltin(FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInInstanceIndex), instanceIndex);
 
-		if (std::optional<BuiltinLocation> instanceIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInInstanceIndex))
-		{
-			Value value;
-			value.m_scalar = ir::ScalarKind::Int32;
-			value.SetInt32(storage, 0, static_cast<cct::Int32>(instanceIndex));
-			CopyValue(inputs[instanceIndexVar->m_variable], value, storage);
-		}
-
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
-		if (!result)
+		if (!Run(module, function, externalBuffers, externalImages, prepared, storage))
 			return std::nullopt;
 
 		std::optional<BuiltinLocation> positionVar = FindBuiltinVariable(module, SpvStorageClassOutput, SpvBuiltInPosition);
 		if (!positionVar)
 			return std::nullopt;
 
-		auto positionIt = result->find(positionVar->m_variable);
-		if (positionIt == result->end())
+		const Value* position = FindVariable(module, storage, positionVar->m_variable);
+		if (!position)
 			return std::nullopt;
 
 		VertexStageOutput output;
 		if (positionVar->m_member)
 		{
-			std::optional<Value> member = ExtractStructMember(module, positionIt->second, *positionVar->m_member, storage);
+			std::optional<Value> member = ExtractStructMember(module, *position, *positionVar->m_member, storage);
 			if (!member)
 				return std::nullopt;
 			CopyValue(output.m_position, *member, storage);
 		}
 		else
-			CopyValue(output.m_position, positionIt->second, storage);
+			CopyValue(output.m_position, *position, storage);
 
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassOutput))
-		{
-			auto valueIt = result->find(variableId);
-			if (valueIt != result->end())
-				ScatterLocationValue(module, variableId, location, valueIt->second, output.m_locations, storage);
-		}
+			if (const Value* value = FindVariable(module, storage, variableId))
+				ScatterLocationValue(module, variableId, location, *value, output.m_locations, storage);
 
 		return output;
 	}
@@ -252,55 +233,24 @@ namespace see::exec
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
-	{
-		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, BuildPreparedModule(module));
-	}
-
-	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
-		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
-		const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
-	{
-		ExecutionStorage storage;
-		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, prepared, storage);
-	}
-
-	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
-		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
-		const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
-		storage.Reset(prepared, module.m_ssaSlotCount);
+		storage.Reset(prepared);
 
-		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : locations.m_inputs)
 			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs, storage))
-				CopyValue(inputs[variableId], *gathered, storage);
+				if (Value* variable = EmplaceVariable(module, storage, variableId))
+					CopyValue(*variable, *gathered, storage);
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
-		if (!result)
+		if (!Run(module, function, externalBuffers, externalImages, prepared, storage))
 			return std::nullopt;
 
 		std::unordered_map<cct::UInt32, Value> outputs;
 		for (const auto& [variableId, location] : locations.m_outputs)
-		{
-			auto valueIt = result->find(variableId);
-			if (valueIt != result->end())
-				ScatterLocationValue(module, variableId, location, valueIt->second, outputs, storage);
-		}
+			if (const Value* value = FindVariable(module, storage, variableId))
+				ScatterLocationValue(module, variableId, location, *value, outputs, storage);
 
 		return outputs;
-	}
-
-	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
-		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
-	{
-		return RunFragmentStage(module, function, BuildStageLocations(module), locationInputs, externalBuffers, externalImages);
 	}
 } // namespace see::exec

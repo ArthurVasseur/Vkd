@@ -45,6 +45,8 @@ namespace see::ir
 		cct::UInt32 m_encoded = 0; // kind in bits 0-1, slot in bits 2-31
 	};
 
+	static constexpr cct::UInt32 InvalidSlot = 0xFFFFFFFFu;
+
 	[[nodiscard]] constexpr ValueKind GetKind(ValueRef ref) noexcept
 	{
 		return static_cast<ValueKind>(ref.m_encoded & 3u);

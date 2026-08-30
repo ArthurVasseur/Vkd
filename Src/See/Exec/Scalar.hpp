@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <optional>
@@ -84,6 +85,15 @@ namespace see::exec
 		cct::UInt32 m_height = 0;
 	};
 
+	// Where a pointer id currently points: a base variable plus a word offset into its storage.
+	struct PointerInfo
+	{
+		cct::UInt32 m_baseVariable = 0;
+		cct::UInt32 m_wordOffset = 0;
+		cct::UInt32 m_pointeeType = 0; // ir type id of what this pointer currently points to
+		cct::UInt32 m_matrixStride = 0; // words between matrix columns in memory, 0 when naturally packed
+	};
+
 	struct MemberLayout
 	{
 		cct::UInt32 m_offset = 0;
@@ -133,6 +143,21 @@ namespace see::exec
 			return m_arena;
 		}
 
+		[[nodiscard]] cct::UInt32 SsaSlotCount() const noexcept
+		{
+			return m_ssaSlotCount;
+		}
+
+		[[nodiscard]] cct::UInt32 VariableSlotCount() const noexcept
+		{
+			return m_variableSlotCount;
+		}
+
+		[[nodiscard]] cct::UInt32 PointerSlotCount() const noexcept
+		{
+			return m_pointerSlotCount;
+		}
+
 	private:
 		friend PreparedModule BuildPreparedModule(const ir::Module& module);
 
@@ -144,35 +169,62 @@ namespace see::exec
 		std::vector<cct::UInt8> m_memberLayoutValid;
 		std::vector<cct::UInt32> m_arrayStrides;
 		WordArena m_arena;
+		cct::UInt32 m_ssaSlotCount = 0;
+		cct::UInt32 m_variableSlotCount = 0;
+		cct::UInt32 m_pointerSlotCount = 0;
 	};
 
 	[[nodiscard]] PreparedModule BuildPreparedModule(const ir::Module& module);
 
-	class RegisterFile
+	// A table indexed by slot and reused for the whole life of the storage. Reset bumps an epoch rather
+	// than clearing, so what the previous invocation left behind reads as absent at no cost, and no
+	// invocation ever allocates a node or frees one.
+	template<typename T>
+	class SlotFile
 	{
 	public:
-		void Reset(cct::UInt32 slotCount);
-
-		[[nodiscard]] const Value* Find(cct::UInt32 slot) const noexcept
+		void Reset(cct::UInt32 slotCount)
 		{
-			return m_slotEpoch[slot] == m_epoch ? &m_values[slot] : nullptr;
+			if (m_slotEpoch.size() < slotCount)
+			{
+				m_entries.resize(slotCount);
+				m_slotEpoch.resize(slotCount, 0);
+			}
+
+			if (m_epoch == 0xFFFFFFFFu)
+			{
+				std::fill(m_slotEpoch.begin(), m_slotEpoch.end(), 0u);
+				m_epoch = 0;
+			}
+
+			++m_epoch;
 		}
 
-		[[nodiscard]] Value& Emplace(cct::UInt32 slot) noexcept
+		[[nodiscard]] const T* Find(cct::UInt32 slot) const noexcept
+		{
+			return m_slotEpoch[slot] == m_epoch ? &m_entries[slot] : nullptr;
+		}
+
+		[[nodiscard]] T* Find(cct::UInt32 slot) noexcept
+		{
+			return m_slotEpoch[slot] == m_epoch ? &m_entries[slot] : nullptr;
+		}
+
+		[[nodiscard]] T& Emplace(cct::UInt32 slot) noexcept
 		{
 			m_slotEpoch[slot] = m_epoch;
-			return m_values[slot];
+			return m_entries[slot];
 		}
 
 	private:
-		std::vector<Value> m_values;
+		std::vector<T> m_entries;
 		std::vector<cct::UInt32> m_slotEpoch;
 		cct::UInt32 m_epoch = 0;
 	};
 
-	// Everything one invocation owns: its registers, and the arena backing values too large to live
-	// inline. An overflow offset only means anything relative to the storage that handed it out, so this
-	// is neither copyable nor movable.
+	// Everything one invocation owns: its registers, its variables and pointers, and the arena backing
+	// values too large to live inline. An overflow offset only means anything relative to the storage
+	// that handed it out, so this is neither copyable nor movable.
 	class ExecutionStorage
 	{
 	public:
@@ -180,21 +232,43 @@ namespace see::exec
 		ExecutionStorage(const ExecutionStorage&) = delete;
 		ExecutionStorage& operator=(const ExecutionStorage&) = delete;
 
-		void Reset(const PreparedModule& prepared, cct::UInt32 slotCount)
+		void Reset(const PreparedModule& prepared)
 		{
 			m_prepared = &prepared;
-			m_registers.Reset(slotCount);
+			m_registers.Reset(prepared.SsaSlotCount());
+			m_variables.Reset(prepared.VariableSlotCount());
+			m_pointers.Reset(prepared.PointerSlotCount());
 			m_arena.Rewind();
 		}
 
-		[[nodiscard]] RegisterFile& Registers() noexcept
+		[[nodiscard]] const PreparedModule& Prepared() const noexcept
+		{
+			return *m_prepared;
+		}
+
+		[[nodiscard]] SlotFile<Value>& Registers() noexcept
 		{
 			return m_registers;
 		}
 
-		[[nodiscard]] const RegisterFile& Registers() const noexcept
+		[[nodiscard]] const SlotFile<Value>& Registers() const noexcept
 		{
 			return m_registers;
+		}
+
+		[[nodiscard]] SlotFile<Value>& Variables() noexcept
+		{
+			return m_variables;
+		}
+
+		[[nodiscard]] const SlotFile<Value>& Variables() const noexcept
+		{
+			return m_variables;
+		}
+
+		[[nodiscard]] SlotFile<PointerInfo>& Pointers() noexcept
+		{
+			return m_pointers;
 		}
 
 		[[nodiscard]] cct::UInt32 Allocate(cct::UInt32 wordCount)
@@ -215,7 +289,9 @@ namespace see::exec
 		}
 
 	private:
-		RegisterFile m_registers;
+		SlotFile<Value> m_registers;
+		SlotFile<Value> m_variables;
+		SlotFile<PointerInfo> m_pointers;
 		WordArena m_arena;
 		const PreparedModule* m_prepared = nullptr;
 	};
@@ -248,8 +324,14 @@ namespace see::exec
 
 	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex, ExecutionStorage& storage);
 
-	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
-		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage);
+	// A variable is named by its ir id but stored by slot; these translate. Emplace returns nullptr for
+	// an id that owns no storage.
+	[[nodiscard]] const Value* FindVariable(const ir::Module& module, const ExecutionStorage& storage, cct::UInt32 variableId) noexcept;
+	[[nodiscard]] Value* EmplaceVariable(const ir::Module& module, ExecutionStorage& storage, cct::UInt32 variableId) noexcept;
+
+	// Inputs are the variables the caller emplaced in `storage` after resetting it, and the outputs are
+	// the variables left there afterwards - nothing is handed back by value.
+	[[nodiscard]] bool Run(const ir::Module& module, const ir::Function& function,
+						   const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+						   const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage);
 } // namespace see::exec
