@@ -165,8 +165,8 @@ namespace see::exec
 
 	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
 													const std::unordered_map<cct::UInt32, Value>& locationInputs,
-													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
+													const ExternalBufferTable& externalBuffers,
+													const ExternalImageTable& externalImages, const PreparedModule& prepared,
 													ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
@@ -232,8 +232,8 @@ namespace see::exec
 	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
+		const ExternalBufferTable& externalBuffers,
+		const ExternalImageTable& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		storage.Reset(prepared);

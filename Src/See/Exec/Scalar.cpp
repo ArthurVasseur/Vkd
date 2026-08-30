@@ -112,8 +112,8 @@ namespace see::exec
 			const ir::Module& m_module;
 			const PreparedModule& m_prepared;
 			ExecutionStorage& m_storage;
-			const std::unordered_map<cct::UInt32, ExternalBuffer>& m_externalBuffers;
-			const std::unordered_map<cct::UInt32, ExternalImage>& m_externalImages;
+			const ExternalBufferTable& m_externalBuffers;
+			const ExternalImageTable& m_externalImages;
 		};
 
 		cct::UInt32 VariableSlot(const RuntimeState& state, cct::UInt32 id)
@@ -143,14 +143,18 @@ namespace see::exec
 		// Returns nullptr if the variable is unknown or the range doesn't fit its storage.
 		cct::UInt32* ResolveWords(RuntimeState& state, cct::UInt32 baseVariable, cct::UInt32 wordOffset, cct::UInt32 count)
 		{
-			if (auto externalIt = state.m_externalBuffers.find(baseVariable); externalIt != state.m_externalBuffers.end())
+			const cct::UInt32 slot = VariableSlot(state, baseVariable);
+			if (slot == ir::InvalidSlot)
+				return nullptr;
+
+			if (const ExternalBuffer* external = state.m_externalBuffers.Find(slot))
 			{
-				if (wordOffset + count > externalIt->second.m_wordCount)
+				if (wordOffset + count > external->m_wordCount)
 					return nullptr;
-				return externalIt->second.m_words + wordOffset;
+				return external->m_words + wordOffset;
 			}
 
-			Value* variable = FindVariableStorage(state, baseVariable);
+			Value* variable = state.m_storage.Variables().Find(slot);
 			if (!variable || wordOffset + count > variable->WordCount())
 				return nullptr;
 			return variable->Words(state.m_storage).data() + wordOffset;
@@ -189,7 +193,8 @@ namespace see::exec
 				if (matrixStride != 0 && memberShape && memberShape->m_columns > 1)
 					wordCount = matrixStride * memberShape->m_columns;
 
-				layout.push_back(MemberLayout{.m_offset = offset, .m_wordCount = wordCount, .m_matrixStride = matrixStride});
+				layout.push_back(MemberLayout{
+					.m_offset = offset, .m_wordCount = wordCount, .m_matrixStride = matrixStride, .m_type = structType.m_memberTypes[memberIndex]});
 				packedOffset = offset + wordCount;
 			}
 			return layout;
@@ -337,8 +342,8 @@ namespace see::exec
 		void RegisterVariable(RuntimeState& state, cct::UInt32 id, cct::UInt32 pointerTypeId)
 		{
 			cct::UInt32 pointeeType = 0;
-			if (auto typeIt = state.m_module.m_types.find(pointerTypeId); typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Pointer)
-				pointeeType = typeIt->second.m_pointee;
+			if (const TypeInfo* pointerType = state.m_prepared.GetTypeInfo(pointerTypeId); pointerType && pointerType->m_kind == ir::TypeKind::Pointer)
+				pointeeType = pointerType->m_pointee;
 
 			const cct::UInt32 pointerSlot = PointerSlot(state, id);
 			if (pointerSlot == ir::InvalidSlot)
@@ -350,7 +355,7 @@ namespace see::exec
 			if (variableSlot == ir::InvalidSlot || state.m_storage.Variables().Find(variableSlot))
 				return;
 
-			if (state.m_externalBuffers.find(id) == state.m_externalBuffers.end())
+			if (!state.m_externalBuffers.Find(variableSlot))
 				if (const Value* zero = state.m_prepared.GetZeroValue(pointerTypeId))
 					CopyValue(state.m_storage.Variables().Emplace(variableSlot), *zero, state.m_storage);
 		}
@@ -360,8 +365,8 @@ namespace see::exec
 			if (pointer.m_matrixStride == 0 || pointer.m_matrixStride == shape.m_rows || shape.m_columns <= 1)
 				return 0;
 
-			auto typeIt = state.m_module.m_types.find(pointer.m_pointeeType);
-			if (typeIt == state.m_module.m_types.end() || typeIt->second.m_kind != ir::TypeKind::Matrix)
+			const TypeInfo* pointeeType = state.m_prepared.GetTypeInfo(pointer.m_pointeeType);
+			if (!pointeeType || pointeeType->m_kind != ir::TypeKind::Matrix)
 				return 0;
 
 			return pointer.m_matrixStride;
@@ -379,8 +384,8 @@ namespace see::exec
 			// (Sampled) images aren't word-addressable data - loading one just produces a handle
 			// naming the variable it came from, for a later ImageSample to resolve against the
 			// bound ExternalImage.
-			if (auto typeIt = state.m_module.m_types.find(pointer->m_pointeeType);
-				typeIt != state.m_module.m_types.end() && (typeIt->second.m_kind == ir::TypeKind::Image || typeIt->second.m_kind == ir::TypeKind::SampledImage))
+			if (const TypeInfo* pointeeType = state.m_prepared.GetTypeInfo(pointer->m_pointeeType);
+				pointeeType && (pointeeType->m_kind == ir::TypeKind::Image || pointeeType->m_kind == ir::TypeKind::SampledImage))
 			{
 				return StoreSsa(state, instruction.m_id, Value{.m_imageVariable = pointer->m_baseVariable});
 			}
@@ -496,38 +501,39 @@ namespace see::exec
 					return false;
 				const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32(state.m_storage));
 
-				auto typeIt = state.m_module.m_types.find(info.m_pointeeType);
-				if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Struct)
+				const TypeInfo* pointeeType = state.m_prepared.GetTypeInfo(info.m_pointeeType);
+				const ir::TypeKind kind = pointeeType ? pointeeType->m_kind : ir::TypeKind::Void;
+				if (kind == ir::TypeKind::Struct)
 				{
 					const std::vector<MemberLayout>* layout = state.m_prepared.GetMemberLayout(info.m_pointeeType);
 					if (!layout || indexValue >= layout->size())
 						return false;
 					info.m_wordOffset += (*layout)[indexValue].m_offset;
 					info.m_matrixStride = (*layout)[indexValue].m_matrixStride;
-					info.m_pointeeType = typeIt->second.m_memberTypes[indexValue];
+					info.m_pointeeType = (*layout)[indexValue].m_type;
 				}
-				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Array)
+				else if (kind == ir::TypeKind::Array)
 				{
 					const cct::UInt32 stride = state.m_prepared.GetArrayStride(info.m_pointeeType);
 					if (stride == 0)
 						return false;
 					info.m_wordOffset += indexValue * stride;
-					info.m_pointeeType = typeIt->second.m_pointee;
+					info.m_pointeeType = pointeeType->m_pointee;
 				}
-				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Matrix)
+				else if (kind == ir::TypeKind::Matrix)
 				{
-					auto columnIt = state.m_module.m_types.find(typeIt->second.m_pointee);
-					if (columnIt == state.m_module.m_types.end())
+					const TypeInfo* columnType = state.m_prepared.GetTypeInfo(pointeeType->m_pointee);
+					if (!columnType)
 						return false;
-					const cct::UInt32 columnStride = info.m_matrixStride != 0 ? info.m_matrixStride : columnIt->second.m_componentCount;
+					const cct::UInt32 columnStride = info.m_matrixStride != 0 ? info.m_matrixStride : columnType->m_componentCount;
 					info.m_wordOffset += indexValue * columnStride;
 					info.m_matrixStride = 0;
-					info.m_pointeeType = typeIt->second.m_pointee;
+					info.m_pointeeType = pointeeType->m_pointee;
 				}
-				else if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Vector)
+				else if (kind == ir::TypeKind::Vector)
 				{
 					info.m_wordOffset += indexValue;
-					info.m_pointeeType = typeIt->second.m_pointee;
+					info.m_pointeeType = pointeeType->m_pointee;
 				}
 				else
 				{
@@ -1372,11 +1378,11 @@ namespace see::exec
 			if (!imageHandle || !coord || imageHandle->m_imageVariable == 0)
 				return false;
 
-			auto imageIt = state.m_externalImages.find(imageHandle->m_imageVariable);
-			if (imageIt == state.m_externalImages.end())
+			const ExternalImage* bound = state.m_externalImages.Find(VariableSlot(state, imageHandle->m_imageVariable));
+			if (!bound)
 				return false;
 
-			const ExternalImage& image = imageIt->second;
+			const ExternalImage& image = *bound;
 			if (!image.m_texels || image.m_width == 0 || image.m_height == 0)
 				return false;
 
@@ -1925,15 +1931,11 @@ namespace see::exec
 		if (composite.m_structType == 0)
 			return std::nullopt;
 
-		auto typeIt = module.m_types.find(composite.m_structType);
-		if (typeIt == module.m_types.end())
-			return std::nullopt;
-
 		const std::vector<MemberLayout>* layout = storage.Prepared().GetMemberLayout(composite.m_structType);
 		if (!layout || memberIndex >= layout->size())
 			return std::nullopt;
 
-		const Value* memberShape = storage.Prepared().GetZeroValue(typeIt->second.m_memberTypes[memberIndex]);
+		const Value* memberShape = storage.Prepared().GetZeroValue((*layout)[memberIndex].m_type);
 		if (!memberShape)
 			return std::nullopt;
 
@@ -1979,6 +1981,14 @@ namespace see::exec
 			return nullptr;
 
 		return &m_zeroValues[typeId];
+	}
+
+	const TypeInfo* PreparedModule::GetTypeInfo(cct::UInt32 typeId) const noexcept
+	{
+		if (typeId >= m_typeInfos.size() || !m_typeInfoValid[typeId])
+			return nullptr;
+
+		return &m_typeInfos[typeId];
 	}
 
 	const std::vector<MemberLayout>* PreparedModule::GetMemberLayout(cct::UInt32 typeId) const noexcept
@@ -2034,9 +2044,14 @@ namespace see::exec
 		prepared.m_memberLayouts.assign(typeCount, {});
 		prepared.m_memberLayoutValid.assign(typeCount, 0);
 		prepared.m_arrayStrides.assign(typeCount, 0);
+		prepared.m_typeInfos.assign(typeCount, TypeInfo{});
+		prepared.m_typeInfoValid.assign(typeCount, 0);
 
 		for (const auto& [typeId, type] : module.m_types)
 		{
+			prepared.m_typeInfos[typeId] = TypeInfo{.m_kind = type.m_kind, .m_componentCount = type.m_componentCount, .m_pointee = type.m_pointee};
+			prepared.m_typeInfoValid[typeId] = 1;
+
 			if (std::optional<Value> zero = MakeZeroValue(module, typeId))
 			{
 				install(prepared.m_zeroValues[typeId], *zero);
@@ -2105,9 +2120,8 @@ namespace see::exec
 		return slot == ir::InvalidSlot ? nullptr : &storage.Variables().Emplace(slot);
 	}
 
-	bool Run(const ir::Module& module, const ir::Function& function,
-			 const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-			 const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
+	bool Run(const ir::Module& module, const ir::Function& function, const ExternalBufferTable& externalBuffers,
+			 const ExternalImageTable& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		RuntimeState state{.m_module = module, .m_prepared = prepared, .m_storage = storage, .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};

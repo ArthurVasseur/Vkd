@@ -98,7 +98,56 @@ namespace see::exec
 		cct::UInt32 m_offset = 0;
 		cct::UInt32 m_wordCount = 0;
 		cct::UInt32 m_matrixStride = 0;
+		cct::UInt32 m_type = 0; // ir type id of the member, so walking into a struct needs no type lookup
 	};
+
+	// What an invocation needs to know about a type. Everything here is fixed by the module, so it is
+	// resolved once at preparation instead of being read back out of a hash map on every instruction.
+	struct TypeInfo
+	{
+		ir::TypeKind m_kind = ir::TypeKind::Void;
+		cct::UInt32 m_componentCount = 0;
+		cct::UInt32 m_pointee = 0;
+	};
+
+	// What the driver bound to each resource variable, indexed by variable slot and fixed for a whole
+	// draw. Buffers and images are addressed the same way but are not the same data, so they get the
+	// same indexing in two separate tables rather than one merged one.
+	template<typename T>
+	class BindingTable
+	{
+	public:
+		void Bind(const ir::Module& module, cct::UInt32 variableId, const T& binding)
+		{
+			if (variableId >= module.m_variableSlots.size())
+				return;
+
+			const cct::UInt32 slot = module.m_variableSlots[variableId];
+			if (slot == ir::InvalidSlot)
+				return;
+
+			if (m_valid.size() <= slot)
+			{
+				m_entries.resize(module.m_variableSlotCount);
+				m_valid.resize(module.m_variableSlotCount, 0);
+			}
+
+			m_entries[slot] = binding;
+			m_valid[slot] = 1;
+		}
+
+		[[nodiscard]] const T* Find(cct::UInt32 variableSlot) const noexcept
+		{
+			return variableSlot < m_valid.size() && m_valid[variableSlot] ? &m_entries[variableSlot] : nullptr;
+		}
+
+	private:
+		std::vector<T> m_entries;
+		std::vector<cct::UInt8> m_valid;
+	};
+
+	using ExternalBufferTable = BindingTable<ExternalBuffer>;
+	using ExternalImageTable = BindingTable<ExternalImage>;
 
 	// Fixed-size blocks, so a span handed out by Allocate stays valid across every later allocation.
 	// Rewind reuses the blocks instead of releasing them.
@@ -135,6 +184,7 @@ namespace see::exec
 		[[nodiscard]] const Value* GetConstant(cct::UInt32 slot) const noexcept;
 		[[nodiscard]] const Value* GetZeroValue(cct::UInt32 typeId) const noexcept;
 		[[nodiscard]] const std::vector<MemberLayout>* GetMemberLayout(cct::UInt32 typeId) const noexcept;
+		[[nodiscard]] const TypeInfo* GetTypeInfo(cct::UInt32 typeId) const noexcept;
 		[[nodiscard]] cct::UInt32 GetArrayStride(cct::UInt32 typeId) const noexcept;
 
 		[[nodiscard]] const WordArena& Arena() const noexcept
@@ -167,6 +217,8 @@ namespace see::exec
 		std::vector<std::vector<MemberLayout>> m_memberLayouts;
 		std::vector<cct::UInt8> m_memberLayoutValid;
 		std::vector<cct::UInt32> m_arrayStrides;
+		std::vector<TypeInfo> m_typeInfos;
+		std::vector<cct::UInt8> m_typeInfoValid;
 		WordArena m_arena;
 		cct::UInt32 m_ssaSlotCount = 0;
 		cct::UInt32 m_variableSlotCount = 0;
@@ -329,7 +381,6 @@ namespace see::exec
 
 	// Inputs are the variables the caller emplaced in `storage` after resetting it, and the outputs are
 	// the variables left there afterwards - nothing is handed back by value.
-	[[nodiscard]] bool Run(const ir::Module& module, const ir::Function& function,
-						   const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-						   const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage);
+	[[nodiscard]] bool Run(const ir::Module& module, const ir::Function& function, const ExternalBufferTable& externalBuffers,
+						   const ExternalImageTable& externalImages, const PreparedModule& prepared, ExecutionStorage& storage);
 } // namespace see::exec

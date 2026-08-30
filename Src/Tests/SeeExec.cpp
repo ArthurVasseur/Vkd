@@ -487,7 +487,8 @@ TEST_CASE("see::exec::Run - uniform block bigger than 16 words via an external b
 		std::memcpy(&uboWords[1 + i * 4 + i], &diagonal, sizeof(float));
 	}
 
-	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
+	see::exec::ExternalBufferTable externalBuffers;
+	externalBuffers.Bind(module, uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())});
 
 	const bool result = see::exec::Run(module, module.m_functions[0], externalBuffers, {}, prepared, storage);
 	REQUIRE(result);
@@ -542,7 +543,8 @@ TEST_CASE("see::exec::Run - external buffer struct member offset from OpMemberDe
 	std::memcpy(&blockWords[3], &decoy, sizeof(float));
 	std::memcpy(&blockWords[4], &real, sizeof(float));
 
-	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{blockId, see::exec::ExternalBuffer{blockWords.data(), static_cast<cct::UInt32>(blockWords.size())}}};
+	see::exec::ExternalBufferTable externalBuffers;
+	externalBuffers.Bind(module, blockId, see::exec::ExternalBuffer{blockWords.data(), static_cast<cct::UInt32>(blockWords.size())});
 
 	const bool result = see::exec::Run(module, module.m_functions[0], externalBuffers, {}, prepared, storage);
 	REQUIRE(result);
@@ -602,7 +604,8 @@ TEST_CASE("see::exec::Run - nearest-neighbor image sampling through an external 
 	uv.SetFloat(storage, 0, 0.9f); // right column
 	uv.SetFloat(storage, 1, 0.9f); // bottom row -> bottom-right texel (255, 255, 0, 255)
 
-	std::unordered_map<cct::UInt32, see::exec::ExternalImage> externalImages{{texId, see::exec::ExternalImage{texels.data(), 2, 2}}};
+	see::exec::ExternalImageTable externalImages;
+	externalImages.Bind(module, texId, see::exec::ExternalImage{texels.data(), 2, 2});
 
 	SeedInput(module, storage, uvId, uv);
 	const bool result = see::exec::Run(module, module.m_functions[0], {}, externalImages, prepared, storage);
@@ -1818,7 +1821,8 @@ TEST_CASE("see::exec::Run - MatrixStride pads the columns of a mat3 in a uniform
 			std::memcpy(&uboWords[column * 4 + row], &value, sizeof(float));
 		}
 
-	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
+	see::exec::ExternalBufferTable externalBuffers;
+	externalBuffers.Bind(module, uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())});
 
 	const bool result = see::exec::Run(module, module.m_functions[0], externalBuffers, {}, prepared, storage);
 	REQUIRE(result);

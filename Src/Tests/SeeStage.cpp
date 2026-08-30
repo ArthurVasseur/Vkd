@@ -256,7 +256,8 @@ TEST_CASE("see::exec::RunFragmentStage - reads a uniform block through an extern
 	const float channels[4] = {0.1f, 0.2f, 0.3f, 0.4f};
 	std::memcpy(uboWords.data(), channels, sizeof(channels));
 
-	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
+	see::exec::ExternalBufferTable externalBuffers;
+	externalBuffers.Bind(module, uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())});
 
 	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], see::exec::BuildStageLocations(module), {}, externalBuffers, {}, prepared, storage);
 	REQUIRE(outputs.has_value());

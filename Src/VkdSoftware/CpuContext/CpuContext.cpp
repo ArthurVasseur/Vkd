@@ -9,7 +9,9 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <future>
+#include <intrin.h>
 #include <limits>
 #include <optional>
 #include <unordered_map>
@@ -31,6 +33,31 @@
 
 namespace vkd::software
 {
+	namespace ctxprof
+	{
+		std::atomic<unsigned long long> g_interpCycles{0}, g_fragCycles{0}, g_writeCycles{0}, g_fragments{0};
+		std::atomic<unsigned long long> g_attrCycles{0}, g_vertCycles{0}, g_vertices{0};
+
+		struct Dump
+		{
+			~Dump()
+			{
+				std::FILE* f = std::fopen("C:/Users/Arthur/AppData/Local/Temp/claude/cts/ctxprof_b4.txt", "w");
+				if (!f)
+					return;
+				const double frags = g_fragments ? (double)g_fragments.load() : 1.0;
+				const double verts = g_vertices ? (double)g_vertices.load() : 1.0;
+				std::fprintf(f, "fragments %llu interp %.0f frag %.0f write %.0f\n", g_fragments.load(),
+							 g_interpCycles.load() / frags, g_fragCycles.load() / frags, g_writeCycles.load() / frags);
+				std::fprintf(f, "vertices %llu attr %.0f vert %.0f\n", g_vertices.load(),
+							 g_attrCycles.load() / verts, g_vertCycles.load() / verts);
+				std::fclose(f);
+			}
+		};
+
+		Dump g_dump;
+	} // namespace ctxprof
+
 	namespace
 	{
 		struct ScreenVertex
@@ -110,9 +137,9 @@ namespace vkd::software
 			return std::make_pair(*descriptorSet, *binding);
 		}
 
-		std::unordered_map<UInt32, see::exec::ExternalBuffer> ResolveUniformBuffers(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, const std::unordered_map<UInt64, UInt32>& dynamicOffsets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
+		see::exec::ExternalBufferTable ResolveUniformBuffers(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
 		{
-			std::unordered_map<UInt32, see::exec::ExternalBuffer> result;
+			see::exec::ExternalBufferTable result;
 
 			for (const see::ir::Instruction& global : module.m_globalInstructions)
 			{
@@ -147,15 +174,15 @@ namespace vkd::software
 					continue;
 
 				outMappedMemories.push_back(buffer->GetMemory());
-				result[global.m_id] = see::exec::ExternalBuffer{reinterpret_cast<UInt32*>(mapped), static_cast<UInt32>(byteSize / sizeof(UInt32))};
+				result.Bind(module, global.m_id, see::exec::ExternalBuffer{reinterpret_cast<UInt32*>(mapped), static_cast<UInt32>(byteSize / sizeof(UInt32))});
 			}
 
 			return result;
 		}
 
-		std::unordered_map<UInt32, see::exec::ExternalImage> ResolveSampledImages(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
+		see::exec::ExternalImageTable ResolveSampledImages(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
 		{
-			std::unordered_map<UInt32, see::exec::ExternalImage> result;
+			see::exec::ExternalImageTable result;
 
 			for (const see::ir::Instruction& global : module.m_globalInstructions)
 			{
@@ -189,7 +216,7 @@ namespace vkd::software
 					continue;
 
 				outMappedMemories.push_back(image->GetMemory());
-				result[global.m_id] = see::exec::ExternalImage{reinterpret_cast<const cct::UInt8*>(mapped), extent.width, extent.height};
+				result.Bind(module, global.m_id, see::exec::ExternalImage{reinterpret_cast<const cct::UInt8*>(mapped), extent.width, extent.height});
 			}
 
 			return result;
@@ -352,8 +379,8 @@ namespace vkd::software
 			const see::ir::Function* m_fragmentFunction;
 			const see::exec::StageLocations* m_fragmentLocations;
 			const see::exec::PreparedModule* m_fragmentPrepared;
-			const std::unordered_map<UInt32, see::exec::ExternalBuffer>* m_fragmentUniforms;
-			const std::unordered_map<UInt32, see::exec::ExternalImage>* m_fragmentImages;
+			const see::exec::ExternalBufferTable* m_fragmentUniforms;
+			const see::exec::ExternalImageTable* m_fragmentImages;
 			cct::ThreadPool* m_rasterPool;
 		};
 
@@ -422,6 +449,8 @@ namespace vkd::software
 					const float pl1 = pw1 * invPwSum;
 					const float pl2 = pw2 * invPwSum;
 
+					++ctxprof::g_fragments;
+					const unsigned long long p0 = __rdtsc();
 					for (const auto& [location, value] : v0.m_output.m_locations)
 					{
 						auto it1 = v1.m_output.m_locations.find(location);
@@ -432,9 +461,13 @@ namespace vkd::software
 						see::exec::CopyValue(interpolated[location], InterpolateLocation(value, it1->second, it2->second, pl0, pl1, pl2, storage), storage);
 					}
 
+					const unsigned long long p1 = __rdtsc();
+					ctxprof::g_interpCycles += p1 - p0;
 					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs =
 						see::exec::RunFragmentStage(*context.m_fragmentModule, *context.m_fragmentFunction, *context.m_fragmentLocations, interpolated, *context.m_fragmentUniforms,
 													*context.m_fragmentImages, *context.m_fragmentPrepared, storage);
+					const unsigned long long p2 = __rdtsc();
+					ctxprof::g_fragCycles += p2 - p1;
 					if (!fragmentOutputs)
 						continue;
 
@@ -454,6 +487,7 @@ namespace vkd::software
 
 					cct::UByte* pixel = context.m_pixels + (static_cast<std::size_t>(y) * context.m_extent.width + static_cast<std::size_t>(x)) * pixelSize;
 					std::memcpy(pixel, pattern, pixelSize);
+					ctxprof::g_writeCycles += __rdtsc() - p2;
 				}
 			};
 
@@ -816,12 +850,12 @@ namespace vkd::software
 		else
 			scissor = pipeline->GetScissors()[0];
 
-		std::vector<vkd::DeviceMemory*> mappedMemories;
-		const std::unordered_map<UInt32, see::exec::ExternalBuffer> vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, mappedMemories);
-		const std::unordered_map<UInt32, see::exec::ExternalBuffer> fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, mappedMemories);
-		const std::unordered_map<UInt32, see::exec::ExternalImage> vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedMemories);
-		const std::unordered_map<UInt32, see::exec::ExternalImage> fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedMemories);
-		const std::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories);
+		vkd::vector<vkd::DeviceMemory*> mappedMemories(CommandAllocator<vkd::DeviceMemory*>(*m_allocationCallbacks));
+		const see::exec::ExternalBufferTable vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, mappedMemories);
+		const see::exec::ExternalBufferTable fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, mappedMemories);
+		const see::exec::ExternalImageTable vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedMemories);
+		const see::exec::ExternalImageTable fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedMemories);
+		const vkd::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories, *m_allocationCallbacks);
 		const see::exec::StageLocations fragmentLocations = see::exec::BuildStageLocations(*fragmentModule);
 		see::exec::ExecutionStorage vertexStorage;
 		const see::exec::PreparedModule vertexPrepared = see::exec::BuildPreparedModule(*vertexModule);
@@ -852,10 +886,15 @@ namespace vkd::software
 
 				for (UInt32 i = 0; i < 3; ++i)
 				{
+					++ctxprof::g_vertices;
+					const unsigned long long q0 = __rdtsc();
 					const UInt32 vertexIndex = resolveVertexIndex(base + i);
 					const std::unordered_map<UInt32, see::exec::Value> vertexAttributes = FetchVertexAttributes(*pipeline, mappedVertexBuffers, vertexIndex, instance, vertexStorage);
+					const unsigned long long q1 = __rdtsc();
+					ctxprof::g_attrCycles += q1 - q0;
 					std::optional<see::exec::VertexStageOutput> output =
 						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages, vertexPrepared, vertexStorage);
+					ctxprof::g_vertCycles += __rdtsc() - q1;
 					if (!output)
 					{
 						allValid = false;
