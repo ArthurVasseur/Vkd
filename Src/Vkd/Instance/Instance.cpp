@@ -105,9 +105,10 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		VKD_FROM_HANDLE(Instance, instance, pInstance);
-		if (!instance)
+		if (pInstance == VK_NULL_HANDLE)
 			return;
+
+		VKD_FROM_HANDLE(Instance, instance, pInstance);
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Instance>*>(pInstance);
 		mem::DeleteDispatchable(dispatchable);

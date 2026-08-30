@@ -206,6 +206,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (pDevice == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, device, pDevice);
 
 		auto* dispatchable = reinterpret_cast<DispatchableObject<Device>*>(pDevice);
@@ -454,6 +457,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (commandPool == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
 
@@ -532,9 +538,10 @@ namespace vkd
 		// TODO: implement - free command buffers back to pool
 		for (uint32_t i = 0; i < commandBufferCount; ++i)
 		{
-			VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, pCommandBuffers[i]);
-			if (!cmdBuffer)
+			if (pCommandBuffers[i] == VK_NULL_HANDLE)
 				continue;
+
+			VKD_FROM_HANDLE(CommandBuffer, cmdBuffer, pCommandBuffers[i]);
 
 			auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[i]);
 			mem::DeleteDispatchable(dispatchable);
@@ -570,6 +577,9 @@ namespace vkd
 	void Device::DestroyFence(VkDevice device, VkFence fence, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+
+		if (fence == VK_NULL_HANDLE)
+			return;
 
 		VKD_FROM_HANDLE(Fence, fenceObj, fence);
 		VKD_FROM_HANDLE(Device, deviceObj, device);
@@ -736,6 +746,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (buffer == VK_NULL_HANDLE || device == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Buffer, bufferObj, buffer);
 
@@ -797,6 +810,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (bufferView == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(BufferView, bufferViewObj, bufferView);
 
@@ -832,6 +848,9 @@ namespace vkd
 	void Device::DestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+
+		if (image == VK_NULL_HANDLE)
+			return;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Image, imageObj, image);
@@ -1063,6 +1082,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (pipeline == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Pipeline, pipelineObj, pipeline);
 
@@ -1098,6 +1120,9 @@ namespace vkd
 	void Device::DestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+
+		if (renderPass == VK_NULL_HANDLE)
+			return;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, renderPass);
@@ -1135,6 +1160,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (imageView == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(ImageView, imageViewObj, imageView);
 
@@ -1171,6 +1199,9 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		if (framebuffer == VK_NULL_HANDLE)
+			return;
+
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(Framebuffer, framebufferObj, framebuffer);
 
@@ -1206,6 +1237,9 @@ namespace vkd
 	void Device::DestroyShaderModule(VkDevice device, VkShaderModule shaderModule, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+
+		if (shaderModule == VK_NULL_HANDLE)
+			return;
 
 		VKD_FROM_HANDLE(Device, deviceObj, device);
 		VKD_FROM_HANDLE(ShaderModule, shaderModuleObj, shaderModule);
