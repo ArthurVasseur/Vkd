@@ -390,7 +390,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdExecuteCommands);
 
 #undef VKD_ENTRYPOINT_LOOKUP
-		cct::Logger::Warning("Could not find '{}' function", pName);
+		// cct::Logger::Warning("Could not find '{}' function", pName);
 
 		return TrapUnknownFunction(pName);
 	}
@@ -979,37 +979,41 @@ namespace vkd
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
 		for (uint32_t i = 0; i < createInfoCount; ++i)
+			pPipelines[i] = VK_NULL_HANDLE;
+
+		for (uint32_t i = 0; i < createInfoCount; ++i)
 		{
 			auto pipelineResult = deviceObj->CreatePipeline(*pAllocator);
 			if (pipelineResult.IsError())
 			{
-				// Clean up any pipelines created so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
-					VKD_FROM_HANDLE(Pipeline, pipelineObj, pPipelines[j]);
-					if (pipelineObj)
-					{
-						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
-						mem::DeleteDispatchable(dispatchable);
-					}
+					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
+					mem::Delete(*pAllocator, pipelineObjToDelete);
+					pPipelines[j] = VK_NULL_HANDLE;
 				}
 				return pipelineResult.GetError();
 			}
 
 			auto* pipelineObj = std::move(pipelineResult).GetValue();
-			VkResult result = pipelineObj->CreateGraphicsPipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			VkResult result;
+			try
+			{
+				result = pipelineObj->CreateGraphicsPipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			}
+			catch (const std::bad_alloc&)
+			{
+				result = VK_ERROR_OUT_OF_HOST_MEMORY;
+			}
+
 			if (result != VK_SUCCESS)
 			{
 				mem::Delete(*pAllocator, pipelineObj);
-				// Clean up any pipelines created so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
 					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
-					if (pipelineObjToDelete)
-					{
-						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
-						mem::DeleteDispatchable(dispatchable);
-					}
+					mem::Delete(*pAllocator, pipelineObjToDelete);
+					pPipelines[j] = VK_NULL_HANDLE;
 				}
 				return result;
 			}
@@ -1031,37 +1035,41 @@ namespace vkd
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
 		for (uint32_t i = 0; i < createInfoCount; ++i)
+			pPipelines[i] = VK_NULL_HANDLE;
+
+		for (uint32_t i = 0; i < createInfoCount; ++i)
 		{
 			auto pipelineResult = deviceObj->CreatePipeline(*pAllocator);
 			if (pipelineResult.IsError())
 			{
-				// Clean up any pipelines created so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
-					VKD_FROM_HANDLE(Pipeline, pipelineObj, pPipelines[j]);
-					if (pipelineObj)
-					{
-						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
-						mem::DeleteDispatchable(dispatchable);
-					}
+					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
+					mem::Delete(*pAllocator, pipelineObjToDelete);
+					pPipelines[j] = VK_NULL_HANDLE;
 				}
 				return pipelineResult.GetError();
 			}
 
 			auto* pipelineObj = std::move(pipelineResult).GetValue();
-			VkResult result = pipelineObj->CreateComputePipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			VkResult result;
+			try
+			{
+				result = pipelineObj->CreateComputePipeline(*deviceObj, pCreateInfos[i], *pAllocator);
+			}
+			catch (const std::bad_alloc&)
+			{
+				result = VK_ERROR_OUT_OF_HOST_MEMORY;
+			}
+
 			if (result != VK_SUCCESS)
 			{
 				mem::Delete(*pAllocator, pipelineObj);
-				// Clean up any pipelines created so far
 				for (uint32_t j = 0; j < i; ++j)
 				{
 					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
-					if (pipelineObjToDelete)
-					{
-						auto* dispatchable = reinterpret_cast<DispatchableObject<Pipeline>*>(pPipelines[j]);
-						mem::DeleteDispatchable(dispatchable);
-					}
+					mem::Delete(*pAllocator, pipelineObjToDelete);
+					pPipelines[j] = VK_NULL_HANDLE;
 				}
 				return result;
 			}
