@@ -185,6 +185,7 @@ target("vkd")
         "RenderPass",
         "Sampler",
         "ShaderModule",
+        "QueryPool",
         "Synchronization",
         "Synchronization/Fence",
         "Synchronization/Semaphore",

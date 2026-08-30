@@ -34,6 +34,7 @@ namespace vkd::software
 		Result<vkd::Fence*, VkResult> CreateFence(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::Semaphore*, VkResult> CreateSemaphore(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::Event*, VkResult> CreateEvent(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::QueryPool*, VkResult> CreateQueryPool(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::Buffer*, VkResult> CreateBuffer(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::BufferView*, VkResult> CreateBufferView(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) override;

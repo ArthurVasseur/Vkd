@@ -12,6 +12,7 @@
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/PipelineLayout/PipelineLayout.hpp"
+#include "Vkd/QueryPool/QueryPool.hpp"
 #include "Vkd/Sampler/Sampler.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/BufferView/BufferView.hpp"
@@ -141,6 +142,18 @@ namespace vkd::software
 		}
 
 		return event;
+	}
+
+	Result<vkd::QueryPool*, VkResult> SoftwareDevice::CreateQueryPool(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* queryPool = mem::NewObject<vkd::QueryPool>(allocationCallbacks);
+		if (!queryPool)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate QueryPool");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return queryPool;
 	}
 
 	Result<vkd::Buffer*, VkResult> SoftwareDevice::CreateBuffer(const VkAllocationCallbacks& allocationCallbacks)

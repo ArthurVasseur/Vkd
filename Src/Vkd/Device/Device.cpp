@@ -25,6 +25,7 @@
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/PipelineLayout/PipelineLayout.hpp"
+#include "Vkd/QueryPool/QueryPool.hpp"
 #include "Vkd/Queue/Queue.hpp"
 #include "Vkd/RenderPass/RenderPass.hpp"
 #include "Vkd/Sampler/Sampler.hpp"
@@ -1399,21 +1400,50 @@ namespace vkd
 	VkResult Device::CreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreateQueryPool not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pQueryPool);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto queryPoolResult = deviceObj->CreateQueryPool(*pAllocator);
+		if (queryPoolResult.IsError())
+			return queryPoolResult.GetError();
+
+		auto* queryPoolObj = std::move(queryPoolResult).GetValue();
+		VkResult result = queryPoolObj->Create(*deviceObj, *pCreateInfo);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, queryPoolObj);
+			return result;
+		}
+
+		*pQueryPool = VKD_TO_HANDLE(VkQueryPool, queryPoolObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroyQueryPool(VkDevice device, VkQueryPool queryPool, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroyQueryPool not implemented");
+
+		if (queryPool == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+
+		mem::Delete(pAllocator ? *pAllocator : queryPoolObj->GetAllocationCallbacks(), queryPoolObj);
 	}
 
 	VkResult Device::GetQueryPoolResults(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, size_t dataSize, void* pData, VkDeviceSize stride, VkQueryResultFlags flags)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetQueryPoolResults not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+
+		return queryPoolObj->GetResults(firstQuery, queryCount, dataSize, pData, stride, flags);
 	}
 
 	VkResult Device::CreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout)
