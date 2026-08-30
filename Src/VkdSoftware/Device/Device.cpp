@@ -11,6 +11,7 @@
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/Memory/Memory.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
+#include "Vkd/PipelineCache/PipelineCache.hpp"
 #include "Vkd/PipelineLayout/PipelineLayout.hpp"
 #include "Vkd/QueryPool/QueryPool.hpp"
 #include "Vkd/Sampler/Sampler.hpp"
@@ -154,6 +155,18 @@ namespace vkd::software
 		}
 
 		return queryPool;
+	}
+
+	Result<vkd::PipelineCache*, VkResult> SoftwareDevice::CreatePipelineCache(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* pipelineCache = mem::NewObject<vkd::PipelineCache>(allocationCallbacks);
+		if (!pipelineCache)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate PipelineCache");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return pipelineCache;
 	}
 
 	Result<vkd::Buffer*, VkResult> SoftwareDevice::CreateBuffer(const VkAllocationCallbacks& allocationCallbacks)

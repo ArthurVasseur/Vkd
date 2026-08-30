@@ -24,6 +24,7 @@
 #include "Vkd/ImageView/ImageView.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
+#include "Vkd/PipelineCache/PipelineCache.hpp"
 #include "Vkd/PipelineLayout/PipelineLayout.hpp"
 #include "Vkd/QueryPool/QueryPool.hpp"
 #include "Vkd/Queue/Queue.hpp"
@@ -1680,28 +1681,60 @@ namespace vkd
 	VkResult Device::CreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreatePipelineCache not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pPipelineCache);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto cacheResult = deviceObj->CreatePipelineCache(*pAllocator);
+		if (cacheResult.IsError())
+			return cacheResult.GetError();
+
+		auto* cacheObj = std::move(cacheResult).GetValue();
+		VkResult result = cacheObj->Create(*deviceObj, *pCreateInfo);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, cacheObj);
+			return result;
+		}
+
+		*pPipelineCache = VKD_TO_HANDLE(VkPipelineCache, cacheObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroyPipelineCache(VkDevice device, VkPipelineCache pipelineCache, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroyPipelineCache not implemented");
+
+		if (pipelineCache == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(PipelineCache, cacheObj, pipelineCache);
+
+		mem::Delete(pAllocator ? *pAllocator : cacheObj->GetAllocationCallbacks(), cacheObj);
 	}
 
 	VkResult Device::GetPipelineCacheData(VkDevice device, VkPipelineCache pipelineCache, size_t* pDataSize, void* pData)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetPipelineCacheData not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(PipelineCache, cacheObj, pipelineCache);
+
+		return cacheObj->GetData(pDataSize, pData);
 	}
 
 	VkResult Device::MergePipelineCaches(VkDevice device, VkPipelineCache dstCache, uint32_t srcCacheCount, const VkPipelineCache* pSrcCaches)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkMergePipelineCaches not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(PipelineCache, cacheObj, dstCache);
+
+		return cacheObj->Merge(srcCacheCount, pSrcCaches);
 	}
 
 	VkResult Device::DeviceWaitIdle(VkDevice device)

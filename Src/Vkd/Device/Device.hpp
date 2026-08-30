@@ -23,6 +23,7 @@ namespace vkd
 	class Semaphore;
 	class Event;
 	class QueryPool;
+	class PipelineCache;
 	class Buffer;
 	class BufferView;
 	class Image;
@@ -153,6 +154,7 @@ namespace vkd
 		virtual Result<Semaphore*, VkResult> CreateSemaphore(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Event*, VkResult> CreateEvent(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<QueryPool*, VkResult> CreateQueryPool(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<PipelineCache*, VkResult> CreatePipelineCache(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Buffer*, VkResult> CreateBuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<BufferView*, VkResult> CreateBufferView(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) = 0;

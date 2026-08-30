@@ -186,6 +186,7 @@ target("vkd")
         "Sampler",
         "ShaderModule",
         "QueryPool",
+        "PipelineCache",
         "Synchronization",
         "Synchronization/Fence",
         "Synchronization/Semaphore",
