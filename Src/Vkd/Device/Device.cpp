@@ -981,18 +981,18 @@ namespace vkd
 		for (uint32_t i = 0; i < createInfoCount; ++i)
 			pPipelines[i] = VK_NULL_HANDLE;
 
+		VkResult firstError = VK_SUCCESS;
 		for (uint32_t i = 0; i < createInfoCount; ++i)
 		{
 			auto pipelineResult = deviceObj->CreatePipeline(*pAllocator);
 			if (pipelineResult.IsError())
 			{
-				for (uint32_t j = 0; j < i; ++j)
-				{
-					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
-					mem::Delete(*pAllocator, pipelineObjToDelete);
-					pPipelines[j] = VK_NULL_HANDLE;
-				}
-				return pipelineResult.GetError();
+				if (firstError == VK_SUCCESS)
+					firstError = pipelineResult.GetError();
+
+				if (pCreateInfos[i].flags & VK_PIPELINE_CREATE_EARLY_RETURN_ON_FAILURE_BIT)
+					break;
+				continue;
 			}
 
 			auto* pipelineObj = std::move(pipelineResult).GetValue();
@@ -1009,19 +1009,18 @@ namespace vkd
 			if (result != VK_SUCCESS)
 			{
 				mem::Delete(*pAllocator, pipelineObj);
-				for (uint32_t j = 0; j < i; ++j)
-				{
-					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
-					mem::Delete(*pAllocator, pipelineObjToDelete);
-					pPipelines[j] = VK_NULL_HANDLE;
-				}
-				return result;
+				if (firstError == VK_SUCCESS)
+					firstError = result;
+
+				if (pCreateInfos[i].flags & VK_PIPELINE_CREATE_EARLY_RETURN_ON_FAILURE_BIT)
+					break;
+				continue;
 			}
 
 			pPipelines[i] = VKD_TO_HANDLE(VkPipeline, pipelineObj);
 		}
 
-		return VK_SUCCESS;
+		return firstError;
 	}
 
 	VkResult Device::CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines)
@@ -1037,18 +1036,18 @@ namespace vkd
 		for (uint32_t i = 0; i < createInfoCount; ++i)
 			pPipelines[i] = VK_NULL_HANDLE;
 
+		VkResult firstError = VK_SUCCESS;
 		for (uint32_t i = 0; i < createInfoCount; ++i)
 		{
 			auto pipelineResult = deviceObj->CreatePipeline(*pAllocator);
 			if (pipelineResult.IsError())
 			{
-				for (uint32_t j = 0; j < i; ++j)
-				{
-					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
-					mem::Delete(*pAllocator, pipelineObjToDelete);
-					pPipelines[j] = VK_NULL_HANDLE;
-				}
-				return pipelineResult.GetError();
+				if (firstError == VK_SUCCESS)
+					firstError = pipelineResult.GetError();
+
+				if (pCreateInfos[i].flags & VK_PIPELINE_CREATE_EARLY_RETURN_ON_FAILURE_BIT)
+					break;
+				continue;
 			}
 
 			auto* pipelineObj = std::move(pipelineResult).GetValue();
@@ -1065,19 +1064,18 @@ namespace vkd
 			if (result != VK_SUCCESS)
 			{
 				mem::Delete(*pAllocator, pipelineObj);
-				for (uint32_t j = 0; j < i; ++j)
-				{
-					VKD_FROM_HANDLE(Pipeline, pipelineObjToDelete, pPipelines[j]);
-					mem::Delete(*pAllocator, pipelineObjToDelete);
-					pPipelines[j] = VK_NULL_HANDLE;
-				}
-				return result;
+				if (firstError == VK_SUCCESS)
+					firstError = result;
+
+				if (pCreateInfos[i].flags & VK_PIPELINE_CREATE_EARLY_RETURN_ON_FAILURE_BIT)
+					break;
+				continue;
 			}
 
 			pPipelines[i] = VKD_TO_HANDLE(VkPipeline, pipelineObj);
 		}
 
-		return VK_SUCCESS;
+		return firstError;
 	}
 
 	void Device::DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator)
