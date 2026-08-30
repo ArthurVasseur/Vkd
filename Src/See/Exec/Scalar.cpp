@@ -17,6 +17,11 @@
 
 namespace see::exec
 {
+	void CopyValue(Value& destination, const Value& source) noexcept
+	{
+		std::memcpy(&destination, &source, sizeof(Value));
+	}
+
 	float Value::GetFloat(cct::UInt32 index) const
 	{
 		float value;
@@ -253,7 +258,7 @@ namespace see::exec
 			if (!slot)
 				return false;
 
-			*slot = value;
+			CopyValue(*slot, value);
 			return true;
 		}
 
@@ -266,7 +271,7 @@ namespace see::exec
 			state.m_pointers[id] = PointerInfo{.m_baseVariable = id, .m_wordOffset = 0, .m_pointeeType = pointeeType};
 			if (state.m_externalBuffers.find(id) == state.m_externalBuffers.end() && state.m_variables.find(id) == state.m_variables.end())
 				if (const Value* zero = state.m_prepared.GetZeroValue(pointerTypeId))
-					state.m_variables[id] = *zero;
+					CopyValue(state.m_variables[id], *zero);
 		}
 
 		cct::UInt32 StridedMatrixColumnStride(const RuntimeState& state, const PointerInfo& pointer, const Value& shape)
@@ -500,7 +505,7 @@ namespace see::exec
 					if (!member)
 						return false;
 
-					current = *member;
+					CopyValue(current, *member);
 					continue;
 				}
 
@@ -515,7 +520,7 @@ namespace see::exec
 					for (cct::UInt32 word = 0; word < current.m_rows; ++word)
 						column.Words()[word] = current.Words()[index * current.m_rows + word];
 
-					current = column;
+					CopyValue(current, column);
 					continue;
 				}
 
@@ -525,7 +530,7 @@ namespace see::exec
 				Value component;
 				component.m_scalar = current.m_scalar;
 				component.Words()[0] = current.Words()[index];
-				current = component;
+				CopyValue(current, component);
 			}
 
 			return StoreSsa(state, instruction.m_id, current);
@@ -574,7 +579,7 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			*result = *vector;
+			CopyValue(*result, *vector);
 			result->Words()[indexValue] = component->Words()[0];
 
 			return true;
@@ -742,7 +747,7 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			*result = *operand;
+			CopyValue(*result, *operand);
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
 				if (result->m_scalar == ir::ScalarKind::Int32)
@@ -776,7 +781,7 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			*result = *operand;
+			CopyValue(*result, *operand);
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
 				const cct::UInt32 bits = static_cast<cct::UInt32>(operand->GetInt32(i));
@@ -821,7 +826,7 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			*result = *base;
+			CopyValue(*result, *base);
 			const cct::UInt32 componentCount = result->WordCount();
 
 			if (countValue == 0)
@@ -898,7 +903,7 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			*result = *operand;
+			CopyValue(*result, *operand);
 			result->m_scalar = (instruction.m_op == ir::Op::ConvertSignedToFloat || instruction.m_op == ir::Op::ConvertUnsignedToFloat) ? ir::ScalarKind::Float32 : ir::ScalarKind::Int32;
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
@@ -1045,7 +1050,7 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			*result = *composite;
+			CopyValue(*result, *composite);
 			const float factor = scalar->GetFloat(0);
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 				result->SetFloat(i, composite->GetFloat(i) * factor);
@@ -1231,7 +1236,7 @@ namespace see::exec
 				if (!result)
 					return false;
 
-				*result = *whenTrue;
+				CopyValue(*result, *whenTrue);
 				for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 					result->Words()[i] = condition->GetBool(i) ? whenTrue->Words()[i] : whenFalse->Words()[i];
 				return true;
@@ -1300,7 +1305,7 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			*result = *operands[0];
+			CopyValue(*result, *operands[0]);
 
 			const auto floatUnary = [&](auto&& f)
 			{
@@ -1778,7 +1783,7 @@ namespace see::exec
 					words[w] = source[w];
 
 				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
-				state.m_variables[paramId] = *copy;
+				CopyValue(state.m_variables[paramId], *copy);
 			}
 
 			BlockWalkOutcome outcome = RunBlocks(state, *callee);
@@ -1871,7 +1876,7 @@ namespace see::exec
 			maxTypeId = std::max(maxTypeId, typeId);
 
 		const std::size_t typeCount = static_cast<std::size_t>(maxTypeId) + 1;
-		prepared.m_zeroValues.assign(typeCount, Value{});
+		prepared.m_zeroValues = std::vector<Value>(typeCount);
 		prepared.m_zeroValid.assign(typeCount, 0);
 		prepared.m_memberLayouts.assign(typeCount, {});
 		prepared.m_memberLayoutValid.assign(typeCount, 0);
@@ -1881,7 +1886,7 @@ namespace see::exec
 		{
 			if (std::optional<Value> zero = MakeZeroValue(module, typeId))
 			{
-				prepared.m_zeroValues[typeId] = *zero;
+				CopyValue(prepared.m_zeroValues[typeId], *zero);
 				prepared.m_zeroValid[typeId] = 1;
 			}
 
@@ -1900,7 +1905,7 @@ namespace see::exec
 			}
 		}
 
-		prepared.m_constants.assign(module.m_constantSlotCount, Value{});
+		prepared.m_constants = std::vector<Value>(module.m_constantSlotCount);
 		prepared.m_constantValid.assign(module.m_constantSlotCount, 0);
 
 		for (const auto& [id, constant] : module.m_constants)
@@ -1920,7 +1925,7 @@ namespace see::exec
 					words[i] = constant.m_words[i];
 
 			const cct::UInt32 slot = ir::GetSlot(module.m_valueRefs[id]);
-			prepared.m_constants[slot] = *value;
+			CopyValue(prepared.m_constants[slot], *value);
 			prepared.m_constantValid[slot] = 1;
 		}
 

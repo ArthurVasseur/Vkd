@@ -332,7 +332,7 @@ namespace vkd::software
 				if (elementOffset + attributeSize > mapped.m_size)
 					continue;
 
-				result[attribute.location] = UnpackVertexAttribute(attribute.format, mapped.m_base + elementOffset);
+				see::exec::CopyValue(result[attribute.location], UnpackVertexAttribute(attribute.format, mapped.m_base + elementOffset));
 			}
 
 			return result;
@@ -428,7 +428,7 @@ namespace vkd::software
 						if (it1 == v1.m_output.m_locations.end() || it2 == v2.m_output.m_locations.end())
 							continue;
 
-						interpolated[location] = InterpolateLocation(value, it1->second, it2->second, pl0, pl1, pl2);
+						see::exec::CopyValue(interpolated[location], InterpolateLocation(value, it1->second, it2->second, pl0, pl1, pl2));
 					}
 
 					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs =
@@ -874,7 +874,8 @@ namespace vkd::software
 					screenVertices[i].m_x = viewport.x + (ndcX * 0.5f + 0.5f) * viewport.width;
 					screenVertices[i].m_y = viewport.y + (ndcY * 0.5f + 0.5f) * viewport.height;
 					screenVertices[i].m_invW = 1.0f / w;
-					screenVertices[i].m_output = std::move(*output);
+					see::exec::CopyValue(screenVertices[i].m_output.m_position, output->m_position);
+					screenVertices[i].m_output.m_locations = std::move(output->m_locations);
 				}
 
 				if (!allValid)

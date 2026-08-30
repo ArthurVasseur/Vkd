@@ -296,7 +296,7 @@ TEST_CASE("see::exec::RunFragmentStage - a matrix input spans one Location per c
 		for (cct::UInt32 row = 0; row < 3; ++row)
 			columnValue.SetFloat(row, static_cast<float>(column * 3 + row));
 
-		locationInputs[1 + column] = columnValue;
+		see::exec::CopyValue(locationInputs[1 + column], columnValue);
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], locationInputs);

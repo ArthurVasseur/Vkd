@@ -47,6 +47,8 @@ namespace see::exec
 			return std::span<cct::UInt32>(m_bits.data(), WordCount());
 		}
 
+		Value& operator=(const Value&) = delete;
+
 		[[nodiscard]] float GetFloat(cct::UInt32 index = 0) const;
 		void SetFloat(cct::UInt32 index, float value);
 		[[nodiscard]] cct::Int32 GetInt32(cct::UInt32 index = 0) const;
@@ -72,6 +74,8 @@ namespace see::exec
 		cct::UInt32 m_width = 0;
 		cct::UInt32 m_height = 0;
 	};
+
+	void CopyValue(Value& destination, const Value& source) noexcept;
 
 	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex);
 

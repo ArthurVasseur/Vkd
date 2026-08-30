@@ -121,7 +121,7 @@ namespace see::exec
 			const VariableShape shape = FindVariableShape(module, variableId);
 			if (shape.m_columns <= 1)
 			{
-				outLocations[location] = value;
+				CopyValue(outLocations[location], value);
 				return;
 			}
 
@@ -133,7 +133,7 @@ namespace see::exec
 				for (cct::UInt32 row = 0; row < shape.m_rows; ++row)
 					columnValue.Words()[row] = value.Words()[column * shape.m_rows + row];
 
-				outLocations[location + column] = columnValue;
+				CopyValue(outLocations[location + column], columnValue);
 			}
 		}
 
@@ -185,14 +185,14 @@ namespace see::exec
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
 			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
-				inputs[variableId] = *gathered;
+				CopyValue(inputs[variableId], *gathered);
 
 		if (std::optional<BuiltinLocation> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
 		{
 			Value value;
 			value.m_scalar = ir::ScalarKind::Int32;
 			value.SetInt32(0, static_cast<cct::Int32>(vertexIndex));
-			inputs[vertexIndexVar->m_variable] = value;
+			CopyValue(inputs[vertexIndexVar->m_variable], value);
 		}
 
 		if (std::optional<BuiltinLocation> instanceIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInInstanceIndex))
@@ -200,7 +200,7 @@ namespace see::exec
 			Value value;
 			value.m_scalar = ir::ScalarKind::Int32;
 			value.SetInt32(0, static_cast<cct::Int32>(instanceIndex));
-			inputs[instanceIndexVar->m_variable] = value;
+			CopyValue(inputs[instanceIndexVar->m_variable], value);
 		}
 
 		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
@@ -221,10 +221,10 @@ namespace see::exec
 			std::optional<Value> member = ExtractStructMember(module, positionIt->second, *positionVar->m_member);
 			if (!member)
 				return std::nullopt;
-			output.m_position = *member;
+			CopyValue(output.m_position, *member);
 		}
 		else
-			output.m_position = positionIt->second;
+			CopyValue(output.m_position, positionIt->second);
 
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassOutput))
 		{
@@ -270,7 +270,7 @@ namespace see::exec
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : locations.m_inputs)
 			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
-				inputs[variableId] = *gathered;
+				CopyValue(inputs[variableId], *gathered);
 
 		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
 		if (!result)
