@@ -6,6 +6,8 @@
 
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 
+#include <algorithm>
+
 #include "VkdUtils/System/System.hpp"
 
 namespace vkd
@@ -254,19 +256,21 @@ namespace vkd
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 
-		if (pQueueFamilyPropertyCount && !pQueueFamilyProperties)
+		VKD_CHECK(pQueueFamilyPropertyCount);
+
+		const auto properties = physicalDevice->GetQueueFamilyProperties();
+		const UInt32 available = static_cast<UInt32>(properties.size());
+
+		if (!pQueueFamilyProperties)
 		{
-			*pQueueFamilyPropertyCount = static_cast<UInt32>(physicalDevice->GetQueueFamilyProperties().size());
+			*pQueueFamilyPropertyCount = available;
 			return;
 		}
 
-		// Return the queue family properties
-		if (pQueueFamilyPropertyCount && pQueueFamilyProperties && *pQueueFamilyPropertyCount > 0)
-		{
-			auto properties = physicalDevice->GetQueueFamilyProperties();
-			std::memcpy(pQueueFamilyProperties, properties.data(), properties.size_bytes());
-			*pQueueFamilyPropertyCount = static_cast<UInt32>(properties.size());
-		}
+		const UInt32 toWrite = std::min(*pQueueFamilyPropertyCount, available);
+		if (toWrite > 0)
+			std::memcpy(pQueueFamilyProperties, properties.data(), toWrite * sizeof(VkQueueFamilyProperties));
+		*pQueueFamilyPropertyCount = toWrite;
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice,
@@ -312,20 +316,20 @@ namespace vkd
 		if (pLayerName)
 			return VK_ERROR_LAYER_NOT_PRESENT;
 
-		if (pPropertyCount && !pProperties)
+		VKD_CHECK(pPropertyCount);
+
+		const UInt32 available = static_cast<UInt32>(s_supportedExtensions.size());
+		if (!pProperties)
 		{
-			*pPropertyCount = s_supportedExtensions.size();
+			*pPropertyCount = available;
 			return VK_SUCCESS;
 		}
 
-		// std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
-		// if (max > 0)
-		// 	std::memcpy(pProperties, s_supportedExtensions.data(), max * sizeof(VkExtensionProperties));
-
-		// if (max < s_supportedExtensions.size())
-		// 	return VK_INCOMPLETE;
-
-		return VK_SUCCESS;
+		const UInt32 toWrite = std::min(*pPropertyCount, available);
+		if (toWrite > 0)
+			std::memcpy(pProperties, s_supportedExtensions.data(), toWrite * sizeof(VkExtensionProperties));
+		*pPropertyCount = toWrite;
+		return toWrite < available ? VK_INCOMPLETE : VK_SUCCESS;
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format,
@@ -337,7 +341,15 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
-		CCT_ASSERT_FALSE("Not Implemented");
+		VKD_CHECK(pPropertyCount);
+
+		if (!pProperties)
+		{
+			*pPropertyCount = 0;
+			return;
+		}
+
+		*pPropertyCount = 0;
 	}
 
 	void PhysicalDevice::DestroyPhysicalDevice(VkPhysicalDevice pPhysicalDevice)
@@ -368,7 +380,26 @@ namespace vkd
 	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties2* pQueueFamilyProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetPhysicalDeviceQueueFamilyProperties2 not implemented (Vulkan 1.1)");
+
+		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+		VKD_CHECK(pQueueFamilyPropertyCount);
+
+		const auto properties = physicalDevice->GetQueueFamilyProperties();
+		const UInt32 available = static_cast<UInt32>(properties.size());
+
+		if (!pQueueFamilyProperties)
+		{
+			*pQueueFamilyPropertyCount = available;
+			return;
+		}
+
+		const UInt32 toWrite = std::min(*pQueueFamilyPropertyCount, available);
+		for (UInt32 i = 0; i < toWrite; ++i)
+		{
+			pQueueFamilyProperties[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+			pQueueFamilyProperties[i].queueFamilyProperties = properties[i];
+		}
+		*pQueueFamilyPropertyCount = toWrite;
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceMemoryProperties2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceMemoryProperties2* pMemoryProperties)
@@ -380,7 +411,17 @@ namespace vkd
 	void PhysicalDevice::GetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, uint32_t* pPropertyCount, VkSparseImageFormatProperties2* pProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetPhysicalDeviceSparseImageFormatProperties2 not implemented (Vulkan 1.1)");
+
+		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+		VKD_CHECK(pPropertyCount);
+
+		if (!pProperties)
+		{
+			*pPropertyCount = 0;
+			return;
+		}
+
+		*pPropertyCount = 0;
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceExternalBufferProperties(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties)
@@ -405,11 +446,15 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 		cct::Logger::Warning("vkGetPhysicalDeviceToolProperties not implemented (Vulkan 1.3)");
-		if (pToolCount && !pToolProperties)
+		VKD_CHECK(pToolCount);
+
+		if (!pToolProperties)
 		{
 			*pToolCount = 0;
 			return VK_SUCCESS;
 		}
+
+		*pToolCount = 0;
 		return VK_SUCCESS;
 	}
 } // namespace vkd

@@ -42,20 +42,15 @@ namespace vkd
 		if (pLayerName)
 			return VK_ERROR_LAYER_NOT_PRESENT;
 
-		if (pPropertyCount && !pProperties)
+		VKD_CHECK(pPropertyCount);
+
+		if (!pProperties)
 		{
-			//*pPropertyCount = s_supportedExtensions.size();
 			*pPropertyCount = 0;
 			return VK_SUCCESS;
 		}
 
-		// std::size_t max = std::min(static_cast<std::size_t>(*pPropertyCount), s_supportedExtensions.size());
-		// for (std::size_t i = 0; i < max; ++i)
-		//	pProperties[i] = s_supportedExtensions[i];
-
-		// if (max < s_supportedExtensions.size())
-		//	return VK_INCOMPLETE;
-
+		*pPropertyCount = 0;
 		return VK_SUCCESS;
 	}
 
@@ -63,12 +58,16 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		if (pPropertyCount && !pProperties)
+		VKD_CHECK(pPropertyCount);
+
+		if (!pProperties)
 		{
 			*pPropertyCount = 0;
 			return VK_SUCCESS;
 		}
-		return VK_ERROR_INCOMPATIBLE_DRIVER;
+
+		*pPropertyCount = 0;
+		return VK_SUCCESS;
 	}
 
 	VkResult Instance::EnumerateInstanceVersion(uint32_t* pApiVersion)
