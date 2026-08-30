@@ -59,6 +59,7 @@ namespace see
 		if (!irModule)
 			return InvalidShaderHandle;
 
+		std::unique_lock<std::shared_mutex> lock(m_shadersMutex);
 		const ShaderHandle handle = m_nextHandle++;
 		m_shaders.emplace(handle, RegisteredShader{.m_stage = stage, .m_code = spirvCode, .m_entryPoint = entryPoint, .m_irModule = std::move(*irModule), .m_entryFunctionId = entryPointIt->m_functionId});
 		return handle;
@@ -66,11 +67,13 @@ namespace see
 
 	void Executor::UnregisterShader(ShaderHandle handle)
 	{
+		std::unique_lock<std::shared_mutex> lock(m_shadersMutex);
 		m_shaders.erase(handle);
 	}
 
 	const ir::Module* Executor::GetIrModule(ShaderHandle handle) const
 	{
+		std::shared_lock<std::shared_mutex> lock(m_shadersMutex);
 		auto it = m_shaders.find(handle);
 		if (it == m_shaders.end())
 			return nullptr;
@@ -80,6 +83,7 @@ namespace see
 
 	const ir::Function* Executor::GetEntryFunction(ShaderHandle handle) const
 	{
+		std::shared_lock<std::shared_mutex> lock(m_shadersMutex);
 		auto it = m_shaders.find(handle);
 		if (it == m_shaders.end())
 			return nullptr;

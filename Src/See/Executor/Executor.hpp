@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -60,6 +61,7 @@ namespace see
 		};
 
 		spv_context_t* m_context;
+		mutable std::shared_mutex m_shadersMutex;
 		std::unordered_map<ShaderHandle, RegisteredShader> m_shaders;
 		ShaderHandle m_nextHandle;
 	};
