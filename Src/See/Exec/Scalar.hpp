@@ -130,6 +130,32 @@ namespace see::exec
 		cct::UInt32 m_epoch = 0;
 	};
 
+	class ExecutionStorage
+	{
+	public:
+		ExecutionStorage() = default;
+		ExecutionStorage(const ExecutionStorage&) = delete;
+		ExecutionStorage& operator=(const ExecutionStorage&) = delete;
+
+		void Reset(cct::UInt32 slotCount)
+		{
+			m_registers.Reset(slotCount);
+		}
+
+		[[nodiscard]] RegisterFile& Registers() noexcept
+		{
+			return m_registers;
+		}
+
+		[[nodiscard]] const RegisterFile& Registers() const noexcept
+		{
+			return m_registers;
+		}
+
+	private:
+		RegisterFile m_registers;
+	};
+
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
@@ -143,5 +169,5 @@ namespace see::exec
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, RegisterFile& registers);
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage);
 } // namespace see::exec

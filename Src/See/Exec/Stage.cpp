@@ -171,15 +171,15 @@ namespace see::exec
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
 	{
-		RegisterFile registers;
-		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, prepared, registers);
+		ExecutionStorage storage;
+		return RunVertexStage(module, function, vertexIndex, instanceIndex, locationInputs, externalBuffers, externalImages, prepared, storage);
 	}
 
 	std::optional<VertexStageOutput> RunVertexStage(const ir::Module& module, const ir::Function& function, cct::UInt32 vertexIndex, cct::UInt32 instanceIndex,
 													const std::unordered_map<cct::UInt32, Value>& locationInputs,
 													const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 													const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
-													RegisterFile& registers)
+													ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
@@ -203,7 +203,7 @@ namespace see::exec
 			CopyValue(inputs[instanceIndexVar->m_variable], value);
 		}
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
 		if (!result)
 			return std::nullopt;
 
@@ -256,15 +256,15 @@ namespace see::exec
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
 	{
-		RegisterFile registers;
-		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, prepared, registers);
+		ExecutionStorage storage;
+		return RunFragmentStage(module, function, locations, locationInputs, externalBuffers, externalImages, prepared, storage);
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, RegisterFile& registers)
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
@@ -272,7 +272,7 @@ namespace see::exec
 			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
 				CopyValue(inputs[variableId], *gathered);
 
-		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
+		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
 		if (!result)
 			return std::nullopt;
 

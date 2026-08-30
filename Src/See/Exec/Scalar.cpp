@@ -78,7 +78,7 @@ namespace see::exec
 		{
 			const ir::Module& m_module;
 			const PreparedModule& m_prepared;
-			RegisterFile& m_registers;
+			ExecutionStorage& m_storage;
 			std::unordered_map<cct::UInt32, Value> m_variables;
 			const std::unordered_map<cct::UInt32, ExternalBuffer>& m_externalBuffers;
 			const std::unordered_map<cct::UInt32, ExternalImage>& m_externalImages;
@@ -219,7 +219,7 @@ namespace see::exec
 			switch (ir::GetKind(ref))
 			{
 				case ir::ValueKind::Ssa:
-					return state.m_registers.Find(ir::GetSlot(ref));
+					return state.m_storage.Registers().Find(ir::GetSlot(ref));
 				case ir::ValueKind::Constant:
 					return state.m_prepared.GetConstant(ir::GetSlot(ref));
 				case ir::ValueKind::Pointer:
@@ -238,7 +238,7 @@ namespace see::exec
 			if (ir::GetKind(ref) != ir::ValueKind::Ssa)
 				return nullptr;
 
-			return &state.m_registers.Emplace(ir::GetSlot(ref));
+			return &state.m_storage.Registers().Emplace(ir::GetSlot(ref));
 		}
 
 		void ResetHeader(Value& value)
@@ -1968,18 +1968,18 @@ namespace see::exec
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
 	{
-		RegisterFile registers;
-		return Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, registers);
+		ExecutionStorage storage;
+		return Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
 	}
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
-															  RegisterFile& registers)
+															  ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
-		registers.Reset(module.m_ssaSlotCount);
-		RuntimeState state{.m_module = module, .m_prepared = prepared, .m_registers = registers, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
+		storage.Reset(module.m_ssaSlotCount);
+		RuntimeState state{.m_module = module, .m_prepared = prepared, .m_storage = storage, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
 			if (global.m_op == ir::Op::Variable)

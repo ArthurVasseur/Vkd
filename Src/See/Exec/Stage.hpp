@@ -39,7 +39,7 @@ namespace see::exec
 																  cct::UInt32 instanceIndex, const std::unordered_map<cct::UInt32, Value>& locationInputs,
 																  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 																  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
-																  RegisterFile& registers);
+																  ExecutionStorage& storage);
 
 	struct StageLocations
 	{
@@ -66,7 +66,7 @@ namespace see::exec
 		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
 		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, RegisterFile& registers);
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage);
 
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
 		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
