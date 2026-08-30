@@ -148,6 +148,8 @@ namespace vkd
 
 		static VkResult VKAPI_CALL DeviceWaitIdle(VkDevice device);
 
+		VkResult WaitIdle();
+
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual Result<CommandPool*, VkResult> CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Fence*, VkResult> CreateFence(const VkAllocationCallbacks& allocationCallbacks) = 0;

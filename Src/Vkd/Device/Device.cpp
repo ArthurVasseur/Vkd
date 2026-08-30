@@ -1737,10 +1737,28 @@ namespace vkd
 		return cacheObj->Merge(srcCacheCount, pSrcCaches);
 	}
 
+	VkResult Device::WaitIdle()
+	{
+		for (auto& queueFamily : m_queues)
+		{
+			for (auto* queue : queueFamily.second)
+			{
+				if (!queue)
+					continue;
+
+				const VkResult result = Queue::QueueWaitIdle(VKD_TO_HANDLE(VkQueue, queue));
+				if (result != VK_SUCCESS)
+					return result;
+			}
+		}
+		return VK_SUCCESS;
+	}
+
 	VkResult Device::DeviceWaitIdle(VkDevice device)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDeviceWaitIdle not implemented");
-		return VK_SUCCESS;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		return deviceObj->WaitIdle();
 	}
 } // namespace vkd
