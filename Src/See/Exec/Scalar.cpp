@@ -384,7 +384,7 @@ namespace see::exec
 			if (!target || !source)
 				return false;
 
-			for (cct::UInt32 i = 0; i < wordCount && i < Value::MaxWords; ++i)
+			for (cct::UInt32 i = 0; i < wordCount; ++i)
 				target[i] = source[i];
 
 			return true;
@@ -1295,7 +1295,7 @@ namespace see::exec
 			if (operands.empty())
 				return false;
 
-			const cct::UInt32 componentCount = operands[0]->m_rows * operands[0]->m_columns;
+			const cct::UInt32 componentCount = operands[0]->WordCount();
 			Value* result = SsaSlot(state, instruction.m_id);
 			if (!result)
 				return false;

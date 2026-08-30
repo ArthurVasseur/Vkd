@@ -76,7 +76,7 @@ namespace vkd::software
 			result.m_rows = a.m_rows;
 			result.m_columns = a.m_columns;
 			result.m_structType = a.m_structType;
-			const UInt32 wordCount = a.m_rows * a.m_columns;
+			const UInt32 wordCount = a.WordCount();
 			for (UInt32 i = 0; i < wordCount; ++i)
 				result.SetFloat(i, l0 * a.GetFloat(i) + l1 * b.GetFloat(i) + l2 * c.GetFloat(i));
 			return result;
