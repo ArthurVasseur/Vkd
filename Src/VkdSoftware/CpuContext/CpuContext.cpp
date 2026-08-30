@@ -63,7 +63,8 @@ namespace vkd::software
 			return false;
 		}
 
-		see::exec::Value InterpolateLocation(const see::exec::Value& a, const see::exec::Value& b, const see::exec::Value& c, float l0, float l1, float l2)
+		see::exec::Value InterpolateLocation(const see::exec::Value& a, const see::exec::Value& b, const see::exec::Value& c, float l0, float l1, float l2,
+											 see::exec::ExecutionStorage& storage)
 		{
 			// Integer-typed fragment inputs must be decorated Flat (SPIR-V requires it), meaning they
 			// take the provoking vertex's (v0's, under Vulkan's default first-vertex convention) value
@@ -78,7 +79,7 @@ namespace vkd::software
 			result.m_structType = a.m_structType;
 			const UInt32 wordCount = a.WordCount();
 			for (UInt32 i = 0; i < wordCount; ++i)
-				result.SetFloat(i, l0 * a.GetFloat(i) + l1 * b.GetFloat(i) + l2 * c.GetFloat(i));
+				result.SetFloat(storage, i, l0 * a.GetFloat(storage, i) + l1 * b.GetFloat(storage, i) + l2 * c.GetFloat(storage, i));
 			return result;
 		}
 
@@ -194,7 +195,7 @@ namespace vkd::software
 			return result;
 		}
 
-		see::exec::Value UnpackVertexAttribute(VkFormat format, const UInt8* bytes)
+		see::exec::Value UnpackVertexAttribute(VkFormat format, const UInt8* bytes, see::exec::ExecutionStorage& storage)
 		{
 			see::exec::Value result;
 			result.m_rows = 4;
@@ -215,9 +216,9 @@ namespace vkd::software
 			// Vulkan expands a vertex attribute to (R,G,B,A); components the format doesn't provide
 			// default to 0 except alpha, which defaults to 1 - independent of the format's component count.
 			if (result.m_scalar == see::ir::ScalarKind::Int32)
-				result.SetInt32(3, 1);
+				result.SetInt32(storage, 3, 1);
 			else
-				result.SetFloat(3, 1.0f);
+				result.SetFloat(storage, 3, 1.0f);
 
 			const VKU_FORMAT_INFO info = vkuGetFormatInfo(format);
 			const UInt32 componentCount = std::min<UInt32>(info.component_count, 4);
@@ -234,20 +235,20 @@ namespace vkd::software
 					{
 						float value;
 						std::memcpy(&value, bytes + byteOffset, 4);
-						result.SetFloat(i, value);
+						result.SetFloat(storage, i, value);
 					}
 					else
 					{
 						UInt16 half = 0;
 						std::memcpy(&half, bytes + byteOffset, 2);
-						result.SetFloat(i, HalfToFloat(half));
+						result.SetFloat(storage, i, HalfToFloat(half));
 					}
 				}
 				else if (isUnorm)
 				{
 					UInt64 raw = 0;
 					std::memcpy(&raw, bytes + byteOffset, byteCount);
-					result.SetFloat(i, static_cast<float>(raw) / static_cast<float>(UnsignedMaxForBits(bits)));
+					result.SetFloat(storage, i, static_cast<float>(raw) / static_cast<float>(UnsignedMaxForBits(bits)));
 				}
 				else if (isSnorm)
 				{
@@ -255,13 +256,13 @@ namespace vkd::software
 					std::memcpy(&raw, bytes + byteOffset, byteCount);
 					const UInt32 shift = 64 - bits;
 					raw = (raw << shift) >> shift; // sign-extend
-					result.SetFloat(i, std::max(static_cast<float>(raw) / static_cast<float>(SignedMaxForBits(bits)), -1.0f));
+					result.SetFloat(storage, i, std::max(static_cast<float>(raw) / static_cast<float>(SignedMaxForBits(bits)), -1.0f));
 				}
 				else if (isUint)
 				{
 					UInt64 raw = 0;
 					std::memcpy(&raw, bytes + byteOffset, byteCount);
-					result.SetInt32(i, static_cast<Int32>(raw));
+					result.SetInt32(storage, i, static_cast<Int32>(raw));
 				}
 				else
 				{
@@ -269,7 +270,7 @@ namespace vkd::software
 					std::memcpy(&raw, bytes + byteOffset, byteCount);
 					const UInt32 shift = 64 - bits;
 					raw = (raw << shift) >> shift; // sign-extend
-					result.SetInt32(i, static_cast<Int32>(raw));
+					result.SetInt32(storage, i, static_cast<Int32>(raw));
 				}
 
 				byteOffset += byteCount;
@@ -308,8 +309,8 @@ namespace vkd::software
 			return result;
 		}
 
-		std::unordered_map<UInt32, see::exec::Value> FetchVertexAttributes(const Pipeline& pipeline, const std::vector<MappedVertexBuffer>& mappedVertexBuffers,
-																		   UInt32 vertexIndex, UInt32 instance)
+		std::unordered_map<UInt32, see::exec::Value> FetchVertexAttributes(const Pipeline& pipeline, const vkd::vector<MappedVertexBuffer>& mappedVertexBuffers,
+																		   UInt32 vertexIndex, UInt32 instance, see::exec::ExecutionStorage& storage)
 		{
 			std::unordered_map<UInt32, see::exec::Value> result;
 
@@ -332,7 +333,7 @@ namespace vkd::software
 				if (elementOffset + attributeSize > mapped.m_size)
 					continue;
 
-				see::exec::CopyValue(result[attribute.location], UnpackVertexAttribute(attribute.format, mapped.m_base + elementOffset));
+				see::exec::CopyValue(result[attribute.location], UnpackVertexAttribute(attribute.format, mapped.m_base + elementOffset, storage), storage);
 			}
 
 			return result;
@@ -428,7 +429,7 @@ namespace vkd::software
 						if (it1 == v1.m_output.m_locations.end() || it2 == v2.m_output.m_locations.end())
 							continue;
 
-						see::exec::CopyValue(interpolated[location], InterpolateLocation(value, it1->second, it2->second, pl0, pl1, pl2));
+						see::exec::CopyValue(interpolated[location], InterpolateLocation(value, it1->second, it2->second, pl0, pl1, pl2, storage), storage);
 					}
 
 					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs =
@@ -443,10 +444,10 @@ namespace vkd::software
 
 					const see::exec::Value& color = colorIt->second;
 					VkClearColorValue clearValue{};
-					clearValue.float32[0] = color.GetFloat(0);
-					clearValue.float32[1] = color.m_rows > 1 ? color.GetFloat(1) : 0.0f;
-					clearValue.float32[2] = color.m_rows > 2 ? color.GetFloat(2) : 0.0f;
-					clearValue.float32[3] = color.m_rows > 3 ? color.GetFloat(3) : 1.0f;
+					clearValue.float32[0] = color.GetFloat(storage, 0);
+					clearValue.float32[1] = color.m_rows > 1 ? color.GetFloat(storage, 1) : 0.0f;
+					clearValue.float32[2] = color.m_rows > 2 ? color.GetFloat(storage, 2) : 0.0f;
+					clearValue.float32[3] = color.m_rows > 3 ? color.GetFloat(storage, 3) : 1.0f;
 
 					UInt8 pattern[32];
 					PackColor(context.m_format, clearValue, pattern);
@@ -852,7 +853,7 @@ namespace vkd::software
 				for (UInt32 i = 0; i < 3; ++i)
 				{
 					const UInt32 vertexIndex = resolveVertexIndex(base + i);
-					const std::unordered_map<UInt32, see::exec::Value> vertexAttributes = FetchVertexAttributes(*pipeline, mappedVertexBuffers, vertexIndex, instance);
+					const std::unordered_map<UInt32, see::exec::Value> vertexAttributes = FetchVertexAttributes(*pipeline, mappedVertexBuffers, vertexIndex, instance, vertexStorage);
 					std::optional<see::exec::VertexStageOutput> output =
 						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages, vertexPrepared, vertexStorage);
 					if (!output)
@@ -861,20 +862,20 @@ namespace vkd::software
 						break;
 					}
 
-					const float w = output->m_position.GetFloat(3);
+					const float w = output->m_position.GetFloat(vertexStorage, 3);
 					if (w == 0.0f)
 					{
 						allValid = false;
 						break;
 					}
 
-					const float ndcX = output->m_position.GetFloat(0) / w;
-					const float ndcY = output->m_position.GetFloat(1) / w;
+					const float ndcX = output->m_position.GetFloat(vertexStorage, 0) / w;
+					const float ndcY = output->m_position.GetFloat(vertexStorage, 1) / w;
 
 					screenVertices[i].m_x = viewport.x + (ndcX * 0.5f + 0.5f) * viewport.width;
 					screenVertices[i].m_y = viewport.y + (ndcY * 0.5f + 0.5f) * viewport.height;
 					screenVertices[i].m_invW = 1.0f / w;
-					see::exec::CopyValue(screenVertices[i].m_output.m_position, output->m_position);
+					see::exec::CopyValue(screenVertices[i].m_output.m_position, output->m_position, vertexStorage);
 					screenVertices[i].m_output.m_locations = std::move(output->m_locations);
 				}
 

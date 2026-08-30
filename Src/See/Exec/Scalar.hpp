@@ -7,59 +7,68 @@
 #pragma once
 
 #include <array>
+#include <memory>
 #include <optional>
 #include <span>
 #include <unordered_map>
 #include <vector>
 
+#include <Concerto/Core/Assert.hpp>
 #include <Concerto/Core/Types/Types.hpp>
 
 #include "See/Ir/Module.hpp"
 
 namespace see::exec
 {
+	class ExecutionStorage;
+
 	struct Value
 	{
-		// Sized for composite locals (arrays of matrices, arrays of structs): a mat4[4] is 64 words.
-		// Anything larger (big uniform blocks) lives in an ExternalBuffer and is addressed
-		// member-by-member instead of ever being materialized whole in a Value.
+		// Largest type the interpreter will ever materialize whole (a mat4[4] is 64 words). Anything
+		// larger lives in an ExternalBuffer and is addressed member-by-member.
 		static constexpr cct::UInt32 MaxWords = 64;
+		// Words kept in the Value itself; 99.27% of the values a CTS run manipulates fit here.
+		static constexpr cct::UInt32 InlineWords = 4;
+
+		// m_overflow is either NoOverflow, or a domain bit plus an offset into that domain's arena.
+		static constexpr cct::UInt32 NoOverflow = 0xFFFFFFFFu;
+		static constexpr cct::UInt32 ModuleDomain = 0x80000000u;
+		static constexpr cct::UInt32 OffsetMask = 0x7FFFFFFFu;
 
 		ir::ScalarKind m_scalar = ir::ScalarKind::Float32;
 		cct::UInt32 m_rows = 1; // vector length, or total word count when m_structType != 0. 1 for a plain scalar.
 		cct::UInt32 m_columns = 1; // matrix column count. 1 for scalar/vector/struct.
-		cct::UInt32 m_structType = 0; // non-zero: this is a struct (ir type id), m_bits is its flat word layout.
+		cct::UInt32 m_structType = 0; // non-zero: this is a struct (ir type id), the words are its flat layout.
 		cct::UInt32 m_imageVariable = 0; // non-zero: this is an (optionally sampled) image handle, naming the UniformConstant variable it was loaded from.
-		std::array<cct::UInt32, MaxWords> m_bits{};
+		std::array<cct::UInt32, InlineWords> m_inline{};
+		cct::UInt32 m_overflow = NoOverflow;
+
+		Value& operator=(const Value&) = delete;
 
 		[[nodiscard]] constexpr cct::UInt32 WordCount() const noexcept
 		{
 			return m_rows * m_columns;
 		}
 
-		[[nodiscard]] std::span<const cct::UInt32> Words() const noexcept
+		[[nodiscard]] constexpr bool IsInline() const noexcept
 		{
-			return std::span<const cct::UInt32>(m_bits.data(), WordCount());
+			return WordCount() <= InlineWords;
 		}
 
-		[[nodiscard]] std::span<cct::UInt32> Words() noexcept
-		{
-			return std::span<cct::UInt32>(m_bits.data(), WordCount());
-		}
+		[[nodiscard]] std::span<const cct::UInt32> Words(const ExecutionStorage& storage) const noexcept;
+		[[nodiscard]] std::span<cct::UInt32> Words(ExecutionStorage& storage) noexcept;
 
-		Value& operator=(const Value&) = delete;
-
-		[[nodiscard]] float GetFloat(cct::UInt32 index = 0) const;
-		void SetFloat(cct::UInt32 index, float value);
-		[[nodiscard]] cct::Int32 GetInt32(cct::UInt32 index = 0) const;
-		void SetInt32(cct::UInt32 index, cct::Int32 value);
-		[[nodiscard]] bool GetBool(cct::UInt32 index = 0) const;
-		void SetBool(cct::UInt32 index, bool value);
+		[[nodiscard]] float GetFloat(const ExecutionStorage& storage, cct::UInt32 index = 0) const;
+		void SetFloat(ExecutionStorage& storage, cct::UInt32 index, float value);
+		[[nodiscard]] cct::Int32 GetInt32(const ExecutionStorage& storage, cct::UInt32 index = 0) const;
+		void SetInt32(ExecutionStorage& storage, cct::UInt32 index, cct::Int32 value);
+		[[nodiscard]] bool GetBool(const ExecutionStorage& storage, cct::UInt32 index = 0) const;
+		void SetBool(ExecutionStorage& storage, cct::UInt32 index, bool value);
 	};
 
 	// A word-addressed view over externally-owned memory (e.g. a mapped uniform/storage buffer). Unlike a
-	// Value, which caps a variable's storage at Value::MaxWords, this lets a pointer variable address
-	// memory of any size without copying it into the interpreter's register file.
+	// Value, which caps its storage at Value::MaxWords, this lets a pointer variable address memory of any
+	// size without copying it into the interpreter's register file.
 	struct ExternalBuffer
 	{
 		cct::UInt32* m_words = nullptr;
@@ -75,15 +84,40 @@ namespace see::exec
 		cct::UInt32 m_height = 0;
 	};
 
-	void CopyValue(Value& destination, const Value& source) noexcept;
-
-	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex);
-
 	struct MemberLayout
 	{
 		cct::UInt32 m_offset = 0;
 		cct::UInt32 m_wordCount = 0;
 		cct::UInt32 m_matrixStride = 0;
+	};
+
+	// Fixed-size blocks, so a span handed out by Allocate stays valid across every later allocation.
+	// Rewind reuses the blocks instead of releasing them.
+	class WordArena
+	{
+	public:
+		static constexpr cct::UInt32 BlockWords = 4096;
+
+		[[nodiscard]] cct::UInt32 Allocate(cct::UInt32 wordCount);
+
+		void Rewind() noexcept
+		{
+			m_cursor = 0;
+		}
+
+		[[nodiscard]] std::span<const cct::UInt32> Resolve(cct::UInt32 offset, cct::UInt32 wordCount) const noexcept
+		{
+			return std::span<const cct::UInt32>(m_blocks[offset / BlockWords].get() + offset % BlockWords, wordCount);
+		}
+
+		[[nodiscard]] std::span<cct::UInt32> Resolve(cct::UInt32 offset, cct::UInt32 wordCount) noexcept
+		{
+			return std::span<cct::UInt32>(m_blocks[offset / BlockWords].get() + offset % BlockWords, wordCount);
+		}
+
+	private:
+		std::vector<std::unique_ptr<cct::UInt32[]>> m_blocks;
+		cct::UInt32 m_cursor = 0;
 	};
 
 	class PreparedModule
@@ -93,6 +127,11 @@ namespace see::exec
 		[[nodiscard]] const Value* GetZeroValue(cct::UInt32 typeId) const noexcept;
 		[[nodiscard]] const std::vector<MemberLayout>* GetMemberLayout(cct::UInt32 typeId) const noexcept;
 		[[nodiscard]] cct::UInt32 GetArrayStride(cct::UInt32 typeId) const noexcept;
+
+		[[nodiscard]] const WordArena& Arena() const noexcept
+		{
+			return m_arena;
+		}
 
 	private:
 		friend PreparedModule BuildPreparedModule(const ir::Module& module);
@@ -104,6 +143,7 @@ namespace see::exec
 		std::vector<std::vector<MemberLayout>> m_memberLayouts;
 		std::vector<cct::UInt8> m_memberLayoutValid;
 		std::vector<cct::UInt32> m_arrayStrides;
+		WordArena m_arena;
 	};
 
 	[[nodiscard]] PreparedModule BuildPreparedModule(const ir::Module& module);
@@ -130,6 +170,9 @@ namespace see::exec
 		cct::UInt32 m_epoch = 0;
 	};
 
+	// Everything one invocation owns: its registers, and the arena backing values too large to live
+	// inline. An overflow offset only means anything relative to the storage that handed it out, so this
+	// is neither copyable nor movable.
 	class ExecutionStorage
 	{
 	public:
@@ -137,9 +180,11 @@ namespace see::exec
 		ExecutionStorage(const ExecutionStorage&) = delete;
 		ExecutionStorage& operator=(const ExecutionStorage&) = delete;
 
-		void Reset(cct::UInt32 slotCount)
+		void Reset(const PreparedModule& prepared, cct::UInt32 slotCount)
 		{
+			m_prepared = &prepared;
 			m_registers.Reset(slotCount);
+			m_arena.Rewind();
 		}
 
 		[[nodiscard]] RegisterFile& Registers() noexcept
@@ -152,19 +197,56 @@ namespace see::exec
 			return m_registers;
 		}
 
+		[[nodiscard]] cct::UInt32 Allocate(cct::UInt32 wordCount)
+		{
+			return m_arena.Allocate(wordCount);
+		}
+
+		[[nodiscard]] std::span<const cct::UInt32> Resolve(cct::UInt32 overflow, cct::UInt32 wordCount) const noexcept
+		{
+			if ((overflow & Value::ModuleDomain) != 0)
+				return m_prepared->Arena().Resolve(overflow & Value::OffsetMask, wordCount);
+			return m_arena.Resolve(overflow, wordCount);
+		}
+
+		[[nodiscard]] std::span<cct::UInt32> Resolve(cct::UInt32 overflow, cct::UInt32 wordCount) noexcept
+		{
+			return m_arena.Resolve(overflow & Value::OffsetMask, wordCount);
+		}
+
 	private:
 		RegisterFile m_registers;
+		WordArena m_arena;
+		const PreparedModule* m_prepared = nullptr;
 	};
 
-	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
-		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers = {},
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages = {});
+	inline std::span<const cct::UInt32> Value::Words(const ExecutionStorage& storage) const noexcept
+	{
+		const cct::UInt32 wordCount = WordCount();
+		if (wordCount <= InlineWords)
+			return std::span<const cct::UInt32>(m_inline.data(), wordCount);
+		CCT_ASSERT(m_overflow != NoOverflow, "See: a {}-word value was never given an overflow region", wordCount);
+		return storage.Resolve(m_overflow, wordCount);
+	}
 
-	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
-		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared);
+	inline std::span<cct::UInt32> Value::Words(ExecutionStorage& storage) noexcept
+	{
+		const cct::UInt32 wordCount = WordCount();
+		if (wordCount <= InlineWords)
+			return std::span<cct::UInt32>(m_inline.data(), wordCount);
+		CCT_ASSERT(m_overflow != NoOverflow, "See: a {}-word value was never given an overflow region", wordCount);
+		return storage.Resolve(m_overflow, wordCount);
+	}
+
+	// Reserves an overflow region for `value` when its shape no longer fits inline. Call after setting
+	// the shape and before writing through Words().
+	void ReserveWords(Value& value, ExecutionStorage& storage);
+
+	// Gives `destination` the shape of `source` plus its own copy of the words, reserving a fresh
+	// overflow region rather than sharing the source's.
+	void CopyValue(Value& destination, const Value& source, ExecutionStorage& storage);
+
+	[[nodiscard]] std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex, ExecutionStorage& storage);
 
 	[[nodiscard]] std::optional<std::unordered_map<cct::UInt32, Value>> Run(
 		const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,

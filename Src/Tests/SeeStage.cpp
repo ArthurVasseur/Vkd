@@ -116,24 +116,26 @@ namespace
 TEST_CASE("see::exec::RunVertexStage - finds BuiltIn/Location variables via decorations", "[see][stage]")
 {
 	const see::ir::Module module = ParseAndConvert(VertexSource);
+	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
+	see::exec::ExecutionStorage storage;
 	REQUIRE(module.m_functions.size() == 1);
 
 	SECTION("vertex 0 takes the positive-x branch")
 	{
-		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0);
+		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 0, {}, {}, {}, prepared, storage);
 		REQUIRE(output.has_value());
-		CHECK(output->m_position.GetFloat(0) == 1.0f);
+		CHECK(output->m_position.GetFloat(storage, 0) == 1.0f);
 
 		auto colorIt = output->m_locations.find(0);
 		REQUIRE(colorIt != output->m_locations.end());
-		CHECK(colorIt->second.GetFloat(0) == 1.0f);
+		CHECK(colorIt->second.GetFloat(storage, 0) == 1.0f);
 	}
 
 	SECTION("vertex 1 takes the negative-x branch")
 	{
-		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 1);
+		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 1, 0, {}, {}, {}, prepared, storage);
 		REQUIRE(output.has_value());
-		CHECK(output->m_position.GetFloat(0) == -1.0f);
+		CHECK(output->m_position.GetFloat(storage, 0) == -1.0f);
 	}
 }
 
@@ -171,43 +173,48 @@ TEST_CASE("see::exec::RunVertexStage - seeds BuiltIn InstanceIndex", "[see][stag
 		"OpFunctionEnd\n";
 
 	const see::ir::Module module = ParseAndConvert(Source);
+	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
+	see::exec::ExecutionStorage storage;
+	storage.Reset(prepared, module.m_ssaSlotCount);
 	REQUIRE(module.m_functions.size() == 1);
 
 	SECTION("instance 0 takes the positive-x branch")
 	{
-		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 0);
+		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 0, {}, {}, {}, prepared, storage);
 		REQUIRE(output.has_value());
-		CHECK(output->m_position.GetFloat(0) == 1.0f);
+		CHECK(output->m_position.GetFloat(storage, 0) == 1.0f);
 	}
 
 	SECTION("instance 1 takes the negative-x branch")
 	{
-		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 1);
+		std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 1, {}, {}, {}, prepared, storage);
 		REQUIRE(output.has_value());
-		CHECK(output->m_position.GetFloat(0) == -1.0f);
+		CHECK(output->m_position.GetFloat(storage, 0) == -1.0f);
 	}
 }
 
 TEST_CASE("see::exec::RunFragmentStage - seeds Location inputs and reads Location outputs", "[see][stage]")
 {
 	const see::ir::Module module = ParseAndConvert(FragmentSource);
+	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
+	see::exec::ExecutionStorage storage;
 	REQUIRE(module.m_functions.size() == 1);
 
 	see::exec::Value color;
 	color.m_rows = 3;
-	color.SetFloat(0, 0.2f);
-	color.SetFloat(1, 0.4f);
-	color.SetFloat(2, 0.6f);
+	color.SetFloat(storage, 0, 0.2f);
+	color.SetFloat(storage, 1, 0.4f);
+	color.SetFloat(storage, 2, 0.6f);
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], {{0, color}});
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], see::exec::BuildStageLocations(module), {{0, color}}, {}, {}, prepared, storage);
 	REQUIRE(outputs.has_value());
 
 	auto colorIt = outputs->find(0);
 	REQUIRE(colorIt != outputs->end());
-	CHECK(colorIt->second.GetFloat(0) == 0.2f);
-	CHECK(colorIt->second.GetFloat(1) == 0.4f);
-	CHECK(colorIt->second.GetFloat(2) == 0.6f);
-	CHECK(colorIt->second.GetFloat(3) == 1.0f);
+	CHECK(colorIt->second.GetFloat(storage, 0) == 0.2f);
+	CHECK(colorIt->second.GetFloat(storage, 1) == 0.4f);
+	CHECK(colorIt->second.GetFloat(storage, 2) == 0.6f);
+	CHECK(colorIt->second.GetFloat(storage, 3) == 1.0f);
 }
 
 TEST_CASE("see::exec::RunFragmentStage - reads a uniform block through an external buffer", "[see][stage]")
@@ -239,6 +246,9 @@ TEST_CASE("see::exec::RunFragmentStage - reads a uniform block through an extern
 		"OpFunctionEnd\n";
 
 	const see::ir::Module module = ParseAndConvert(Source);
+	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
+	see::exec::ExecutionStorage storage;
+	storage.Reset(prepared, module.m_ssaSlotCount);
 	REQUIRE(module.m_functions.size() == 1);
 	const cct::UInt32 uboId = module.m_globalInstructions[0].m_id;
 
@@ -248,15 +258,15 @@ TEST_CASE("see::exec::RunFragmentStage - reads a uniform block through an extern
 
 	std::unordered_map<cct::UInt32, see::exec::ExternalBuffer> externalBuffers{{uboId, see::exec::ExternalBuffer{uboWords.data(), static_cast<cct::UInt32>(uboWords.size())}}};
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], {}, externalBuffers);
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], see::exec::BuildStageLocations(module), {}, externalBuffers, {}, prepared, storage);
 	REQUIRE(outputs.has_value());
 
 	auto colorIt = outputs->find(0);
 	REQUIRE(colorIt != outputs->end());
-	CHECK(colorIt->second.GetFloat(0) == 0.1f);
-	CHECK(colorIt->second.GetFloat(1) == 0.2f);
-	CHECK(colorIt->second.GetFloat(2) == 0.3f);
-	CHECK(colorIt->second.GetFloat(3) == 0.4f);
+	CHECK(colorIt->second.GetFloat(storage, 0) == 0.1f);
+	CHECK(colorIt->second.GetFloat(storage, 1) == 0.2f);
+	CHECK(colorIt->second.GetFloat(storage, 2) == 0.3f);
+	CHECK(colorIt->second.GetFloat(storage, 3) == 0.4f);
 }
 
 TEST_CASE("see::exec::RunFragmentStage - a matrix input spans one Location per column", "[see][stage]")
@@ -287,6 +297,9 @@ TEST_CASE("see::exec::RunFragmentStage - a matrix input spans one Location per c
 		"OpFunctionEnd\n";
 
 	const see::ir::Module module = ParseAndConvert(Source);
+	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
+	see::exec::ExecutionStorage storage;
+	storage.Reset(prepared, module.m_ssaSlotCount);
 
 	std::unordered_map<cct::UInt32, see::exec::Value> locationInputs;
 	for (cct::UInt32 column = 0; column < 3; ++column)
@@ -294,19 +307,19 @@ TEST_CASE("see::exec::RunFragmentStage - a matrix input spans one Location per c
 		see::exec::Value columnValue;
 		columnValue.m_rows = 3;
 		for (cct::UInt32 row = 0; row < 3; ++row)
-			columnValue.SetFloat(row, static_cast<float>(column * 3 + row));
+			columnValue.SetFloat(storage, row, static_cast<float>(column * 3 + row));
 
-		see::exec::CopyValue(locationInputs[1 + column], columnValue);
+		see::exec::CopyValue(locationInputs[1 + column], columnValue, storage);
 	}
 
-	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], locationInputs);
+	std::optional<std::unordered_map<cct::UInt32, see::exec::Value>> outputs = see::exec::RunFragmentStage(module, module.m_functions[0], see::exec::BuildStageLocations(module), locationInputs, {}, {}, prepared, storage);
 	REQUIRE(outputs.has_value());
 
 	auto outIt = outputs->find(0);
 	REQUIRE(outIt != outputs->end());
-	CHECK(outIt->second.GetFloat(0) == 6.0f);
-	CHECK(outIt->second.GetFloat(1) == 7.0f);
-	CHECK(outIt->second.GetFloat(2) == 8.0f);
+	CHECK(outIt->second.GetFloat(storage, 0) == 6.0f);
+	CHECK(outIt->second.GetFloat(storage, 1) == 7.0f);
+	CHECK(outIt->second.GetFloat(storage, 2) == 8.0f);
 }
 
 TEST_CASE("see::exec::RunVertexStage - a matrix output is split across consecutive Locations", "[see][stage]")
@@ -341,8 +354,11 @@ TEST_CASE("see::exec::RunVertexStage - a matrix output is split across consecuti
 		"OpFunctionEnd\n";
 
 	const see::ir::Module module = ParseAndConvert(Source);
+	const see::exec::PreparedModule prepared = see::exec::BuildPreparedModule(module);
+	see::exec::ExecutionStorage storage;
+	storage.Reset(prepared, module.m_ssaSlotCount);
 
-	std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0);
+	std::optional<see::exec::VertexStageOutput> output = see::exec::RunVertexStage(module, module.m_functions[0], 0, 0, {}, {}, {}, prepared, storage);
 	REQUIRE(output.has_value());
 
 	auto first = output->m_locations.find(0);
@@ -350,8 +366,8 @@ TEST_CASE("see::exec::RunVertexStage - a matrix output is split across consecuti
 	REQUIRE(first != output->m_locations.end());
 	REQUIRE(second != output->m_locations.end());
 	CHECK(first->second.m_rows == 2);
-	CHECK(first->second.GetFloat(0) == 1.0f);
-	CHECK(first->second.GetFloat(1) == 2.0f);
-	CHECK(second->second.GetFloat(0) == 3.0f);
-	CHECK(second->second.GetFloat(1) == 4.0f);
+	CHECK(first->second.GetFloat(storage, 0) == 1.0f);
+	CHECK(first->second.GetFloat(storage, 1) == 2.0f);
+	CHECK(second->second.GetFloat(storage, 0) == 3.0f);
+	CHECK(second->second.GetFloat(storage, 1) == 4.0f);
 }

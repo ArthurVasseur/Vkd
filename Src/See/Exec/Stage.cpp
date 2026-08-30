@@ -82,7 +82,7 @@ namespace see::exec
 			return VariableShape{};
 		}
 
-		std::optional<Value> GatherLocationValue(const ir::Module& module, cct::UInt32 variableId, cct::UInt32 location, const std::unordered_map<cct::UInt32, Value>& locationInputs)
+		std::optional<Value> GatherLocationValue(const ir::Module& module, cct::UInt32 variableId, cct::UInt32 location, const std::unordered_map<cct::UInt32, Value>& locationInputs, ExecutionStorage& storage)
 		{
 			const VariableShape shape = FindVariableShape(module, variableId);
 			if (shape.m_columns <= 1)
@@ -97,6 +97,8 @@ namespace see::exec
 			Value result;
 			result.m_rows = shape.m_rows;
 			result.m_columns = shape.m_columns;
+			ReserveWords(result, storage);
+			const std::span<cct::UInt32> words = result.Words(storage);
 			bool any = false;
 			for (cct::UInt32 column = 0; column < shape.m_columns; ++column)
 			{
@@ -107,7 +109,7 @@ namespace see::exec
 				any = true;
 				result.m_scalar = it->second.m_scalar;
 				for (cct::UInt32 row = 0; row < shape.m_rows; ++row)
-					result.Words()[column * shape.m_rows + row] = it->second.Words()[row];
+					words[column * shape.m_rows + row] = it->second.Words(storage)[row];
 			}
 
 			if (!any)
@@ -116,12 +118,12 @@ namespace see::exec
 			return result;
 		}
 
-		void ScatterLocationValue(const ir::Module& module, cct::UInt32 variableId, cct::UInt32 location, const Value& value, std::unordered_map<cct::UInt32, Value>& outLocations)
+		void ScatterLocationValue(const ir::Module& module, cct::UInt32 variableId, cct::UInt32 location, const Value& value, std::unordered_map<cct::UInt32, Value>& outLocations, ExecutionStorage& storage)
 		{
 			const VariableShape shape = FindVariableShape(module, variableId);
 			if (shape.m_columns <= 1)
 			{
-				CopyValue(outLocations[location], value);
+				CopyValue(outLocations[location], value, storage);
 				return;
 			}
 
@@ -130,10 +132,13 @@ namespace see::exec
 				Value columnValue;
 				columnValue.m_scalar = value.m_scalar;
 				columnValue.m_rows = shape.m_rows;
+				ReserveWords(columnValue, storage);
+				const std::span<cct::UInt32> columnWords = columnValue.Words(storage);
+				const std::span<const cct::UInt32> sourceWords = value.Words(storage);
 				for (cct::UInt32 row = 0; row < shape.m_rows; ++row)
-					columnValue.Words()[row] = value.Words()[column * shape.m_rows + row];
+					columnWords[row] = sourceWords[column * shape.m_rows + row];
 
-				CopyValue(outLocations[location + column], columnValue);
+				CopyValue(outLocations[location + column], columnValue, storage);
 			}
 		}
 
@@ -182,25 +187,27 @@ namespace see::exec
 													ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
+		storage.Reset(prepared, module.m_ssaSlotCount);
+
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
-			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
-				CopyValue(inputs[variableId], *gathered);
+			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs, storage))
+				CopyValue(inputs[variableId], *gathered, storage);
 
 		if (std::optional<BuiltinLocation> vertexIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInVertexIndex))
 		{
 			Value value;
 			value.m_scalar = ir::ScalarKind::Int32;
-			value.SetInt32(0, static_cast<cct::Int32>(vertexIndex));
-			CopyValue(inputs[vertexIndexVar->m_variable], value);
+			value.SetInt32(storage, 0, static_cast<cct::Int32>(vertexIndex));
+			CopyValue(inputs[vertexIndexVar->m_variable], value, storage);
 		}
 
 		if (std::optional<BuiltinLocation> instanceIndexVar = FindBuiltinVariable(module, SpvStorageClassInput, SpvBuiltInInstanceIndex))
 		{
 			Value value;
 			value.m_scalar = ir::ScalarKind::Int32;
-			value.SetInt32(0, static_cast<cct::Int32>(instanceIndex));
-			CopyValue(inputs[instanceIndexVar->m_variable], value);
+			value.SetInt32(storage, 0, static_cast<cct::Int32>(instanceIndex));
+			CopyValue(inputs[instanceIndexVar->m_variable], value, storage);
 		}
 
 		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
@@ -218,19 +225,19 @@ namespace see::exec
 		VertexStageOutput output;
 		if (positionVar->m_member)
 		{
-			std::optional<Value> member = ExtractStructMember(module, positionIt->second, *positionVar->m_member);
+			std::optional<Value> member = ExtractStructMember(module, positionIt->second, *positionVar->m_member, storage);
 			if (!member)
 				return std::nullopt;
-			CopyValue(output.m_position, *member);
+			CopyValue(output.m_position, *member, storage);
 		}
 		else
-			CopyValue(output.m_position, positionIt->second);
+			CopyValue(output.m_position, positionIt->second, storage);
 
 		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassOutput))
 		{
 			auto valueIt = result->find(variableId);
 			if (valueIt != result->end())
-				ScatterLocationValue(module, variableId, location, valueIt->second, output.m_locations);
+				ScatterLocationValue(module, variableId, location, valueIt->second, output.m_locations, storage);
 		}
 
 		return output;
@@ -267,10 +274,12 @@ namespace see::exec
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared, ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
+		storage.Reset(prepared, module.m_ssaSlotCount);
+
 		std::unordered_map<cct::UInt32, Value> inputs;
 		for (const auto& [variableId, location] : locations.m_inputs)
-			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs))
-				CopyValue(inputs[variableId], *gathered);
+			if (std::optional<Value> gathered = GatherLocationValue(module, variableId, location, locationInputs, storage))
+				CopyValue(inputs[variableId], *gathered, storage);
 
 		std::optional<std::unordered_map<cct::UInt32, Value>> result = Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
 		if (!result)
@@ -281,7 +290,7 @@ namespace see::exec
 		{
 			auto valueIt = result->find(variableId);
 			if (valueIt != result->end())
-				ScatterLocationValue(module, variableId, location, valueIt->second, outputs);
+				ScatterLocationValue(module, variableId, location, valueIt->second, outputs, storage);
 		}
 
 		return outputs;

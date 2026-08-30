@@ -19,49 +19,90 @@
 
 namespace see::exec
 {
-	void CopyValue(Value& destination, const Value& source) noexcept
+	cct::UInt32 WordArena::Allocate(cct::UInt32 wordCount)
 	{
-		std::memcpy(&destination, &source, sizeof(Value));
+		cct::UInt32 offsetInBlock = m_cursor % BlockWords;
+		if (offsetInBlock + wordCount > BlockWords)
+		{
+			m_cursor += BlockWords - offsetInBlock;
+			offsetInBlock = 0;
+		}
+
+		if (m_cursor / BlockWords >= m_blocks.size())
+			m_blocks.emplace_back(new cct::UInt32[BlockWords]());
+
+		const cct::UInt32 offset = m_cursor;
+		m_cursor += wordCount;
+		return offset;
 	}
 
-	float Value::GetFloat(cct::UInt32 index) const
+	void ReserveWords(Value& value, ExecutionStorage& storage)
+	{
+		value.m_overflow = value.IsInline() ? Value::NoOverflow : storage.Allocate(value.WordCount());
+	}
+
+	void CopyValue(Value& destination, const Value& source, ExecutionStorage& storage)
+	{
+		destination.m_scalar = source.m_scalar;
+		destination.m_rows = source.m_rows;
+		destination.m_columns = source.m_columns;
+		destination.m_structType = source.m_structType;
+		destination.m_imageVariable = source.m_imageVariable;
+
+		const cct::UInt32 wordCount = source.WordCount();
+		if (wordCount <= Value::InlineWords)
+		{
+			destination.m_overflow = Value::NoOverflow;
+			// Fixed size: a runtime-length memcpy of a handful of bytes costs more in call and
+			// size dispatch than copying the whole inline block.
+			destination.m_inline = source.m_inline;
+			return;
+		}
+
+		destination.m_overflow = storage.Allocate(wordCount);
+		const std::span<const cct::UInt32> from = source.Words(storage);
+		const std::span<cct::UInt32> to = destination.Words(storage);
+		std::memcpy(to.data(), from.data(), wordCount * sizeof(cct::UInt32));
+	}
+
+	float Value::GetFloat(const ExecutionStorage& storage, cct::UInt32 index) const
 	{
 		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		float value;
-		std::memcpy(&value, &Words()[index], sizeof(float));
+		std::memcpy(&value, &Words(storage)[index], sizeof(float));
 		return value;
 	}
 
-	void Value::SetFloat(cct::UInt32 index, float value)
+	void Value::SetFloat(ExecutionStorage& storage, cct::UInt32 index, float value)
 	{
 		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
-		std::memcpy(&Words()[index], &value, sizeof(float));
+		std::memcpy(&Words(storage)[index], &value, sizeof(float));
 	}
 
-	cct::Int32 Value::GetInt32(cct::UInt32 index) const
+	cct::Int32 Value::GetInt32(const ExecutionStorage& storage, cct::UInt32 index) const
 	{
 		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
 		cct::Int32 value;
-		std::memcpy(&value, &Words()[index], sizeof(cct::Int32));
+		std::memcpy(&value, &Words(storage)[index], sizeof(cct::Int32));
 		return value;
 	}
 
-	void Value::SetInt32(cct::UInt32 index, cct::Int32 value)
+	void Value::SetInt32(ExecutionStorage& storage, cct::UInt32 index, cct::Int32 value)
 	{
 		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
-		std::memcpy(&Words()[index], &value, sizeof(cct::Int32));
+		std::memcpy(&Words(storage)[index], &value, sizeof(cct::Int32));
 	}
 
-	bool Value::GetBool(cct::UInt32 index) const
+	bool Value::GetBool(const ExecutionStorage& storage, cct::UInt32 index) const
 	{
 		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
-		return Words()[index] != 0;
+		return Words(storage)[index] != 0;
 	}
 
-	void Value::SetBool(cct::UInt32 index, bool value)
+	void Value::SetBool(ExecutionStorage& storage, cct::UInt32 index, bool value)
 	{
 		CCT_ASSERT(index < WordCount(), "See: word index {} out of range for a {}-word value", index, WordCount());
-		Words()[index] = value ? 1u : 0u;
+		Words(storage)[index] = value ? 1u : 0u;
 	}
 
 	namespace
@@ -100,7 +141,7 @@ namespace see::exec
 			auto variableIt = state.m_variables.find(baseVariable);
 			if (variableIt == state.m_variables.end() || wordOffset + count > variableIt->second.WordCount())
 				return nullptr;
-			return variableIt->second.Words().data() + wordOffset;
+			return variableIt->second.Words(state.m_storage).data() + wordOffset;
 		}
 
 		std::optional<Value> MakeZeroValue(const ir::Module& module, cct::UInt32 typeId);
@@ -248,15 +289,17 @@ namespace see::exec
 			value.m_columns = 1;
 			value.m_structType = 0;
 			value.m_imageVariable = 0;
+			value.m_overflow = Value::NoOverflow;
 		}
 
-		void CopyHeader(Value& destination, const Value& source)
+		void CopyHeader(Value& destination, const Value& source, ExecutionStorage& storage)
 		{
 			destination.m_scalar = source.m_scalar;
 			destination.m_rows = source.m_rows;
 			destination.m_columns = source.m_columns;
 			destination.m_structType = source.m_structType;
 			destination.m_imageVariable = source.m_imageVariable;
+			ReserveWords(destination, storage);
 		}
 
 		Value* EmplaceResult(RuntimeState& state, cct::UInt32 id)
@@ -275,7 +318,7 @@ namespace see::exec
 			if (!slot)
 				return false;
 
-			CopyValue(*slot, value);
+			CopyValue(*slot, value, state.m_storage);
 			return true;
 		}
 
@@ -288,7 +331,7 @@ namespace see::exec
 			state.m_pointers[id] = PointerInfo{.m_baseVariable = id, .m_wordOffset = 0, .m_pointeeType = pointeeType};
 			if (state.m_externalBuffers.find(id) == state.m_externalBuffers.end() && state.m_variables.find(id) == state.m_variables.end())
 				if (const Value* zero = state.m_prepared.GetZeroValue(pointerTypeId))
-					CopyValue(state.m_variables[id], *zero);
+					CopyValue(state.m_variables[id], *zero, state.m_storage);
 		}
 
 		cct::UInt32 StridedMatrixColumnStride(const RuntimeState& state, const PointerInfo& pointer, const Value& shape)
@@ -336,8 +379,8 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyHeader(*result, *resultShape);
-			const std::span<cct::UInt32> words = result->Words();
+			CopyHeader(*result, *resultShape, state.m_storage);
+			const std::span<cct::UInt32> words = result->Words(state.m_storage);
 			if (columnStride != 0)
 			{
 				for (cct::UInt32 column = 0; column < result->m_columns; ++column)
@@ -373,7 +416,7 @@ namespace see::exec
 			if (!target)
 				return false;
 
-			const std::span<const cct::UInt32> words = value->Words();
+			const std::span<const cct::UInt32> words = value->Words(state.m_storage);
 			if (columnStride != 0)
 			{
 				for (cct::UInt32 column = 0; column < value->m_columns; ++column)
@@ -430,7 +473,7 @@ namespace see::exec
 				const Value* index = ResolveValue(state, instruction.m_args[argIndex]);
 				if (!index)
 					return false;
-				const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
+				const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32(state.m_storage));
 
 				auto typeIt = state.m_module.m_types.find(info.m_pointeeType);
 				if (typeIt != state.m_module.m_types.end() && typeIt->second.m_kind == ir::TypeKind::Struct)
@@ -485,11 +528,11 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyHeader(*result, *resultShape);
+			CopyHeader(*result, *resultShape, state.m_storage);
 
 			// Each arg contributes its own word count, concatenated in order - covers scalars-into-vector,
 			// vectors-into-matrix-columns, and mixed scalar/vector args (e.g. vec4 built from a vec3 + a float).
-			const std::span<cct::UInt32> words = result->Words();
+			const std::span<cct::UInt32> words = result->Words(state.m_storage);
 			const cct::UInt32 totalWords = result->WordCount();
 			cct::UInt32 writeIndex = 0;
 			for (cct::UInt32 argId : instruction.m_args)
@@ -498,7 +541,7 @@ namespace see::exec
 				if (!component)
 					return false;
 
-				const std::span<const cct::UInt32> componentWords = component->Words();
+				const std::span<const cct::UInt32> componentWords = component->Words(state.m_storage);
 				for (cct::UInt32 i = 0; i < componentWords.size() && writeIndex < totalWords; ++i, ++writeIndex)
 					words[writeIndex] = componentWords[i];
 			}
@@ -525,11 +568,11 @@ namespace see::exec
 
 				if (current.m_structType != 0)
 				{
-					std::optional<Value> member = ExtractStructMember(state.m_module, current, index);
+					std::optional<Value> member = ExtractStructMember(state.m_module, current, index, state.m_storage);
 					if (!member)
 						return false;
 
-					CopyValue(current, *member);
+					CopyValue(current, *member, state.m_storage);
 					continue;
 				}
 
@@ -541,10 +584,11 @@ namespace see::exec
 					Value column;
 					column.m_scalar = current.m_scalar;
 					column.m_rows = current.m_rows;
+					ReserveWords(column, state.m_storage);
 					for (cct::UInt32 word = 0; word < current.m_rows; ++word)
-						column.Words()[word] = current.Words()[index * current.m_rows + word];
+						column.Words(state.m_storage)[word] = current.Words(state.m_storage)[index * current.m_rows + word];
 
-					CopyValue(current, column);
+					CopyValue(current, column, state.m_storage);
 					continue;
 				}
 
@@ -553,8 +597,8 @@ namespace see::exec
 
 				Value component;
 				component.m_scalar = current.m_scalar;
-				component.Words()[0] = current.Words()[index];
-				CopyValue(current, component);
+				component.Words(state.m_storage)[0] = current.Words(state.m_storage)[index];
+				CopyValue(current, component, state.m_storage);
 			}
 
 			return StoreSsa(state, instruction.m_id, current);
@@ -570,7 +614,7 @@ namespace see::exec
 			if (!vector || !index)
 				return false;
 
-			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
+			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32(state.m_storage));
 			if (indexValue >= vector->WordCount())
 				return false;
 
@@ -579,7 +623,7 @@ namespace see::exec
 				return false;
 
 			result->m_scalar = vector->m_scalar;
-			result->Words()[0] = vector->Words()[indexValue];
+			result->Words(state.m_storage)[0] = vector->Words(state.m_storage)[indexValue];
 
 			return true;
 		}
@@ -595,7 +639,7 @@ namespace see::exec
 			if (!vector || !component || !index)
 				return false;
 
-			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32());
+			const cct::UInt32 indexValue = static_cast<cct::UInt32>(index->GetInt32(state.m_storage));
 			if (indexValue >= vector->WordCount())
 				return false;
 
@@ -603,8 +647,8 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyValue(*result, *vector);
-			result->Words()[indexValue] = component->Words()[0];
+			CopyValue(*result, *vector, state.m_storage);
+			result->Words(state.m_storage)[indexValue] = component->Words(state.m_storage)[0];
 
 			return true;
 		}
@@ -631,15 +675,15 @@ namespace see::exec
 
 			const cct::UInt32 firstWords = first->WordCount();
 			const cct::UInt32 secondWords = second->WordCount();
-			const std::span<const cct::UInt32> firstValue = first->Words();
-			const std::span<const cct::UInt32> secondValue = second->Words();
+			const std::span<const cct::UInt32> firstValue = first->Words(state.m_storage);
+			const std::span<const cct::UInt32> secondValue = second->Words(state.m_storage);
 
 			Value* result = SsaSlot(state, instruction.m_id);
 			if (!result)
 				return false;
 
-			CopyHeader(*result, *resultShape);
-			const std::span<cct::UInt32> words = result->Words();
+			CopyHeader(*result, *resultShape, state.m_storage);
+			const std::span<cct::UInt32> words = result->Words(state.m_storage);
 
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
 			{
@@ -677,13 +721,14 @@ namespace see::exec
 
 			result->m_scalar = lhs->m_scalar;
 			result->m_rows = lhs->m_rows;
+			ReserveWords(*result, state.m_storage);
 
 			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
 			{
 				if (result->m_scalar == ir::ScalarKind::Int32)
 				{
-					const cct::Int32 a = lhs->GetInt32(i);
-					const cct::Int32 b = rhs->GetInt32(i);
+					const cct::Int32 a = lhs->GetInt32(state.m_storage, i);
+					const cct::Int32 b = rhs->GetInt32(state.m_storage, i);
 					cct::Int32 r = 0;
 					switch (instruction.m_op)
 					{
@@ -732,12 +777,12 @@ namespace see::exec
 						default:
 							return false;
 					}
-					result->SetInt32(i, r);
+					result->SetInt32(state.m_storage, i, r);
 				}
 				else
 				{
-					const float a = lhs->GetFloat(i);
-					const float b = rhs->GetFloat(i);
+					const float a = lhs->GetFloat(state.m_storage, i);
+					const float b = rhs->GetFloat(state.m_storage, i);
 					float r = 0.0f;
 					switch (instruction.m_op)
 					{
@@ -762,7 +807,7 @@ namespace see::exec
 						default:
 							return false;
 					}
-					result->SetFloat(i, r);
+					result->SetFloat(state.m_storage, i, r);
 				}
 			}
 
@@ -782,13 +827,13 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyValue(*result, *operand);
+			CopyValue(*result, *operand, state.m_storage);
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
 				if (result->m_scalar == ir::ScalarKind::Int32)
-					result->SetInt32(i, -operand->GetInt32(i));
+					result->SetInt32(state.m_storage, i, -operand->GetInt32(state.m_storage, i));
 				else
-					result->SetFloat(i, -operand->GetFloat(i));
+					result->SetFloat(state.m_storage, i, -operand->GetFloat(state.m_storage, i));
 			}
 
 			return true;
@@ -816,20 +861,20 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyValue(*result, *operand);
+			CopyValue(*result, *operand, state.m_storage);
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
-				const cct::UInt32 bits = static_cast<cct::UInt32>(operand->GetInt32(i));
+				const cct::UInt32 bits = static_cast<cct::UInt32>(operand->GetInt32(state.m_storage, i));
 				switch (instruction.m_op)
 				{
 					case ir::Op::BitwiseNot:
-						result->SetInt32(i, static_cast<cct::Int32>(~bits));
+						result->SetInt32(state.m_storage, i, static_cast<cct::Int32>(~bits));
 						break;
 					case ir::Op::BitCount:
-						result->SetInt32(i, static_cast<cct::Int32>(std::popcount(bits)));
+						result->SetInt32(state.m_storage, i, static_cast<cct::Int32>(std::popcount(bits)));
 						break;
 					case ir::Op::BitReverse:
-						result->SetInt32(i, static_cast<cct::Int32>(ReverseBits(bits)));
+						result->SetInt32(state.m_storage, i, static_cast<cct::Int32>(ReverseBits(bits)));
 						break;
 					default:
 						return false;
@@ -852,8 +897,8 @@ namespace see::exec
 			if (!base || !offset || !count || (isInsert && !insert))
 				return false;
 
-			const cct::UInt32 offsetValue = static_cast<cct::UInt32>(offset->GetInt32());
-			const cct::UInt32 countValue = static_cast<cct::UInt32>(count->GetInt32());
+			const cct::UInt32 offsetValue = static_cast<cct::UInt32>(offset->GetInt32(state.m_storage));
+			const cct::UInt32 countValue = static_cast<cct::UInt32>(count->GetInt32(state.m_storage));
 			if (offsetValue > 32 || countValue > 32 || offsetValue + countValue > 32)
 				return false;
 
@@ -861,14 +906,14 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyValue(*result, *base);
+			CopyValue(*result, *base, state.m_storage);
 			const cct::UInt32 componentCount = result->WordCount();
 
 			if (countValue == 0)
 			{
 				if (!isInsert)
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
-						result->SetInt32(i, 0);
+						result->SetInt32(state.m_storage, i, 0);
 
 				return true;
 			}
@@ -876,12 +921,12 @@ namespace see::exec
 			const cct::UInt32 mask = countValue == 32 ? 0xFFFFFFFFu : ((1u << countValue) - 1u);
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
 			{
-				const cct::UInt32 bits = static_cast<cct::UInt32>(base->GetInt32(i));
+				const cct::UInt32 bits = static_cast<cct::UInt32>(base->GetInt32(state.m_storage, i));
 				cct::UInt32 value = 0;
 				switch (instruction.m_op)
 				{
 					case ir::Op::BitFieldInsert:
-						value = (bits & ~(mask << offsetValue)) | ((static_cast<cct::UInt32>(insert->GetInt32(i)) & mask) << offsetValue);
+						value = (bits & ~(mask << offsetValue)) | ((static_cast<cct::UInt32>(insert->GetInt32(state.m_storage, i)) & mask) << offsetValue);
 						break;
 					case ir::Op::BitFieldUnsignedExtract:
 						value = (bits >> offsetValue) & mask;
@@ -894,7 +939,7 @@ namespace see::exec
 					default:
 						return false;
 				}
-				result->SetInt32(i, static_cast<cct::Int32>(value));
+				result->SetInt32(state.m_storage, i, static_cast<cct::Int32>(value));
 			}
 
 			return true;
@@ -917,14 +962,14 @@ namespace see::exec
 			if (resultShape->WordCount() != componentCount)
 				return false;
 
-			const std::span<const cct::UInt32> operandWords = operand->Words();
+			const std::span<const cct::UInt32> operandWords = operand->Words(state.m_storage);
 
 			Value* result = SsaSlot(state, instruction.m_id);
 			if (!result)
 				return false;
 
-			CopyHeader(*result, *resultShape);
-			const std::span<cct::UInt32> words = result->Words();
+			CopyHeader(*result, *resultShape, state.m_storage);
+			const std::span<cct::UInt32> words = result->Words(state.m_storage);
 			for (cct::UInt32 i = 0; i < componentCount; ++i)
 				words[i] = operandWords[i];
 
@@ -944,23 +989,23 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyValue(*result, *operand);
+			CopyValue(*result, *operand, state.m_storage);
 			result->m_scalar = (instruction.m_op == ir::Op::ConvertSignedToFloat || instruction.m_op == ir::Op::ConvertUnsignedToFloat) ? ir::ScalarKind::Float32 : ir::ScalarKind::Int32;
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
 			{
 				switch (instruction.m_op)
 				{
 					case ir::Op::ConvertSignedToFloat:
-						result->SetFloat(i, static_cast<float>(operand->GetInt32(i)));
+						result->SetFloat(state.m_storage, i, static_cast<float>(operand->GetInt32(state.m_storage, i)));
 						break;
 					case ir::Op::ConvertUnsignedToFloat:
-						result->SetFloat(i, static_cast<float>(static_cast<cct::UInt32>(operand->GetInt32(i))));
+						result->SetFloat(state.m_storage, i, static_cast<float>(static_cast<cct::UInt32>(operand->GetInt32(state.m_storage, i))));
 						break;
 					case ir::Op::ConvertFloatToSigned:
-						result->SetInt32(i, static_cast<cct::Int32>(operand->GetFloat(i)));
+						result->SetInt32(state.m_storage, i, static_cast<cct::Int32>(operand->GetFloat(state.m_storage, i)));
 						break;
 					case ir::Op::ConvertFloatToUnsigned:
-						result->SetInt32(i, static_cast<cct::Int32>(static_cast<cct::UInt32>(operand->GetFloat(i))));
+						result->SetInt32(state.m_storage, i, static_cast<cct::Int32>(static_cast<cct::UInt32>(operand->GetFloat(state.m_storage, i))));
 						break;
 					default:
 						return false;
@@ -982,13 +1027,13 @@ namespace see::exec
 
 			float sum = 0.0f;
 			for (cct::UInt32 i = 0; i < lhs->m_rows; ++i)
-				sum += lhs->GetFloat(i) * rhs->GetFloat(i);
+				sum += lhs->GetFloat(state.m_storage, i) * rhs->GetFloat(state.m_storage, i);
 
 			Value* result = EmplaceResult(state, instruction.m_id);
 			if (!result)
 				return false;
 
-			result->SetFloat(0, sum);
+			result->SetFloat(state.m_storage, 0, sum);
 			return true;
 		}
 
@@ -1007,13 +1052,14 @@ namespace see::exec
 				return false;
 
 			result->m_rows = matrix->m_rows;
+			ReserveWords(*result, state.m_storage);
 
 			for (cct::UInt32 row = 0; row < matrix->m_rows; ++row)
 			{
 				float sum = 0.0f;
 				for (cct::UInt32 col = 0; col < matrix->m_columns; ++col)
-					sum += matrix->GetFloat(col * matrix->m_rows + row) * vector->GetFloat(col);
-				result->SetFloat(row, sum);
+					sum += matrix->GetFloat(state.m_storage, col * matrix->m_rows + row) * vector->GetFloat(state.m_storage, col);
+				result->SetFloat(state.m_storage, row, sum);
 			}
 
 			return true;
@@ -1034,13 +1080,14 @@ namespace see::exec
 				return false;
 
 			result->m_rows = matrix->m_columns;
+			ReserveWords(*result, state.m_storage);
 
 			for (cct::UInt32 col = 0; col < matrix->m_columns; ++col)
 			{
 				float sum = 0.0f;
 				for (cct::UInt32 row = 0; row < matrix->m_rows; ++row)
-					sum += vector->GetFloat(row) * matrix->GetFloat(col * matrix->m_rows + row);
-				result->SetFloat(col, sum);
+					sum += vector->GetFloat(state.m_storage, row) * matrix->GetFloat(state.m_storage, col * matrix->m_rows + row);
+				result->SetFloat(state.m_storage, col, sum);
 			}
 
 			return true;
@@ -1062,6 +1109,7 @@ namespace see::exec
 
 			result->m_rows = lhs->m_rows;
 			result->m_columns = rhs->m_columns;
+			ReserveWords(*result, state.m_storage);
 
 			for (cct::UInt32 col = 0; col < result->m_columns; ++col)
 			{
@@ -1069,8 +1117,8 @@ namespace see::exec
 				{
 					float sum = 0.0f;
 					for (cct::UInt32 k = 0; k < lhs->m_columns; ++k)
-						sum += lhs->GetFloat(k * lhs->m_rows + row) * rhs->GetFloat(col * rhs->m_rows + k);
-					result->SetFloat(col * result->m_rows + row, sum);
+						sum += lhs->GetFloat(state.m_storage, k * lhs->m_rows + row) * rhs->GetFloat(state.m_storage, col * rhs->m_rows + k);
+					result->SetFloat(state.m_storage, col * result->m_rows + row, sum);
 				}
 			}
 
@@ -1091,10 +1139,10 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyValue(*result, *composite);
-			const float factor = scalar->GetFloat(0);
+			CopyValue(*result, *composite, state.m_storage);
+			const float factor = scalar->GetFloat(state.m_storage, 0);
 			for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
-				result->SetFloat(i, composite->GetFloat(i) * factor);
+				result->SetFloat(state.m_storage, i, composite->GetFloat(state.m_storage, i) * factor);
 
 			return true;
 		}
@@ -1117,14 +1165,15 @@ namespace see::exec
 
 			result->m_scalar = ir::ScalarKind::Bool;
 			result->m_rows = lhs->m_rows;
+			ReserveWords(*result, state.m_storage);
 			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
 			{
-				const cct::Int32 signedLeft = lhs->GetInt32(i);
-				const cct::Int32 signedRight = rhs->GetInt32(i);
+				const cct::Int32 signedLeft = lhs->GetInt32(state.m_storage, i);
+				const cct::Int32 signedRight = rhs->GetInt32(state.m_storage, i);
 				const cct::UInt32 unsignedLeft = static_cast<cct::UInt32>(signedLeft);
 				const cct::UInt32 unsignedRight = static_cast<cct::UInt32>(signedRight);
-				const float floatLeft = lhs->GetFloat(i);
-				const float floatRight = rhs->GetFloat(i);
+				const float floatLeft = lhs->GetFloat(state.m_storage, i);
+				const float floatRight = rhs->GetFloat(state.m_storage, i);
 
 				bool comparisonResult = false;
 				switch (instruction.m_op)
@@ -1162,7 +1211,7 @@ namespace see::exec
 					default:
 						return false;
 				}
-				result->SetBool(i, comparisonResult);
+				result->SetBool(state.m_storage, i, comparisonResult);
 			}
 
 			return true;
@@ -1184,23 +1233,24 @@ namespace see::exec
 
 			result->m_scalar = ir::ScalarKind::Bool;
 			result->m_rows = lhs->m_rows;
+			ReserveWords(*result, state.m_storage);
 			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
 			{
-				const bool a = lhs->GetBool(i);
-				const bool b = rhs->GetBool(i);
+				const bool a = lhs->GetBool(state.m_storage, i);
+				const bool b = rhs->GetBool(state.m_storage, i);
 				switch (instruction.m_op)
 				{
 					case ir::Op::LogicalAnd:
-						result->SetBool(i, a && b);
+						result->SetBool(state.m_storage, i, a && b);
 						break;
 					case ir::Op::LogicalOr:
-						result->SetBool(i, a || b);
+						result->SetBool(state.m_storage, i, a || b);
 						break;
 					case ir::Op::LogicalEqual:
-						result->SetBool(i, a == b);
+						result->SetBool(state.m_storage, i, a == b);
 						break;
 					case ir::Op::LogicalNotEqual:
-						result->SetBool(i, a != b);
+						result->SetBool(state.m_storage, i, a != b);
 						break;
 					default:
 						return false;
@@ -1225,8 +1275,9 @@ namespace see::exec
 
 			result->m_scalar = ir::ScalarKind::Bool;
 			result->m_rows = operand->m_rows;
+			ReserveWords(*result, state.m_storage);
 			for (cct::UInt32 i = 0; i < result->m_rows; ++i)
-				result->SetBool(i, !operand->GetBool(i));
+				result->SetBool(state.m_storage, i, !operand->GetBool(state.m_storage, i));
 
 			return true;
 		}
@@ -1244,9 +1295,9 @@ namespace see::exec
 			for (cct::UInt32 i = 0; i < operand->m_rows; ++i)
 			{
 				if (instruction.m_op == ir::Op::All)
-					accumulator = accumulator && operand->GetBool(i);
+					accumulator = accumulator && operand->GetBool(state.m_storage, i);
 				else
-					accumulator = accumulator || operand->GetBool(i);
+					accumulator = accumulator || operand->GetBool(state.m_storage, i);
 			}
 
 			Value* result = EmplaceResult(state, instruction.m_id);
@@ -1254,7 +1305,7 @@ namespace see::exec
 				return false;
 
 			result->m_scalar = ir::ScalarKind::Bool;
-			result->SetBool(0, accumulator);
+			result->SetBool(state.m_storage, 0, accumulator);
 			return true;
 		}
 
@@ -1277,13 +1328,13 @@ namespace see::exec
 				if (!result)
 					return false;
 
-				CopyValue(*result, *whenTrue);
+				CopyValue(*result, *whenTrue, state.m_storage);
 				for (cct::UInt32 i = 0; i < result->WordCount(); ++i)
-					result->Words()[i] = condition->GetBool(i) ? whenTrue->Words()[i] : whenFalse->Words()[i];
+					result->Words(state.m_storage)[i] = condition->GetBool(state.m_storage, i) ? whenTrue->Words(state.m_storage)[i] : whenFalse->Words(state.m_storage)[i];
 				return true;
 			}
 
-			return StoreSsa(state, instruction.m_id, condition->GetBool() ? *whenTrue : *whenFalse);
+			return StoreSsa(state, instruction.m_id, condition->GetBool(state.m_storage) ? *whenTrue : *whenFalse);
 		}
 
 		bool ExecuteImageSample(RuntimeState& state, const ir::Instruction& instruction)
@@ -1305,8 +1356,8 @@ namespace see::exec
 				return false;
 
 			// Nearest-neighbor, clamped to the edge, LOD 0 only - no mip chain / filtering yet.
-			const float u = std::clamp(coord->GetFloat(0), 0.0f, 0.999999f);
-			const float v = coord->m_rows > 1 ? std::clamp(coord->GetFloat(1), 0.0f, 0.999999f) : 0.0f;
+			const float u = std::clamp(coord->GetFloat(state.m_storage, 0), 0.0f, 0.999999f);
+			const float v = coord->m_rows > 1 ? std::clamp(coord->GetFloat(state.m_storage, 1), 0.0f, 0.999999f) : 0.0f;
 			const cct::UInt32 x = std::min(static_cast<cct::UInt32>(u * static_cast<float>(image.m_width)), image.m_width - 1);
 			const cct::UInt32 y = std::min(static_cast<cct::UInt32>(v * static_cast<float>(image.m_height)), image.m_height - 1);
 
@@ -1317,8 +1368,9 @@ namespace see::exec
 				return false;
 
 			result->m_rows = 4;
+			ReserveWords(*result, state.m_storage);
 			for (cct::UInt32 i = 0; i < 4; ++i)
-				result->SetFloat(i, static_cast<float>(texel[i]) / 255.0f);
+				result->SetFloat(state.m_storage, i, static_cast<float>(texel[i]) / 255.0f);
 
 			return true;
 		}
@@ -1346,12 +1398,12 @@ namespace see::exec
 			if (!result)
 				return false;
 
-			CopyValue(*result, *operands[0]);
+			CopyValue(*result, *operands[0], state.m_storage);
 
 			const auto floatUnary = [&](auto&& f)
 			{
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result->SetFloat(i, f(operands[0]->GetFloat(i)));
+					result->SetFloat(state.m_storage, i, f(operands[0]->GetFloat(state.m_storage, i)));
 				return true;
 			};
 			const auto floatBinary = [&](auto&& f)
@@ -1359,7 +1411,7 @@ namespace see::exec
 				if (operands.size() < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result->SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i)));
+					result->SetFloat(state.m_storage, i, f(operands[0]->GetFloat(state.m_storage, i), operands[1]->GetFloat(state.m_storage, i)));
 				return true;
 			};
 			const auto floatTernary = [&](auto&& f)
@@ -1367,13 +1419,13 @@ namespace see::exec
 				if (operands.size() < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result->SetFloat(i, f(operands[0]->GetFloat(i), operands[1]->GetFloat(i), operands[2]->GetFloat(i)));
+					result->SetFloat(state.m_storage, i, f(operands[0]->GetFloat(state.m_storage, i), operands[1]->GetFloat(state.m_storage, i), operands[2]->GetFloat(state.m_storage, i)));
 				return true;
 			};
 			const auto intUnary = [&](auto&& f)
 			{
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result->SetInt32(i, f(operands[0]->GetInt32(i)));
+					result->SetInt32(state.m_storage, i, f(operands[0]->GetInt32(state.m_storage, i)));
 				return true;
 			};
 			const auto intBinary = [&](auto&& f)
@@ -1381,7 +1433,7 @@ namespace see::exec
 				if (operands.size() < 2)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result->SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i)));
+					result->SetInt32(state.m_storage, i, f(operands[0]->GetInt32(state.m_storage, i), operands[1]->GetInt32(state.m_storage, i)));
 				return true;
 			};
 			const auto intTernary = [&](auto&& f)
@@ -1389,14 +1441,14 @@ namespace see::exec
 				if (operands.size() < 3)
 					return false;
 				for (cct::UInt32 i = 0; i < componentCount; ++i)
-					result->SetInt32(i, f(operands[0]->GetInt32(i), operands[1]->GetInt32(i), operands[2]->GetInt32(i)));
+					result->SetInt32(state.m_storage, i, f(operands[0]->GetInt32(state.m_storage, i), operands[1]->GetInt32(state.m_storage, i), operands[2]->GetInt32(state.m_storage, i)));
 				return true;
 			};
-			const auto vectorLength = [](const Value& v)
+			const auto vectorLength = [&state](const Value& v)
 			{
 				float sum = 0.0f;
 				for (cct::UInt32 i = 0; i < v.WordCount(); ++i)
-					sum += v.GetFloat(i) * v.GetFloat(i);
+					sum += v.GetFloat(state.m_storage, i) * v.GetFloat(state.m_storage, i);
 				return std::sqrt(sum);
 			};
 
@@ -1565,7 +1617,7 @@ namespace see::exec
 					break;
 				case GLSLstd450Length:
 					ResetHeader(*result);
-					result->SetFloat(0, vectorLength(*operands[0]));
+					result->SetFloat(state.m_storage, 0, vectorLength(*operands[0]));
 					break;
 				case GLSLstd450Distance:
 				{
@@ -1574,11 +1626,11 @@ namespace see::exec
 					float sum = 0.0f;
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
 					{
-						const float d = operands[0]->GetFloat(i) - operands[1]->GetFloat(i);
+						const float d = operands[0]->GetFloat(state.m_storage, i) - operands[1]->GetFloat(state.m_storage, i);
 						sum += d * d;
 					}
 					ResetHeader(*result);
-					result->SetFloat(0, std::sqrt(sum));
+					result->SetFloat(state.m_storage, 0, std::sqrt(sum));
 					break;
 				}
 				case GLSLstd450Cross:
@@ -1587,9 +1639,9 @@ namespace see::exec
 						return false;
 					const Value& a = *operands[0];
 					const Value& b = *operands[1];
-					result->SetFloat(0, a.GetFloat(1) * b.GetFloat(2) - a.GetFloat(2) * b.GetFloat(1));
-					result->SetFloat(1, a.GetFloat(2) * b.GetFloat(0) - a.GetFloat(0) * b.GetFloat(2));
-					result->SetFloat(2, a.GetFloat(0) * b.GetFloat(1) - a.GetFloat(1) * b.GetFloat(0));
+					result->SetFloat(state.m_storage, 0, a.GetFloat(state.m_storage, 1) * b.GetFloat(state.m_storage, 2) - a.GetFloat(state.m_storage, 2) * b.GetFloat(state.m_storage, 1));
+					result->SetFloat(state.m_storage, 1, a.GetFloat(state.m_storage, 2) * b.GetFloat(state.m_storage, 0) - a.GetFloat(state.m_storage, 0) * b.GetFloat(state.m_storage, 2));
+					result->SetFloat(state.m_storage, 2, a.GetFloat(state.m_storage, 0) * b.GetFloat(state.m_storage, 1) - a.GetFloat(state.m_storage, 1) * b.GetFloat(state.m_storage, 0));
 					break;
 				}
 				case GLSLstd450Normalize:
@@ -1598,7 +1650,7 @@ namespace see::exec
 					if (length == 0.0f)
 						return false;
 					for (cct::UInt32 i = 0; i < componentCount; ++i)
-						result->SetFloat(i, operands[0]->GetFloat(i) / length);
+						result->SetFloat(state.m_storage, i, operands[0]->GetFloat(state.m_storage, i) / length);
 					break;
 				}
 				default:
@@ -1768,7 +1820,7 @@ namespace see::exec
 						const Value* condition = ResolveValue(state, block->m_terminatorOperand);
 						if (!condition || block->m_branchTargets.size() < 2)
 							return {};
-						block = FindBlock(function, condition->GetBool() ? block->m_branchTargets[0] : block->m_branchTargets[1]);
+						block = FindBlock(function, condition->GetBool(state.m_storage) ? block->m_branchTargets[0] : block->m_branchTargets[1]);
 						break;
 					}
 					default:
@@ -1820,8 +1872,8 @@ namespace see::exec
 				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
 
 				Value& parameter = state.m_variables[paramId];
-				CopyHeader(parameter, *copyShape);
-				const std::span<cct::UInt32> words = parameter.Words();
+				CopyHeader(parameter, *copyShape, state.m_storage);
+				const std::span<cct::UInt32> words = parameter.Words(state.m_storage);
 				for (cct::UInt32 w = 0; w < wordCount; ++w)
 					words[w] = source[w];
 			}
@@ -1837,7 +1889,7 @@ namespace see::exec
 		}
 	} // namespace
 
-	std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex)
+	std::optional<Value> ExtractStructMember(const ir::Module& module, const Value& composite, cct::UInt32 memberIndex, ExecutionStorage& storage)
 	{
 		if (composite.m_structType == 0)
 			return std::nullopt;
@@ -1854,6 +1906,10 @@ namespace see::exec
 		if (!result)
 			return std::nullopt;
 
+		ReserveWords(*result, storage);
+		const std::span<cct::UInt32> words = result->Words(storage);
+		const std::span<const cct::UInt32> compositeWords = composite.Words(storage);
+
 		const MemberLayout& member = (*layout)[memberIndex];
 		if (member.m_matrixStride != 0 && result->m_columns > 1 && member.m_matrixStride != result->m_rows)
 		{
@@ -1864,7 +1920,7 @@ namespace see::exec
 					if (source >= composite.WordCount())
 						return std::nullopt;
 
-					result->Words()[column * result->m_rows + row] = composite.Words()[source];
+					words[column * result->m_rows + row] = compositeWords[source];
 				}
 
 			return result;
@@ -1872,7 +1928,7 @@ namespace see::exec
 
 		const cct::UInt32 packedWords = result->WordCount();
 		for (cct::UInt32 i = 0; i < packedWords && member.m_offset + i < composite.WordCount(); ++i)
-			result->Words()[i] = composite.Words()[member.m_offset + i];
+			words[i] = compositeWords[member.m_offset + i];
 
 		return result;
 	}
@@ -1915,6 +1971,28 @@ namespace see::exec
 		for (const auto& [typeId, type] : module.m_types)
 			maxTypeId = std::max(maxTypeId, typeId);
 
+		// The module arena is never rewound, and its blocks start zeroed, so a shape installed here
+		// already reads as all-zero words.
+		const auto install = [&prepared](Value& destination, const Value& shape) -> std::span<cct::UInt32>
+		{
+			destination.m_scalar = shape.m_scalar;
+			destination.m_rows = shape.m_rows;
+			destination.m_columns = shape.m_columns;
+			destination.m_structType = shape.m_structType;
+			destination.m_imageVariable = shape.m_imageVariable;
+
+			const cct::UInt32 wordCount = destination.WordCount();
+			if (wordCount <= Value::InlineWords)
+			{
+				destination.m_overflow = Value::NoOverflow;
+				return std::span<cct::UInt32>(destination.m_inline.data(), wordCount);
+			}
+
+			const cct::UInt32 offset = prepared.m_arena.Allocate(wordCount);
+			destination.m_overflow = Value::ModuleDomain | offset;
+			return prepared.m_arena.Resolve(offset, wordCount);
+		};
+
 		const std::size_t typeCount = static_cast<std::size_t>(maxTypeId) + 1;
 		prepared.m_zeroValues = std::vector<Value>(typeCount);
 		prepared.m_zeroValid.assign(typeCount, 0);
@@ -1926,7 +2004,7 @@ namespace see::exec
 		{
 			if (std::optional<Value> zero = MakeZeroValue(module, typeId))
 			{
-				CopyValue(prepared.m_zeroValues[typeId], *zero);
+				install(prepared.m_zeroValues[typeId], *zero);
 				prepared.m_zeroValid[typeId] = 1;
 			}
 
@@ -1957,15 +2035,17 @@ namespace see::exec
 			if (!value)
 				continue;
 
-			const std::span<cct::UInt32> words = value->Words();
+			const cct::UInt32 slot = ir::GetSlot(module.m_valueRefs[id]);
+			const std::span<cct::UInt32> words = install(prepared.m_constants[slot], *value);
+			if (words.empty())
+				continue;
+
 			if (constant.m_words.empty())
 				words[0] = constant.m_bits;
 			else
 				for (std::size_t i = 0; i < constant.m_words.size() && i < words.size(); ++i)
 					words[i] = constant.m_words[i];
 
-			const cct::UInt32 slot = ir::GetSlot(module.m_valueRefs[id]);
-			CopyValue(prepared.m_constants[slot], *value);
 			prepared.m_constantValid[slot] = 1;
 		}
 
@@ -1991,26 +2071,10 @@ namespace see::exec
 
 	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
 															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
-	{
-		return Run(module, function, std::move(inputs), externalBuffers, externalImages, BuildPreparedModule(module));
-	}
-
-	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
-															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared)
-	{
-		ExecutionStorage storage;
-		return Run(module, function, std::move(inputs), externalBuffers, externalImages, prepared, storage);
-	}
-
-	std::optional<std::unordered_map<cct::UInt32, Value>> Run(const ir::Module& module, const ir::Function& function, std::unordered_map<cct::UInt32, Value> inputs,
-															  const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 															  const std::unordered_map<cct::UInt32, ExternalImage>& externalImages, const PreparedModule& prepared,
 															  ExecutionStorage& storage)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
-		storage.Reset(module.m_ssaSlotCount);
 		RuntimeState state{.m_module = module, .m_prepared = prepared, .m_storage = storage, .m_variables = std::move(inputs), .m_externalBuffers = externalBuffers, .m_externalImages = externalImages};
 
 		for (const ir::Instruction& global : module.m_globalInstructions)
