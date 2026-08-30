@@ -25,6 +25,7 @@
 #include "VkdSoftware/RenderPass/RenderPass.hpp"
 #include "VkdSoftware/ShaderModule/ShaderModule.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
+#include "VkdSoftware/Synchronization/Semaphore/Semaphore.hpp"
 #include "VkdUtils/System/System.hpp"
 
 namespace vkd::software
@@ -115,6 +116,18 @@ namespace vkd::software
 		}
 
 		return fence;
+	}
+
+	Result<vkd::Semaphore*, VkResult> SoftwareDevice::CreateSemaphore(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		auto* semaphore = mem::NewObject<Semaphore>(allocationCallbacks);
+		if (!semaphore)
+		{
+			CCT_ASSERT_FALSE("Failed to allocate Semaphore");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+
+		return semaphore;
 	}
 
 	Result<vkd::Buffer*, VkResult> SoftwareDevice::CreateBuffer(const VkAllocationCallbacks& allocationCallbacks)

@@ -20,6 +20,7 @@ namespace vkd
 	class Queue;
 	class CommandPool;
 	class Fence;
+	class Semaphore;
 	class Buffer;
 	class BufferView;
 	class Image;
@@ -147,6 +148,7 @@ namespace vkd
 		virtual DispatchableObjectResult<Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) = 0;
 		virtual Result<CommandPool*, VkResult> CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Fence*, VkResult> CreateFence(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		virtual Result<Semaphore*, VkResult> CreateSemaphore(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Buffer*, VkResult> CreateBuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<BufferView*, VkResult> CreateBufferView(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) = 0;

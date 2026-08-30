@@ -32,6 +32,7 @@ namespace vkd::software
 		DispatchableObjectResult<vkd::Queue> CreateQueueForFamily(uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags) override;
 		Result<vkd::CommandPool*, VkResult> CreateCommandPool(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::Fence*, VkResult> CreateFence(const VkAllocationCallbacks& allocationCallbacks) override;
+		Result<vkd::Semaphore*, VkResult> CreateSemaphore(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::Buffer*, VkResult> CreateBuffer(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::BufferView*, VkResult> CreateBufferView(const VkAllocationCallbacks& allocationCallbacks) override;
 		Result<vkd::Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) override;

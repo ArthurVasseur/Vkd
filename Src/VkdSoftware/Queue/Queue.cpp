@@ -11,6 +11,7 @@
 #include "VkdSoftware/CpuContext/CpuContext.hpp"
 #include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
+#include "VkdSoftware/Synchronization/Semaphore/Semaphore.hpp"
 
 namespace vkd::software
 {
@@ -22,18 +23,49 @@ namespace vkd::software
 	VkResult Queue::Submit(uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		VKD_CHECK(submitCount && pSubmits);
+		if (submitCount > 0)
+			VKD_CHECK(pSubmits);
 
-		vkd::vector<vkd::CommandBuffer*> cmdBuffers(CommandAllocator<vkd::CommandBuffer*>(GetAllocationCallbacks()));
+		struct Batch
+		{
+			vkd::vector<vkd::Semaphore*> waitSemaphores;
+			vkd::vector<vkd::CommandBuffer*> commandBuffers;
+			vkd::vector<vkd::Semaphore*> signalSemaphores;
+		};
+
+		vkd::vector<Batch> batches(CommandAllocator<Batch>(GetAllocationCallbacks()));
+		batches.reserve(submitCount);
 		for (uint32_t s = 0; s < submitCount; ++s)
 		{
 			const VkSubmitInfo& submit = pSubmits[s];
-			cmdBuffers.reserve(cmdBuffers.size() + submit.commandBufferCount);
+			Batch batch{
+				.waitSemaphores = vkd::vector<vkd::Semaphore*>(CommandAllocator<vkd::Semaphore*>(GetAllocationCallbacks())),
+				.commandBuffers = vkd::vector<vkd::CommandBuffer*>(CommandAllocator<vkd::CommandBuffer*>(GetAllocationCallbacks())),
+				.signalSemaphores = vkd::vector<vkd::Semaphore*>(CommandAllocator<vkd::Semaphore*>(GetAllocationCallbacks())),
+			};
+
+			batch.waitSemaphores.reserve(submit.waitSemaphoreCount);
+			for (uint32_t i = 0; i < submit.waitSemaphoreCount; ++i)
+			{
+				VKD_FROM_HANDLE(vkd::Semaphore, semaphoreObj, submit.pWaitSemaphores[i]);
+				batch.waitSemaphores.push_back(semaphoreObj);
+			}
+
+			batch.commandBuffers.reserve(submit.commandBufferCount);
 			for (uint32_t i = 0; i < submit.commandBufferCount; ++i)
 			{
 				VKD_FROM_HANDLE(vkd::CommandBuffer, cmdBufferObj, submit.pCommandBuffers[i]);
-				cmdBuffers.push_back(cmdBufferObj);
+				batch.commandBuffers.push_back(cmdBufferObj);
 			}
+
+			batch.signalSemaphores.reserve(submit.signalSemaphoreCount);
+			for (uint32_t i = 0; i < submit.signalSemaphoreCount; ++i)
+			{
+				VKD_FROM_HANDLE(vkd::Semaphore, semaphoreObj, submit.pSignalSemaphores[i]);
+				batch.signalSemaphores.push_back(semaphoreObj);
+			}
+
+			batches.push_back(std::move(batch));
 		}
 
 		auto* softwareDevice = static_cast<SoftwareDevice*>(GetOwner());
@@ -42,19 +74,25 @@ namespace vkd::software
 		std::lock_guard<std::mutex> lock(m_submitMutex);
 		auto previousSubmit = std::move(m_previousSubmit);
 
-		m_previousSubmit = threadPool.Submit([cmdBuffers = std::move(cmdBuffers), fence, previousSubmit = std::move(previousSubmit), allocationCallbacks = &GetAllocationCallbacks()]() mutable -> bool
+		m_previousSubmit = threadPool.Submit([batches = std::move(batches), fence, previousSubmit = std::move(previousSubmit), allocationCallbacks = &GetAllocationCallbacks()]() mutable -> bool
 											 {
-			// Wait for the previous submit to complete before starting the new one
 			if (previousSubmit.valid())
-			{
 				previousSubmit.wait();
-			}
 
-			for (auto* cmdBufferObj : cmdBuffers)
+			for (auto& batch : batches)
 			{
-				CpuContext cpuContext(*allocationCallbacks);
-				CommandDispatcher commandDispatcher(cpuContext);
-				commandDispatcher.Execute(*cmdBufferObj);
+				for (auto* semaphore : batch.waitSemaphores)
+					semaphore->Wait();
+
+				for (auto* cmdBufferObj : batch.commandBuffers)
+				{
+					CpuContext cpuContext(*allocationCallbacks);
+					CommandDispatcher commandDispatcher(cpuContext);
+					commandDispatcher.Execute(*cmdBufferObj);
+				}
+
+				for (auto* semaphore : batch.signalSemaphores)
+					semaphore->Signal();
 			}
 
 			if (fence)

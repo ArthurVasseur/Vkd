@@ -30,6 +30,7 @@
 #include "Vkd/Sampler/Sampler.hpp"
 #include "Vkd/ShaderModule/ShaderModule.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
+#include "Vkd/Synchronization/Semaphore/Semaphore.hpp"
 
 namespace vkd
 {
@@ -1289,14 +1290,40 @@ namespace vkd
 	VkResult Device::CreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkCreateSemaphore not implemented");
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pCreateInfo && pSemaphore);
+
+		if (!pAllocator)
+			pAllocator = &deviceObj->GetAllocationCallbacks();
+
+		auto semaphoreResult = deviceObj->CreateSemaphore(*pAllocator);
+		if (semaphoreResult.IsError())
+			return semaphoreResult.GetError();
+
+		auto* semaphoreObj = std::move(semaphoreResult).GetValue();
+		VkResult result = semaphoreObj->Create(*deviceObj, *pCreateInfo);
+		if (result != VK_SUCCESS)
+		{
+			mem::Delete(*pAllocator, semaphoreObj);
+			return result;
+		}
+
+		*pSemaphore = VKD_TO_HANDLE(VkSemaphore, semaphoreObj);
+		return VK_SUCCESS;
 	}
 
 	void Device::DestroySemaphore(VkDevice device, VkSemaphore semaphore, const VkAllocationCallbacks* pAllocator)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkDestroySemaphore not implemented");
+
+		if (semaphore == VK_NULL_HANDLE)
+			return;
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Semaphore, semaphoreObj, semaphore);
+
+		mem::Delete(pAllocator ? *pAllocator : semaphoreObj->GetAllocationCallbacks(), semaphoreObj);
 	}
 
 	VkResult Device::CreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkEvent* pEvent)
