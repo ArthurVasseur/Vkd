@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <new>
+
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/DescriptorSet/DescriptorSet.hpp"
@@ -24,7 +26,8 @@ namespace vkd
 		m_state(State::Initial),
 		m_usageFlags(0),
 		m_pendingSubmits(0),
-		m_ops(CommandAllocator<Op>(allocationCallbacks))
+		m_ops(CommandAllocator<Op>(allocationCallbacks)),
+		m_recordingError(VK_SUCCESS)
 	{
 	}
 
@@ -68,16 +71,10 @@ namespace vkd
 			return VK_ERROR_VALIDATION_FAILED_EXT;
 		}
 
-		if (m_state != State::Initial && m_state != State::Executable && m_state != State::Recording)
-		{
-			m_state = State::Invalid;
-			CCT_ASSERT_FALSE("Invalid command buffer state for begin");
-			return VK_ERROR_VALIDATION_FAILED_EXT;
-		}
-
 		m_ops.clear();
 		m_usageFlags = beginInfo.flags;
 		m_pendingSubmits = 0;
+		m_recordingError = VK_SUCCESS;
 		m_state = State::Recording;
 		return VK_SUCCESS;
 	}
@@ -85,6 +82,15 @@ namespace vkd
 	inline VkResult CommandBuffer::End()
 	{
 		VKD_AUTO_PROFILER_SCOPE();
+
+		if (m_recordingError != VK_SUCCESS)
+		{
+			const VkResult error = m_recordingError;
+			m_recordingError = VK_SUCCESS;
+			m_state = State::Invalid;
+			return error;
+		}
+
 		Transition(State::Executable, {State::Recording});
 
 		return VK_SUCCESS;
@@ -105,6 +111,7 @@ namespace vkd
 		m_ops.clear();
 		m_usageFlags = 0;
 		m_pendingSubmits = 0;
+		m_recordingError = VK_SUCCESS;
 		m_state = State::Initial;
 		return VK_SUCCESS;
 	}
@@ -112,7 +119,7 @@ namespace vkd
 	inline void CommandBuffer::PushFillBuffer(VkBuffer dst, VkDeviceSize off, VkDeviceSize size, uint32_t data)
 	{
 		VKD_FROM_HANDLE(Buffer, bufferObj, dst);
-		m_ops.emplace_back(Buffer::OpFill{bufferObj, off, size, data});
+		Record(Buffer::OpFill{bufferObj, off, size, data});
 	}
 
 	inline void CommandBuffer::PushCopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy* pRegions)
@@ -123,7 +130,7 @@ namespace vkd
 		vkd::vector<VkBufferCopy> regions(CommandAllocator<VkBufferCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy));
-		m_ops.emplace_back(Buffer::OpCopy{srcBufferObj, dstBufferObj, std::move(regions)});
+		Record(Buffer::OpCopy{srcBufferObj, dstBufferObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushCopyBuffer2(VkBuffer srcBuffer, VkBuffer dstBuffer, uint32_t regionCount, const VkBufferCopy2* pRegions)
@@ -134,7 +141,7 @@ namespace vkd
 		vkd::vector<VkBufferCopy2> regions(CommandAllocator<VkBufferCopy2>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferCopy2));
-		m_ops.emplace_back(Buffer::OpCopy2{srcBufferObj, dstBufferObj, std::move(regions)});
+		Record(Buffer::OpCopy2{srcBufferObj, dstBufferObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushUpdateBuffer(VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize dataSize, const void* pData)
@@ -144,7 +151,7 @@ namespace vkd
 		vkd::vector<UInt8> data(CommandAllocator<UInt8>(GetAllocationCallbacks()));
 		data.resize(dataSize);
 		std::memcpy(data.data(), pData, dataSize);
-		m_ops.emplace_back(Buffer::OpUpdate{dstBufferObj, dstOffset, std::move(data)});
+		Record(Buffer::OpUpdate{dstBufferObj, dstOffset, std::move(data)});
 	}
 
 	inline void CommandBuffer::PushCopyImage(VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkImageCopy* pRegions)
@@ -155,7 +162,7 @@ namespace vkd
 		vkd::vector<VkImageCopy> regions(CommandAllocator<VkImageCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkImageCopy));
-		m_ops.emplace_back(Image::OpCopy{srcImageObj, dstImageObj, std::move(regions)});
+		Record(Image::OpCopy{srcImageObj, dstImageObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushCopyBufferToImage(VkBuffer srcBuffer, VkImage dstImage, VkImageLayout dstImageLayout, UInt32 regionCount, const VkBufferImageCopy* pRegions)
@@ -166,7 +173,7 @@ namespace vkd
 		vkd::vector<VkBufferImageCopy> regions(CommandAllocator<VkBufferImageCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
-		m_ops.emplace_back(Buffer::OpCopyBufferToImage{srcBufferObj, dstImageObj, dstImageLayout, std::move(regions)});
+		Record(Buffer::OpCopyBufferToImage{srcBufferObj, dstImageObj, dstImageLayout, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushCopyImageToBuffer(VkImage srcImage, VkImageLayout srcImageLayout, VkBuffer dstBuffer, UInt32 regionCount, const VkBufferImageCopy* pRegions)
@@ -177,7 +184,7 @@ namespace vkd
 		vkd::vector<VkBufferImageCopy> regions(CommandAllocator<VkBufferImageCopy>(GetAllocationCallbacks()));
 		regions.resize(regionCount);
 		std::memcpy(regions.data(), pRegions, regions.size() * sizeof(VkBufferImageCopy));
-		m_ops.emplace_back(Buffer::OpCopyImageToBuffer{srcImageObj, srcImageLayout, dstBufferObj, std::move(regions)});
+		Record(Buffer::OpCopyImageToBuffer{srcImageObj, srcImageLayout, dstBufferObj, std::move(regions)});
 	}
 
 	inline void CommandBuffer::PushClearColorImage(VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, UInt32 rangeCount, const VkImageSubresourceRange* pRanges)
@@ -187,14 +194,14 @@ namespace vkd
 		vkd::vector<VkImageSubresourceRange> ranges(CommandAllocator<VkImageSubresourceRange>(GetAllocationCallbacks()));
 		ranges.resize(rangeCount);
 		std::memcpy(ranges.data(), pRanges, ranges.size() * sizeof(VkImageSubresourceRange));
-		m_ops.emplace_back(Image::OpClearColorImage{imageObj, imageLayout, *pColor, std::move(ranges)});
+		Record(Image::OpClearColorImage{imageObj, imageLayout, *pColor, std::move(ranges)});
 	}
 
 	inline void CommandBuffer::PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)
 	{
 		VKD_FROM_HANDLE(Pipeline, pipelineObject, pipeline);
 
-		m_ops.emplace_back(OpBindPipeline{
+		Record(OpBindPipeline{
 			.BindPoint = pipelineBindPoint,
 			.PipelineObject = pipelineObject,
 		});
@@ -214,7 +221,7 @@ namespace vkd
 			offsets[i] = pOffsets[i];
 		}
 
-		m_ops.emplace_back(OpBindVertexBuffer{
+		Record(OpBindVertexBuffer{
 			.Buffers = std::move(buffers),
 			.Offsets = std::move(offsets),
 			.FirstBinding = firstBinding,
@@ -225,7 +232,7 @@ namespace vkd
 	{
 		VKD_FROM_HANDLE(Buffer, bufferObject, buffer);
 
-		m_ops.emplace_back(OpBindIndexBuffer{
+		Record(OpBindIndexBuffer{
 			.BufferHandle = bufferObject,
 			.Offset = offset,
 			.IndexType = indexType,
@@ -266,7 +273,7 @@ namespace vkd
 			}
 		}
 
-		m_ops.emplace_back(OpBindDescriptorSets{
+		Record(OpBindDescriptorSets{
 			.BindPoint = pipelineBindPoint,
 			.FirstSet = firstSet,
 			.DescriptorSets = std::move(descriptorSets),
@@ -276,7 +283,7 @@ namespace vkd
 
 	inline void CommandBuffer::PushDraw(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstVertex, UInt32 firstInstance)
 	{
-		m_ops.emplace_back(OpDraw{
+		Record(OpDraw{
 			.VertexCount = vertexCount,
 			.InstanceCount = instanceCount,
 			.FirstVertex = firstVertex,
@@ -286,7 +293,7 @@ namespace vkd
 
 	inline void CommandBuffer::PushDrawIndexed(UInt32 indexCount, UInt32 instanceCount, UInt32 firstIndex, cct::Int32 vertexOffset, UInt32 firstInstance)
 	{
-		m_ops.emplace_back(OpDrawIndexed{
+		Record(OpDrawIndexed{
 			.IndexCount = indexCount,
 			.InstanceCount = instanceCount,
 			.FirstIndex = firstIndex,
@@ -297,7 +304,7 @@ namespace vkd
 
 	inline void CommandBuffer::PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport)
 	{
-		m_ops.emplace_back(OpSetViewport{
+		Record(OpSetViewport{
 			.Viewports = vkd::vector<VkViewport>(pViewports.begin(), pViewports.end(), CommandAllocator<VkViewport>(GetAllocationCallbacks())),
 			.FirstViewport = firstViewport,
 		});
@@ -305,7 +312,7 @@ namespace vkd
 
 	inline void CommandBuffer::PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor)
 	{
-		m_ops.emplace_back(OpSetScissor{
+		Record(OpSetScissor{
 			.Scissors = vkd::vector<VkRect2D>(pScissors.begin(), pScissors.end(), CommandAllocator<VkRect2D>(GetAllocationCallbacks())),
 			.FirstScissor = firstScissor,
 		});
@@ -320,7 +327,7 @@ namespace vkd
 		if (beginInfo.clearValueCount > 0 && beginInfo.pClearValues != nullptr)
 			clearValues.assign(beginInfo.pClearValues, beginInfo.pClearValues + beginInfo.clearValueCount);
 
-		m_ops.emplace_back(OpBeginRenderPass{
+		Record(OpBeginRenderPass{
 			.RenderPassObject = renderPassObj,
 			.FramebufferObject = framebufferObj,
 			.RenderArea = beginInfo.renderArea,
@@ -331,14 +338,14 @@ namespace vkd
 
 	inline void CommandBuffer::PushEndRenderPass()
 	{
-		m_ops.emplace_back(OpEndRenderPass{});
+		Record(OpEndRenderPass{});
 	}
 
 	inline void CommandBuffer::PushResetQueryPool(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount)
 	{
 		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
 
-		m_ops.emplace_back(OpResetQueryPool{
+		Record(OpResetQueryPool{
 			.QueryPoolObject = queryPoolObj,
 			.FirstQuery = firstQuery,
 			.QueryCount = queryCount,
@@ -349,7 +356,7 @@ namespace vkd
 	{
 		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
 
-		m_ops.emplace_back(OpBeginQuery{
+		Record(OpBeginQuery{
 			.QueryPoolObject = queryPoolObj,
 			.Query = query,
 			.Flags = flags,
@@ -360,7 +367,7 @@ namespace vkd
 	{
 		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
 
-		m_ops.emplace_back(OpEndQuery{
+		Record(OpEndQuery{
 			.QueryPoolObject = queryPoolObj,
 			.Query = query,
 		});
@@ -370,7 +377,7 @@ namespace vkd
 	{
 		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
 
-		m_ops.emplace_back(OpWriteTimestamp{
+		Record(OpWriteTimestamp{
 			.QueryPoolObject = queryPoolObj,
 			.PipelineStage = pipelineStage,
 			.Query = query,
@@ -382,7 +389,7 @@ namespace vkd
 		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
 		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
 
-		m_ops.emplace_back(OpCopyQueryPoolResults{
+		Record(OpCopyQueryPoolResults{
 			.QueryPoolObject = queryPoolObj,
 			.FirstQuery = firstQuery,
 			.QueryCount = queryCount,
@@ -461,5 +468,19 @@ namespace vkd
 		m_state = State::Invalid;
 		CCT_ASSERT_FALSE("Invalid CB state transition {} -> {}", (int)previous, (int)to);
 		return VK_ERROR_VALIDATION_FAILED_EXT;
+	}
+
+	template<typename OpT>
+	inline void CommandBuffer::Record(OpT&& op)
+	{
+		try
+		{
+			Record(std::forward<OpT>(op));
+		}
+		catch (const std::bad_alloc&)
+		{
+			if (m_recordingError == VK_SUCCESS)
+				m_recordingError = VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
 	}
 } // namespace vkd

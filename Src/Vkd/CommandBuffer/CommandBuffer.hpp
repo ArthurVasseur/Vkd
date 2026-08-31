@@ -127,6 +127,9 @@ namespace vkd
 	protected:
 		inline VkResult Transition(State to, std::initializer_list<State> allowed);
 
+		template<typename OpT>
+		inline void Record(OpT&& op);
+
 	private:
 		CommandPool* m_owner;
 		VkCommandBufferLevel m_level;
@@ -134,6 +137,7 @@ namespace vkd
 		VkCommandBufferUsageFlags m_usageFlags;
 		UInt32 m_pendingSubmits;
 		vkd::vector<Op> m_ops;
+		VkResult m_recordingError;
 	};
 } // namespace vkd
 
