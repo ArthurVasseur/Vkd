@@ -38,58 +38,6 @@ namespace vkd
 		if (pName == nullptr)
 			return nullptr;
 
-#define VKD_ENTRYPOINT_LOOKUP(klass, name) \
-	if (strcmp(pName, "vk" #name) == 0)    \
-	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
-#define VKD_ENTRYPOINT_LOOKUP_KHR(klass, name) \
-	if (strcmp(pName, "vk" #name "KHR") == 0)  \
-	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
-
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceExtensionProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceLayerProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceVersion);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, CreateInstance);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Icd, GetInstanceProcAddr);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, DestroyInstance);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumeratePhysicalDevices);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFeatures);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFeatures2);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceFeatures2);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFormatProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceImageFormatProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceProperties2);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceProperties2);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceQueueFamilyProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceMemoryProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, EnumerateDeviceExtensionProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
-
-		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumeratePhysicalDeviceGroups);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::Instance, EnumeratePhysicalDeviceGroups);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFormatProperties2);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceFormatProperties2);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceImageFormatProperties2);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceImageFormatProperties2);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceQueueFamilyProperties2);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceQueueFamilyProperties2);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceMemoryProperties2);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceMemoryProperties2);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties2);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties2);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceExternalBufferProperties);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceExternalBufferProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceExternalFenceProperties);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceExternalFenceProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceExternalSemaphoreProperties);
-		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceExternalSemaphoreProperties);
-		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceToolProperties);
-
-#undef VKD_ENTRYPOINT_LOOKUP
-#undef VKD_ENTRYPOINT_LOOKUP_KHR
-
 #define VKD_ICD_ENTRYPOINT_LOOKUP(klass, name) \
 	if (strcmp(pName, "vk_icd" #name) == 0)    \
 	return (PFN_vkVoidFunction)klass::name
@@ -102,12 +50,38 @@ namespace vkd
 #endif
 #undef VKD_ICD_ENTRYPOINT_LOOKUP
 
+#define VKD_ENTRYPOINT_LOOKUP(klass, name) \
+	if (strcmp(pName, "vk" #name) == 0)    \
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
+
+		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceExtensionProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceLayerProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumerateInstanceVersion);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, CreateInstance);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Icd, GetInstanceProcAddr);
+
+		if (pInstance == VK_NULL_HANDLE)
+			return nullptr;
+
+		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, DestroyInstance);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Instance, EnumeratePhysicalDevices);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFeatures);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceFormatProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceImageFormatProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceQueueFamilyProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceMemoryProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, EnumerateDeviceExtensionProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
+
+#undef VKD_ENTRYPOINT_LOOKUP
+
 		auto* pfn = Device::GetDeviceProcAddr(nullptr, pName);
 		if (pfn)
 			return pfn;
-#ifdef VKD_DEBUG_CHECKS
-		// cct::Logger::Warning("Could not find '{}' function", pName);
-#endif
+
 		return nullptr;
 	}
 
