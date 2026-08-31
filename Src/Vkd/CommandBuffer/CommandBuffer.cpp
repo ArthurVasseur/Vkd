@@ -134,10 +134,7 @@ namespace vkd
 
 		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
 
-		if (dynamicOffsetCount > 0)
-			cct::Logger::Warning("CmdBindDescriptorSets: dynamic descriptor offsets are not supported, ignored");
-
-		commandBufferObj->PushBindDescriptorSets(pipelineBindPoint, firstSet, std::span(pDescriptorSets, descriptorSetCount));
+		commandBufferObj->PushBindDescriptorSets(pipelineBindPoint, firstSet, std::span(pDescriptorSets, descriptorSetCount), std::span(pDynamicOffsets, dynamicOffsetCount));
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* pValues)

@@ -21,6 +21,7 @@ namespace vkd
 	class Device;
 	class DescriptorSetLayout;
 	class Buffer;
+	class BufferView;
 	class ImageView;
 	class Sampler;
 
@@ -57,11 +58,15 @@ namespace vkd
 		void SetImageBinding(UInt32 binding, UInt32 arrayElement, const ImageBinding& info);
 		[[nodiscard]] const ImageBinding* FindImageBinding(UInt32 binding, UInt32 arrayElement = 0) const noexcept;
 
+		void SetBufferViewBinding(UInt32 binding, UInt32 arrayElement, BufferView* view);
+		[[nodiscard]] BufferView* FindBufferViewBinding(UInt32 binding, UInt32 arrayElement = 0) const noexcept;
+
 	protected:
 		Device* m_owner;
 		DescriptorSetLayout* m_layout;
 		vkd::unordered_map<UInt32, vkd::vector<BufferBinding>> m_bufferBindings;
 		vkd::unordered_map<UInt32, vkd::vector<ImageBinding>> m_imageBindings;
+		vkd::unordered_map<UInt32, vkd::vector<BufferView*>> m_bufferViewBindings;
 	};
 } // namespace vkd
 

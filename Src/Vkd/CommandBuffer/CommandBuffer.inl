@@ -9,6 +9,7 @@
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
 #include "Vkd/DescriptorSet/DescriptorSet.hpp"
+#include "Vkd/DescriptorSetLayout/DescriptorSetLayout.hpp"
 #include "Vkd/Framebuffer/Framebuffer.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/QueryPool/QueryPool.hpp"
@@ -231,21 +232,45 @@ namespace vkd
 		});
 	}
 
-	inline void CommandBuffer::PushBindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, UInt32 firstSet, std::span<const VkDescriptorSet> pDescriptorSets)
+	inline void CommandBuffer::PushBindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, UInt32 firstSet, std::span<const VkDescriptorSet> pDescriptorSets, std::span<const UInt32> pDynamicOffsets)
 	{
 		vkd::vector<DescriptorSet*> descriptorSets(CommandAllocator<DescriptorSet*>(GetAllocationCallbacks()));
 		descriptorSets.resize(pDescriptorSets.size());
 
+		vkd::vector<DynamicOffsetEntry> dynamicOffsets(CommandAllocator<DynamicOffsetEntry>(GetAllocationCallbacks()));
+
+		std::size_t dynamicOffsetCursor = 0;
 		for (std::size_t i = 0; i < pDescriptorSets.size(); ++i)
 		{
 			VKD_FROM_HANDLE(DescriptorSet, descriptorSetObject, pDescriptorSets[i]);
 			descriptorSets[i] = descriptorSetObject;
+
+			if (!descriptorSetObject || !descriptorSetObject->GetLayout())
+				continue;
+
+			for (const DescriptorSetLayout::Binding& binding : descriptorSetObject->GetLayout()->GetBindings())
+			{
+				const bool isDynamic = binding.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC || binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+				if (!isDynamic)
+					continue;
+
+				for (UInt32 element = 0; element < binding.descriptorCount && dynamicOffsetCursor < pDynamicOffsets.size(); ++element)
+				{
+					dynamicOffsets.emplace_back(DynamicOffsetEntry{
+						.SetIndex = static_cast<UInt32>(i),
+						.Binding = binding.binding,
+						.ArrayElement = element,
+						.Offset = pDynamicOffsets[dynamicOffsetCursor++],
+					});
+				}
+			}
 		}
 
 		m_ops.emplace_back(OpBindDescriptorSets{
 			.BindPoint = pipelineBindPoint,
 			.FirstSet = firstSet,
 			.DescriptorSets = std::move(descriptorSets),
+			.DynamicOffsets = std::move(dynamicOffsets),
 		});
 	}
 

@@ -51,4 +51,26 @@ namespace vkd
 
 		return &it->second[arrayElement];
 	}
+
+	void DescriptorSet::SetBufferViewBinding(UInt32 binding, UInt32 arrayElement, BufferView* view)
+	{
+		AssertValid();
+
+		vkd::vector<BufferView*>& bindings = m_bufferViewBindings.try_emplace(binding, ObjectAllocator<BufferView*>(GetAllocationCallbacks())).first->second;
+		if (arrayElement >= bindings.size())
+			bindings.resize(arrayElement + 1);
+
+		bindings[arrayElement] = view;
+	}
+
+	BufferView* DescriptorSet::FindBufferViewBinding(UInt32 binding, UInt32 arrayElement) const noexcept
+	{
+		AssertValid();
+
+		auto it = m_bufferViewBindings.find(binding);
+		if (it == m_bufferViewBindings.end() || arrayElement >= it->second.size())
+			return nullptr;
+
+		return it->second[arrayElement];
+	}
 } // namespace vkd

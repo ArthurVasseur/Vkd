@@ -222,7 +222,7 @@ namespace vkd::software
 			return std::make_pair(*descriptorSet, *binding);
 		}
 
-		std::unordered_map<UInt32, see::exec::ExternalBuffer> ResolveUniformBuffers(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
+		std::unordered_map<UInt32, see::exec::ExternalBuffer> ResolveUniformBuffers(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, const std::unordered_map<UInt64, UInt32>& dynamicOffsets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
 		{
 			std::unordered_map<UInt32, see::exec::ExternalBuffer> result;
 
@@ -244,8 +244,15 @@ namespace vkd::software
 					continue;
 
 				vkd::Buffer* buffer = bufferBinding->buffer;
-				const VkDeviceSize byteSize = bufferBinding->range == VK_WHOLE_SIZE ? (buffer->GetSize() - bufferBinding->offset) : bufferBinding->range;
-				const VkDeviceSize absoluteOffset = buffer->GetMemoryOffset() + bufferBinding->offset;
+
+				VkDeviceSize offset = bufferBinding->offset;
+				const UInt64 dynamicKey = (static_cast<UInt64>(setBinding->first) << 32) | setBinding->second;
+				auto dynamicIt = dynamicOffsets.find(dynamicKey);
+				if (dynamicIt != dynamicOffsets.end())
+					offset += dynamicIt->second;
+
+				const VkDeviceSize byteSize = bufferBinding->range == VK_WHOLE_SIZE ? (buffer->GetSize() - offset) : bufferBinding->range;
+				const VkDeviceSize absoluteOffset = buffer->GetMemoryOffset() + offset;
 
 				void* mapped = nullptr;
 				if (buffer->GetMemory()->Map(absoluteOffset, byteSize, &mapped) != VK_SUCCESS || !mapped)
@@ -479,6 +486,13 @@ namespace vkd::software
 		for (size_t i = 0; i < op.DescriptorSets.size(); ++i)
 			m_boundDescriptorSets[op.FirstSet + i] = op.DescriptorSets[i];
 
+		for (const DynamicOffsetEntry& entry : op.DynamicOffsets)
+		{
+			const UInt32 set = op.FirstSet + entry.SetIndex;
+			const UInt64 key = (static_cast<UInt64>(set) << 32) | entry.Binding;
+			m_dynamicOffsets[key] = entry.Offset;
+		}
+
 		return VK_SUCCESS;
 	}
 
@@ -584,8 +598,8 @@ namespace vkd::software
 			scissor = pipeline->GetScissors()[0];
 
 		vkd::vector<vkd::DeviceMemory*> mappedUniformMemories(CommandAllocator<vkd::DeviceMemory*>(*m_allocationCallbacks));
-		const std::unordered_map<UInt32, see::exec::ExternalBuffer> vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, mappedUniformMemories);
-		const std::unordered_map<UInt32, see::exec::ExternalBuffer> fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, mappedUniformMemories);
+		const std::unordered_map<UInt32, see::exec::ExternalBuffer> vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, m_dynamicOffsets, mappedUniformMemories);
+		const std::unordered_map<UInt32, see::exec::ExternalBuffer> fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, m_dynamicOffsets, mappedUniformMemories);
 		const std::unordered_map<UInt32, see::exec::ExternalImage> vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedUniformMemories);
 		const std::unordered_map<UInt32, see::exec::ExternalImage> fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedUniformMemories);
 

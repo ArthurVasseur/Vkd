@@ -16,7 +16,8 @@ namespace vkd
 		m_owner(nullptr),
 		m_layout(nullptr),
 		m_bufferBindings(ObjectAllocator<std::pair<const UInt32, vkd::vector<BufferBinding>>>(allocationCallbacks)),
-		m_imageBindings(ObjectAllocator<std::pair<const UInt32, vkd::vector<ImageBinding>>>(allocationCallbacks))
+		m_imageBindings(ObjectAllocator<std::pair<const UInt32, vkd::vector<ImageBinding>>>(allocationCallbacks)),
+		m_bufferViewBindings(ObjectAllocator<std::pair<const UInt32, vkd::vector<BufferView*>>>(allocationCallbacks))
 	{
 	}
 

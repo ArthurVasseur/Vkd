@@ -1630,6 +1630,16 @@ namespace vkd
 			}
 
 			DescriptorSet* setObj = std::move(setResult).GetValue();
+
+			for (const DescriptorSetLayout::Binding& binding : layoutObj->GetBindings())
+			{
+				for (UInt32 element = 0; element < binding.immutableSamplers.size(); ++element)
+				{
+					VKD_FROM_HANDLE(Sampler, samplerObj, binding.immutableSamplers[element]);
+					setObj->SetImageBinding(binding.binding, element, DescriptorSet::ImageBinding{.imageView = nullptr, .sampler = samplerObj});
+				}
+			}
+
 			allocated.push_back(setObj);
 			pDescriptorSets[i] = VKD_TO_HANDLE(VkDescriptorSet, setObj);
 		}
@@ -1683,18 +1693,51 @@ namespace vkd
 				continue;
 			}
 
-			if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+			const bool isSamplerType = write.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER || write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			const bool isImageType = isSamplerType || write.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+									 write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || write.descriptorType == VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			if (isImageType)
 			{
 				if (!write.pImageInfo)
 					continue;
+
+				const DescriptorSetLayout::Binding* layoutBinding = setObj->GetLayout() ? setObj->GetLayout()->FindBinding(write.dstBinding) : nullptr;
+				const bool hasImmutableSamplers = layoutBinding && !layoutBinding->immutableSamplers.empty();
 
 				for (UInt32 j = 0; j < write.descriptorCount; ++j)
 				{
 					const VkDescriptorImageInfo& imageInfo = write.pImageInfo[j];
 					VKD_FROM_HANDLE(ImageView, imageViewObj, imageInfo.imageView);
-					VKD_FROM_HANDLE(Sampler, samplerObj, imageInfo.sampler);
+
+					Sampler* samplerObj = nullptr;
+					if (isSamplerType)
+					{
+						if (hasImmutableSamplers)
+						{
+							const DescriptorSet::ImageBinding* existing = setObj->FindImageBinding(write.dstBinding, write.dstArrayElement + j);
+							samplerObj = existing ? existing->sampler : nullptr;
+						}
+						else
+						{
+							VKD_FROM_HANDLE(Sampler, writtenSampler, imageInfo.sampler);
+							samplerObj = writtenSampler;
+						}
+					}
 
 					setObj->SetImageBinding(write.dstBinding, write.dstArrayElement + j, DescriptorSet::ImageBinding{.imageView = imageViewObj, .sampler = samplerObj});
+				}
+				continue;
+			}
+
+			if (write.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER || write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+			{
+				if (!write.pTexelBufferView)
+					continue;
+
+				for (UInt32 j = 0; j < write.descriptorCount; ++j)
+				{
+					VKD_FROM_HANDLE(BufferView, bufferViewObj, write.pTexelBufferView[j]);
+					setObj->SetBufferViewBinding(write.dstBinding, write.dstArrayElement + j, bufferViewObj);
 				}
 				continue;
 			}
@@ -1702,8 +1745,27 @@ namespace vkd
 			cct::Logger::Warning("UpdateDescriptorSets: descriptor type {} not supported, write ignored", static_cast<int>(write.descriptorType));
 		}
 
-		if (descriptorCopyCount > 0)
-			cct::Logger::Warning("UpdateDescriptorSets: descriptor set copies are not supported, ignored");
+		for (UInt32 i = 0; i < descriptorCopyCount; ++i)
+		{
+			const VkCopyDescriptorSet& copy = pDescriptorCopies[i];
+			VKD_FROM_HANDLE(DescriptorSet, srcSetObj, copy.srcSet);
+			VKD_FROM_HANDLE(DescriptorSet, dstSetObj, copy.dstSet);
+
+			for (UInt32 j = 0; j < copy.descriptorCount; ++j)
+			{
+				const UInt32 srcElement = copy.srcArrayElement + j;
+				const UInt32 dstElement = copy.dstArrayElement + j;
+
+				if (const DescriptorSet::BufferBinding* buffer = srcSetObj->FindBufferBinding(copy.srcBinding, srcElement))
+					dstSetObj->SetBufferBinding(copy.dstBinding, dstElement, *buffer);
+
+				if (const DescriptorSet::ImageBinding* image = srcSetObj->FindImageBinding(copy.srcBinding, srcElement))
+					dstSetObj->SetImageBinding(copy.dstBinding, dstElement, *image);
+
+				if (BufferView* view = srcSetObj->FindBufferViewBinding(copy.srcBinding, srcElement))
+					dstSetObj->SetBufferViewBinding(copy.dstBinding, dstElement, view);
+			}
+		}
 	}
 
 	VkResult Device::CreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache)

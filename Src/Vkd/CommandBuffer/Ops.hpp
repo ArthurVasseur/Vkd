@@ -40,11 +40,20 @@ namespace vkd
 		VkIndexType IndexType;
 	};
 
+	struct DynamicOffsetEntry
+	{
+		UInt32 SetIndex;
+		UInt32 Binding;
+		UInt32 ArrayElement;
+		UInt32 Offset;
+	};
+
 	struct OpBindDescriptorSets
 	{
 		VkPipelineBindPoint BindPoint;
 		UInt32 FirstSet;
 		vkd::vector<DescriptorSet*> DescriptorSets;
+		vkd::vector<DynamicOffsetEntry> DynamicOffsets;
 	};
 
 	struct OpBeginRenderPass

@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <functional>
+#include <unordered_map>
 #include <vector>
 
 #include "Vkd/Buffer/Buffer.hpp"
@@ -64,6 +66,7 @@ namespace vkd::software
 		VkDeviceSize m_indexBufferOffset = 0;
 		VkIndexType m_indexType = VK_INDEX_TYPE_UINT32;
 		vkd::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
+		std::unordered_map<UInt64, UInt32> m_dynamicOffsets;
 		vkd::vector<VkViewport> m_dynamicViewports;
 		vkd::vector<VkRect2D> m_dynamicScissors;
 
