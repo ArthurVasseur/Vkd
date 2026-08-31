@@ -231,10 +231,8 @@ namespace vkd
 	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyDevice);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue);
-		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateCommandPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyCommandPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetCommandPool);
@@ -309,7 +307,6 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, ResetCommandBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdFillBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer);
-		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyBuffer2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdUpdateBuffer);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBlitImage);
@@ -343,7 +340,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdExecuteCommands);
 
 #undef VKD_ENTRYPOINT_LOOKUP
-		// cct::Logger::Warning("Could not find '{}' function", pName);
+
 		return nullptr;
 	}
 
