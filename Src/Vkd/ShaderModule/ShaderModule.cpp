@@ -14,7 +14,7 @@ namespace vkd
 
 		if (info.codeSize == 0 || !info.pCode || (info.codeSize % sizeof(UInt32)) != 0)
 		{
-			m_createResult = VK_ERROR_INITIALIZATION_FAILED;
+			m_createResult = VK_ERROR_VALIDATION_FAILED_EXT;
 			return m_createResult;
 		}
 

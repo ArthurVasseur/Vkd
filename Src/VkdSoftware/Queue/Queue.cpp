@@ -138,6 +138,6 @@ namespace vkd::software
 		VKD_AUTO_PROFILER_SCOPE();
 
 		// Sparse binding is an optional feature, not implemented for software queue
-		return VK_ERROR_FEATURE_NOT_PRESENT;
+		return VK_ERROR_VALIDATION_FAILED_EXT;
 	}
 } // namespace vkd::software

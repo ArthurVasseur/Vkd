@@ -666,7 +666,7 @@ namespace vkd
 			if (!fenceObj)
 			{
 				CCT_ASSERT_FALSE("Invalid VkFence handle at index {}", i);
-				return VK_ERROR_DEVICE_LOST;
+				return VK_ERROR_VALIDATION_FAILED_EXT;
 			}
 
 			VkResult result = fenceObj->Reset();
