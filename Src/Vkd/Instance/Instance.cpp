@@ -10,7 +10,6 @@
 
 #include "Vkd/Icd/Icd.hpp"
 #include "Vkd/Memory/AllocationCallbacks.hpp"
-#include "VkdSoftware/PhysicalDevice/PhysicalDevice.hpp"
 
 namespace vkd
 {
@@ -154,10 +153,9 @@ namespace vkd
 		if (m_physicalDevicesAlreadyEnumerated)
 			return VK_SUCCESS; // Enumerate Physical devices only once during the lifetime of this VkInstance
 
-		DispatchableObject<software::PhysicalDevice>* softwarePhysicalDevice = mem::NewInstanceDispatchable<software::PhysicalDevice>(GetAllocationCallbacks());
-		if (!softwarePhysicalDevice)
+		DispatchableObject<PhysicalDevice>* physicalDevice = VkdCreatePlatformPhysicalDevice(GetAllocationCallbacks());
+		if (!physicalDevice)
 			return Error(VK_ERROR_OUT_OF_HOST_MEMORY, "Out of host memory");
-		DispatchableObject<PhysicalDevice>* physicalDevice = reinterpret_cast<DispatchableObject<PhysicalDevice>*>(softwarePhysicalDevice);
 
 		VkResult result = physicalDevice->Object->Create(*this, GetAllocationCallbacks());
 		if (result != VK_SUCCESS)

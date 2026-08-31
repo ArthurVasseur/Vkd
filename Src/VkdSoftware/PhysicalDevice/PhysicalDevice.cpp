@@ -169,3 +169,12 @@ namespace vkd::software
 		return reinterpret_cast<DispatchableObject<Device>*>(softwareDevice);
 	}
 } // namespace vkd::software
+
+namespace vkd
+{
+	DispatchableObject<PhysicalDevice>* VkdCreatePlatformPhysicalDevice(const VkAllocationCallbacks& allocationCallbacks)
+	{
+		DispatchableObject<software::PhysicalDevice>* softwarePhysicalDevice = mem::NewInstanceDispatchable<software::PhysicalDevice>(allocationCallbacks);
+		return reinterpret_cast<DispatchableObject<PhysicalDevice>*>(softwarePhysicalDevice);
+	}
+} // namespace vkd

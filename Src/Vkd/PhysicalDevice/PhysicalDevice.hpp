@@ -79,4 +79,6 @@ namespace vkd
 		VkPhysicalDeviceProperties m_physicalDeviceProperties;
 		std::array<VkQueueFamilyProperties, 3 /*(graphics + compute + transfer), graphics, transfer*/> m_queueFamilyProperties;
 	};
+
+	DispatchableObject<PhysicalDevice>* VkdCreatePlatformPhysicalDevice(const VkAllocationCallbacks& allocationCallbacks);
 } // namespace vkd
