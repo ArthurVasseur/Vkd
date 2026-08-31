@@ -50,6 +50,7 @@ namespace vkd
 		virtual VkResult Create(Device& owner, const VkImageCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);
 		void BindImageMemory(DeviceMemory& deviceMemory, VkDeviceSize memoryOffset);
 		void GetMemoryRequirements(VkMemoryRequirements& memoryRequirements) const;
+		void GetSubresourceLayout(const VkImageSubresource& subresource, VkSubresourceLayout& layout) const;
 
 		[[nodiscard]] inline Device* GetOwner() const;
 		[[nodiscard]] inline VkImageType GetImageType() const;

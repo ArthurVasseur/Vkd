@@ -69,6 +69,41 @@ namespace vkd
 		memoryRequirements.memoryTypeBits = 0xFFFFFFFF;
 	}
 
+	inline void Image::GetSubresourceLayout(const VkImageSubresource& subresource, VkSubresourceLayout& layout) const
+	{
+		const VkDeviceSize pixelSize = vkuFormatElementSize(m_format);
+
+		VkDeviceSize mipChainSize = 0;
+		VkDeviceSize levelOffset = 0;
+		VkDeviceSize levelSize = 0;
+		VkDeviceSize levelRowPitch = 0;
+		VkDeviceSize levelDepthPitch = 0;
+
+		for (UInt32 level = 0; level < m_mipLevels; ++level)
+		{
+			const VkDeviceSize mipWidth = std::max<VkDeviceSize>(m_extent.width >> level, 1);
+			const VkDeviceSize mipHeight = std::max<VkDeviceSize>(m_extent.height >> level, 1);
+			const VkDeviceSize mipDepth = std::max<VkDeviceSize>(m_extent.depth >> level, 1);
+			const VkDeviceSize thisLevelSize = mipWidth * mipHeight * mipDepth * pixelSize;
+
+			if (level == subresource.mipLevel)
+			{
+				levelOffset = mipChainSize;
+				levelSize = thisLevelSize;
+				levelRowPitch = mipWidth * pixelSize;
+				levelDepthPitch = mipWidth * mipHeight * pixelSize;
+			}
+
+			mipChainSize += thisLevelSize;
+		}
+
+		layout.offset = (subresource.arrayLayer * mipChainSize) + levelOffset;
+		layout.size = levelSize;
+		layout.rowPitch = levelRowPitch;
+		layout.arrayPitch = mipChainSize;
+		layout.depthPitch = levelDepthPitch;
+	}
+
 	inline Device* Image::GetOwner() const
 	{
 		AssertValid();

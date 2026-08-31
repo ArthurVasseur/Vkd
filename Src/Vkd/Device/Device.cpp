@@ -272,9 +272,12 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageMemoryRequirements);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageSparseMemoryRequirements);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageSubresourceLayout);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindImageMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, AllocateMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceMemoryCommitment);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, MapMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, UnmapMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FlushMappedMemoryRanges);
@@ -284,6 +287,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipeline);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateRenderPass);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyRenderPass);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetRenderAreaGranularity);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateImageView);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyImageView);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateFramebuffer);
@@ -832,6 +836,28 @@ namespace vkd
 		imageObj->GetMemoryRequirements(*pMemoryRequirements);
 	}
 
+	void Device::GetImageSparseMemoryRequirements(VkDevice device, VkImage image, uint32_t* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements* pSparseMemoryRequirements)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Image, imageObj, image);
+		VKD_CHECK(pSparseMemoryRequirementCount);
+
+		*pSparseMemoryRequirementCount = 0;
+	}
+
+	void Device::GetImageSubresourceLayout(VkDevice device, VkImage image, const VkImageSubresource* pSubresource, VkSubresourceLayout* pLayout)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Image, imageObj, image);
+		VKD_CHECK(pSubresource && pLayout);
+
+		imageObj->GetSubresourceLayout(*pSubresource, *pLayout);
+	}
+
 	VkResult Device::BindImageMemory(VkDevice device, VkImage image, VkDeviceMemory memory, VkDeviceSize memoryOffset)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
@@ -883,6 +909,17 @@ namespace vkd
 		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
 
 		mem::Delete(pAllocator ? *pAllocator : memoryObj->GetAllocationCallbacks(), memoryObj);
+	}
+
+	void Device::GetDeviceMemoryCommitment(VkDevice device, VkDeviceMemory memory, VkDeviceSize* pCommittedMemoryInBytes)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(DeviceMemory, memoryObj, memory);
+		VKD_CHECK(pCommittedMemoryInBytes);
+
+		*pCommittedMemoryInBytes = memoryObj->GetSize();
 	}
 
 	VkResult Device::MapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData)
@@ -1097,6 +1134,18 @@ namespace vkd
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, renderPass);
 
 		mem::Delete(pAllocator ? *pAllocator : renderPassObj->GetAllocationCallbacks(), renderPassObj);
+	}
+
+	void Device::GetRenderAreaGranularity(VkDevice device, VkRenderPass renderPass, VkExtent2D* pGranularity)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(RenderPass, renderPassObj, renderPass);
+		VKD_CHECK(pGranularity);
+
+		pGranularity->width = 1;
+		pGranularity->height = 1;
 	}
 
 	VkResult Device::CreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkImageView* pView)
