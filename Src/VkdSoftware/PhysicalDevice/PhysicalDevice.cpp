@@ -16,7 +16,7 @@ namespace vkd::software
 
 		physicalDeviceProperties.apiVersion = VKD_VK_API_VERSION;
 		physicalDeviceProperties.driverVersion = VKD_DRIVER_VERSION;
-		physicalDeviceProperties.vendorID = 0x0601;
+		physicalDeviceProperties.vendorID = 0x10010;
 		physicalDeviceProperties.deviceID = 0x060103;
 		physicalDeviceProperties.deviceType = VK_PHYSICAL_DEVICE_TYPE_CPU;
 
@@ -80,7 +80,7 @@ namespace vkd::software
 			.subTexelPrecisionBits = 4,
 			.mipmapPrecisionBits = 4,
 			.maxDrawIndexedIndexValue = 4294967295,
-			.maxDrawIndirectCount = 65535,
+			.maxDrawIndirectCount = 1,
 			.maxSamplerLodBias = 2.0f,
 			.maxSamplerAnisotropy = 1.0f,
 			.maxViewports = 1,

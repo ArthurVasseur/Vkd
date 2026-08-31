@@ -7,6 +7,7 @@
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
 
 #include <algorithm>
+#include <bit>
 
 #include "VkdUtils/System/System.hpp"
 
@@ -133,16 +134,20 @@ namespace vkd
 		pFormatProperties->optimalTilingFeatures = 0;
 		pFormatProperties->bufferFeatures = 0;
 
-		// CPU backend primarily supports buffer operations
-		// Image operations are not yet implemented
 		switch (format)
 		{
-			// TODO: Add support for VK_FORMAT_R8G8B8A8_UNORM when image operations are implemented
-			// This would enable basic RGBA8 image support for the CPU backend
 			case VK_FORMAT_R8G8B8A8_UNORM:
-				// Currently no image support - all features remain 0
-				// Future: enable VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT
+			{
+				const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+													  VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT |
+													  VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+													  VK_FORMAT_FEATURE_TRANSFER_SRC_BIT |
+													  VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+				pFormatProperties->linearTilingFeatures = features;
+				pFormatProperties->optimalTilingFeatures = features;
+				pFormatProperties->bufferFeatures = VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT;
 				break;
+			}
 
 			// All other formats: no support
 			default:
@@ -162,37 +167,28 @@ namespace vkd
 		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
 		CCT_ASSERT(pImageFormatProperties, "pImageFormatProperties cannot be null");
 
-		// CPU backend does not currently support image operations
-		// Images require significant infrastructure (tiling, sampling, format conversion, etc.)
+		std::memset(pImageFormatProperties, 0, sizeof(VkImageFormatProperties));
 
-		// TODO: Implement support for VK_FORMAT_R8G8B8A8_UNORM with VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-		// TODO: Implement support for VK_FORMAT_R8G8B8A8_UNORM with VK_IMAGE_USAGE_TRANSFER_DST_BIT
-		// TODO: Implement support for VK_IMAGE_TYPE_2D with VK_IMAGE_TILING_LINEAR
+		const VkImageUsageFlags supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+													  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-		// Check for unsupported image usage flags
-		const VkImageUsageFlags unsupportedUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
-														VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-														VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-														VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-														VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-														VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-														VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-		if (usage & unsupportedUsageFlags)
-		{
-			// All image usages are currently unsupported
+		if (format != VK_FORMAT_R8G8B8A8_UNORM || type != VK_IMAGE_TYPE_2D ||
+			(tiling != VK_IMAGE_TILING_OPTIMAL && tiling != VK_IMAGE_TILING_LINEAR) ||
+			(usage & ~supportedUsageFlags) != 0 || (flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0)
 			return VK_ERROR_FORMAT_NOT_SUPPORTED;
-		}
 
-		// Check for unsupported tiling modes
-		if (tiling == VK_IMAGE_TILING_OPTIMAL || tiling == VK_IMAGE_TILING_LINEAR)
-		{
-			// Both tiling modes are currently unsupported
-			return VK_ERROR_FORMAT_NOT_SUPPORTED;
-		}
+		const VkPhysicalDeviceLimits& limits = physicalDevice->GetPhysicalDeviceProperties().limits;
 
-		// All image formats are currently unsupported
-		return VK_ERROR_FORMAT_NOT_SUPPORTED;
+		pImageFormatProperties->maxExtent = {limits.maxImageDimension2D, limits.maxImageDimension2D, 1};
+		pImageFormatProperties->maxMipLevels = std::bit_width(limits.maxImageDimension2D);
+		pImageFormatProperties->maxArrayLayers = limits.maxImageArrayLayers;
+		pImageFormatProperties->sampleCounts = (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+												   ? limits.framebufferColorSampleCounts
+												   : VK_SAMPLE_COUNT_1_BIT;
+		pImageFormatProperties->maxResourceSize = static_cast<VkDeviceSize>(limits.maxImageDimension2D) *
+												  limits.maxImageDimension2D * limits.maxImageArrayLayers * 4;
+
+		return VK_SUCCESS;
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceProperties(VkPhysicalDevice pPhysicalDevice,
