@@ -462,6 +462,9 @@ namespace vkd
 		VKD_FROM_HANDLE(CommandPool, poolObj, pAllocateInfo->commandPool);
 
 		for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; ++i)
+			pCommandBuffers[i] = VK_NULL_HANDLE;
+
+		for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; ++i)
 		{
 			auto bufferResult = poolObj->AllocateCommandBuffer(pAllocateInfo->level);
 			if (bufferResult.IsError())
@@ -471,6 +474,7 @@ namespace vkd
 					auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
 					poolObj->RemoveCommandBuffer(dispatchable);
 					mem::DeleteDispatchable(dispatchable);
+					pCommandBuffers[j] = VK_NULL_HANDLE;
 				}
 				return bufferResult.GetError();
 			}
@@ -485,6 +489,7 @@ namespace vkd
 					auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
 					poolObj->RemoveCommandBuffer(dispatchable);
 					mem::DeleteDispatchable(dispatchable);
+					pCommandBuffers[j] = VK_NULL_HANDLE;
 				}
 				return result;
 			}
@@ -1599,6 +1604,9 @@ namespace vkd
 		VKD_FROM_HANDLE(DescriptorPool, poolObj, pAllocateInfo->descriptorPool);
 		const VkAllocationCallbacks& allocationCallbacks = poolObj->GetAllocationCallbacks();
 
+		for (UInt32 i = 0; i < pAllocateInfo->descriptorSetCount; ++i)
+			pDescriptorSets[i] = VK_NULL_HANDLE;
+
 		vkd::vector<DescriptorSet*> allocated(ObjectAllocator<DescriptorSet*>(allocationCallbacks));
 		allocated.reserve(pAllocateInfo->descriptorSetCount);
 
@@ -1611,6 +1619,8 @@ namespace vkd
 			{
 				for (DescriptorSet* set : allocated)
 					poolObj->FreeSet(set, allocationCallbacks);
+				for (UInt32 j = 0; j < pAllocateInfo->descriptorSetCount; ++j)
+					pDescriptorSets[j] = VK_NULL_HANDLE;
 				return setResult.GetError();
 			}
 
