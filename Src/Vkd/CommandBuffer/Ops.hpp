@@ -24,6 +24,7 @@ namespace vkd
 	class Framebuffer;
 	class RenderPass;
 	class DescriptorSet;
+	class QueryPool;
 
 	struct OpBindVertexBuffer
 	{
@@ -57,6 +58,44 @@ namespace vkd
 
 	struct OpEndRenderPass
 	{
+	};
+
+	struct OpResetQueryPool
+	{
+		QueryPool* QueryPoolObject;
+		UInt32 FirstQuery;
+		UInt32 QueryCount;
+	};
+
+	struct OpBeginQuery
+	{
+		QueryPool* QueryPoolObject;
+		UInt32 Query;
+		VkQueryControlFlags Flags;
+	};
+
+	struct OpEndQuery
+	{
+		QueryPool* QueryPoolObject;
+		UInt32 Query;
+	};
+
+	struct OpWriteTimestamp
+	{
+		QueryPool* QueryPoolObject;
+		VkPipelineStageFlagBits PipelineStage;
+		UInt32 Query;
+	};
+
+	struct OpCopyQueryPoolResults
+	{
+		QueryPool* QueryPoolObject;
+		UInt32 FirstQuery;
+		UInt32 QueryCount;
+		Buffer* DstBuffer;
+		VkDeviceSize DstOffset;
+		VkDeviceSize Stride;
+		VkQueryResultFlags Flags;
 	};
 
 	struct OpDraw
@@ -122,5 +161,10 @@ namespace vkd
 		OpSetViewport,
 		OpSetScissor,
 		OpBeginRenderPass,
-		OpEndRenderPass>;
+		OpEndRenderPass,
+		OpResetQueryPool,
+		OpBeginQuery,
+		OpEndQuery,
+		OpWriteTimestamp,
+		OpCopyQueryPoolResults>;
 } // namespace vkd

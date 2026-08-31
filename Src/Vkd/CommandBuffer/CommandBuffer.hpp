@@ -85,6 +85,11 @@ namespace vkd
 		static void VKAPI_CALL CmdEndRenderPass(VkCommandBuffer commandBuffer);
 		static void VKAPI_CALL CmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents);
 		static void VKAPI_CALL CmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount, const VkCommandBuffer* pCommandBuffers);
+		static void VKAPI_CALL CmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount);
+		static void VKAPI_CALL CmdBeginQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query, VkQueryControlFlags flags);
+		static void VKAPI_CALL CmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query);
+		static void VKAPI_CALL CmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage, VkQueryPool queryPool, uint32_t query);
+		static void VKAPI_CALL CmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize stride, VkQueryResultFlags flags);
 
 		inline VkResult Begin(const VkCommandBufferBeginInfo& beginInfo);
 		inline VkResult End();
@@ -107,6 +112,11 @@ namespace vkd
 		inline void PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor);
 		inline void PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents);
 		inline void PushEndRenderPass();
+		inline void PushResetQueryPool(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount);
+		inline void PushBeginQuery(VkQueryPool queryPool, UInt32 query, VkQueryControlFlags flags);
+		inline void PushEndQuery(VkQueryPool queryPool, UInt32 query);
+		inline void PushWriteTimestamp(VkPipelineStageFlagBits pipelineStage, VkQueryPool queryPool, UInt32 query);
+		inline void PushCopyQueryPoolResults(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize stride, VkQueryResultFlags flags);
 
 		inline VkResult MarkSubmitted();
 		inline VkResult MarkComplete();

@@ -35,6 +35,11 @@ namespace vkd
 
 		VkResult GetResults(UInt32 firstQuery, UInt32 queryCount, std::size_t dataSize, void* pData, VkDeviceSize stride, VkQueryResultFlags flags);
 
+		void Reset(UInt32 firstQuery, UInt32 queryCount);
+		void Begin(UInt32 query, VkQueryControlFlags flags);
+		void End(UInt32 query);
+		void WriteTimestamp(UInt32 query);
+
 	private:
 		[[nodiscard]] UInt32 ValuesPerQuery() const;
 

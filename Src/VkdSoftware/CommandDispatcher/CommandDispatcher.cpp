@@ -130,4 +130,29 @@ namespace vkd::software
 	{
 		return m_context->EndRenderPass(std::move(op));
 	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpResetQueryPool op)
+	{
+		return m_context->ResetQueryPool(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpBeginQuery op)
+	{
+		return m_context->BeginQuery(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpEndQuery op)
+	{
+		return m_context->EndQuery(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpWriteTimestamp op)
+	{
+		return m_context->WriteTimestamp(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpCopyQueryPoolResults op)
+	{
+		return m_context->CopyQueryPoolResults(std::move(op));
+	}
 } // namespace vkd::software

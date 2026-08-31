@@ -16,6 +16,7 @@
 #include "Vkd/DescriptorSet/DescriptorSet.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/ImageView/ImageView.hpp"
+#include "Vkd/QueryPool/QueryPool.hpp"
 #include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Pipeline/Pipeline.hpp"
 
@@ -974,6 +975,66 @@ namespace vkd::software
 		m_currentRenderPass = nullptr;
 		m_currentFramebuffer = nullptr;
 		m_renderArea = {};
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::ResetQueryPool(vkd::OpResetQueryPool op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.QueryPoolObject, "Invalid pointer");
+		op.QueryPoolObject->Reset(op.FirstQuery, op.QueryCount);
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::BeginQuery(vkd::OpBeginQuery op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.QueryPoolObject, "Invalid pointer");
+		op.QueryPoolObject->Begin(op.Query, op.Flags);
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::EndQuery(vkd::OpEndQuery op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.QueryPoolObject, "Invalid pointer");
+		op.QueryPoolObject->End(op.Query);
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::WriteTimestamp(vkd::OpWriteTimestamp op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.QueryPoolObject, "Invalid pointer");
+		op.QueryPoolObject->WriteTimestamp(op.Query);
+
+		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::CopyQueryPoolResults(vkd::OpCopyQueryPoolResults op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.QueryPoolObject && op.DstBuffer && op.DstBuffer->GetMemory(), "Invalid pointer");
+
+		const VkDeviceSize available = op.DstBuffer->GetSize() - op.DstOffset;
+
+		cct::UByte* dstData = nullptr;
+		const VkResult result = MapRange(op.DstBuffer->GetMemory(), op.DstBuffer->GetMemoryOffset() + op.DstOffset, available, &dstData);
+		if (result != VK_SUCCESS)
+			return result;
+
+		op.QueryPoolObject->GetResults(op.FirstQuery, op.QueryCount, static_cast<std::size_t>(available), dstData, op.Stride, op.Flags);
+
+		op.DstBuffer->GetMemory()->Unmap();
 
 		return VK_SUCCESS;
 	}

@@ -44,6 +44,11 @@ namespace vkd::software
 		VkResult operator()(vkd::OpSetScissor op);
 		VkResult operator()(vkd::OpBeginRenderPass op);
 		VkResult operator()(vkd::OpEndRenderPass op);
+		VkResult operator()(vkd::OpResetQueryPool op);
+		VkResult operator()(vkd::OpBeginQuery op);
+		VkResult operator()(vkd::OpEndQuery op);
+		VkResult operator()(vkd::OpWriteTimestamp op);
+		VkResult operator()(vkd::OpCopyQueryPoolResults op);
 
 		CpuContext* m_context;
 	};

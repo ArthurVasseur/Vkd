@@ -11,6 +11,7 @@
 #include "Vkd/DescriptorSet/DescriptorSet.hpp"
 #include "Vkd/Framebuffer/Framebuffer.hpp"
 #include "Vkd/Pipeline/Pipeline.hpp"
+#include "Vkd/QueryPool/QueryPool.hpp"
 #include "Vkd/RenderPass/RenderPass.hpp"
 
 namespace vkd
@@ -306,6 +307,65 @@ namespace vkd
 	inline void CommandBuffer::PushEndRenderPass()
 	{
 		m_ops.emplace_back(OpEndRenderPass{});
+	}
+
+	inline void CommandBuffer::PushResetQueryPool(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount)
+	{
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+
+		m_ops.emplace_back(OpResetQueryPool{
+			.QueryPoolObject = queryPoolObj,
+			.FirstQuery = firstQuery,
+			.QueryCount = queryCount,
+		});
+	}
+
+	inline void CommandBuffer::PushBeginQuery(VkQueryPool queryPool, UInt32 query, VkQueryControlFlags flags)
+	{
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+
+		m_ops.emplace_back(OpBeginQuery{
+			.QueryPoolObject = queryPoolObj,
+			.Query = query,
+			.Flags = flags,
+		});
+	}
+
+	inline void CommandBuffer::PushEndQuery(VkQueryPool queryPool, UInt32 query)
+	{
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+
+		m_ops.emplace_back(OpEndQuery{
+			.QueryPoolObject = queryPoolObj,
+			.Query = query,
+		});
+	}
+
+	inline void CommandBuffer::PushWriteTimestamp(VkPipelineStageFlagBits pipelineStage, VkQueryPool queryPool, UInt32 query)
+	{
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+
+		m_ops.emplace_back(OpWriteTimestamp{
+			.QueryPoolObject = queryPoolObj,
+			.PipelineStage = pipelineStage,
+			.Query = query,
+		});
+	}
+
+	inline void CommandBuffer::PushCopyQueryPoolResults(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize stride, VkQueryResultFlags flags)
+	{
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+		VKD_FROM_HANDLE(Buffer, dstBufferObj, dstBuffer);
+
+		m_ops.emplace_back(OpCopyQueryPoolResults{
+			.QueryPoolObject = queryPoolObj,
+			.FirstQuery = firstQuery,
+			.QueryCount = queryCount,
+			.DstBuffer = dstBufferObj,
+			.DstOffset = dstOffset,
+			.Stride = stride,
+			.Flags = flags,
+		});
 	}
 
 	inline VkResult CommandBuffer::MarkSubmitted()

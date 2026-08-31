@@ -362,6 +362,11 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdEndRenderPass);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdNextSubpass);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdExecuteCommands);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdResetQueryPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBeginQuery);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdEndQuery);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdWriteTimestamp);
+		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyQueryPoolResults);
 
 #undef VKD_ENTRYPOINT_LOOKUP
 

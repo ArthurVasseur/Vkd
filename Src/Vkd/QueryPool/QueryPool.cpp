@@ -69,7 +69,7 @@ namespace vkd
 			}
 		}
 
-		if (!allAvailable && !partial)
+		if (!allAvailable && !partial && !wantAvailability)
 			return VK_NOT_READY;
 
 		auto* out = static_cast<UInt8*>(pData);
@@ -111,5 +111,54 @@ namespace vkd
 
 		(void)dataSize;
 		return allAvailable ? VK_SUCCESS : VK_NOT_READY;
+	}
+
+	void QueryPool::Reset(UInt32 firstQuery, UInt32 queryCount)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		VKD_CHECK(firstQuery + queryCount <= m_queryCount);
+
+		const UInt32 valuesPerQuery = ValuesPerQuery();
+		std::lock_guard lock(m_mutex);
+		for (UInt32 i = 0; i < queryCount; ++i)
+		{
+			m_available[firstQuery + i] = 0;
+			std::fill_n(m_results.begin() + static_cast<std::ptrdiff_t>(static_cast<std::size_t>(firstQuery + i) * valuesPerQuery), valuesPerQuery, 0);
+		}
+	}
+
+	void QueryPool::Begin(UInt32 query, VkQueryControlFlags flags)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		VKD_CHECK(query < m_queryCount);
+		(void)flags;
+
+		std::lock_guard lock(m_mutex);
+		m_available[query] = 0;
+	}
+
+	void QueryPool::End(UInt32 query)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		VKD_CHECK(query < m_queryCount);
+
+		{
+			std::lock_guard lock(m_mutex);
+			m_available[query] = 1;
+		}
+		m_cv.notify_all();
+	}
+
+	void QueryPool::WriteTimestamp(UInt32 query)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+		VKD_CHECK(query < m_queryCount);
+
+		{
+			std::lock_guard lock(m_mutex);
+			m_results[query] = 0;
+			m_available[query] = 1;
+		}
+		m_cv.notify_all();
 	}
 } // namespace vkd

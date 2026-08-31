@@ -288,4 +288,44 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 		cct::Logger::Warning("CmdBlitImage: not implemented, ignored");
 	}
+
+	void VKAPI_CALL CommandBuffer::CmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushResetQueryPool(queryPool, firstQuery, queryCount);
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdBeginQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query, VkQueryControlFlags flags)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushBeginQuery(queryPool, query, flags);
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushEndQuery(queryPool, query);
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage, VkQueryPool queryPool, uint32_t query)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushWriteTimestamp(pipelineStage, queryPool, query);
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize stride, VkQueryResultFlags flags)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushCopyQueryPoolResults(queryPool, firstQuery, queryCount, dstBuffer, dstOffset, stride, flags);
+	}
 } // namespace vkd

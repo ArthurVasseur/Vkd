@@ -44,6 +44,11 @@ namespace vkd::software
 		VkResult ClearColorImage(vkd::Image::OpClearColorImage op);
 		VkResult BeginRenderPass(vkd::OpBeginRenderPass op);
 		VkResult EndRenderPass(vkd::OpEndRenderPass op);
+		VkResult ResetQueryPool(vkd::OpResetQueryPool op);
+		VkResult BeginQuery(vkd::OpBeginQuery op);
+		VkResult EndQuery(vkd::OpEndQuery op);
+		VkResult WriteTimestamp(vkd::OpWriteTimestamp op);
+		VkResult CopyQueryPoolResults(vkd::OpCopyQueryPoolResults op);
 
 		inline void Reset();
 
