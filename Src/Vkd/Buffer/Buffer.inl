@@ -41,7 +41,7 @@ namespace vkd
 	{
 		memoryRequirements.size = GetSize();
 		memoryRequirements.alignment = 16;
-		memoryRequirements.memoryTypeBits = 0xFFFFFFFF;
+		memoryRequirements.memoryTypeBits = 0x1;
 	}
 
 	inline Device* Buffer::GetOwner() const

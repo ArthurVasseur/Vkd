@@ -64,9 +64,9 @@ namespace vkd
 			mipChainSize += mipWidth * mipHeight * mipDepth * pixelSize;
 		}
 
-		memoryRequirements.size = mipChainSize * m_arrayLayers;
+		memoryRequirements.size = mipChainSize * m_arrayLayers * static_cast<VkDeviceSize>(m_samples);
 		memoryRequirements.alignment = 256;
-		memoryRequirements.memoryTypeBits = 0xFFFFFFFF;
+		memoryRequirements.memoryTypeBits = 0x1;
 	}
 
 	inline void Image::GetSubresourceLayout(const VkImageSubresource& subresource, VkSubresourceLayout& layout) const

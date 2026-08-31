@@ -28,7 +28,7 @@ namespace vkd::software
 			return result;
 
 		auto* softwareDevice = static_cast<SoftwareDevice*>(&owner);
-		if (!softwareDevice->GetAllocator().Allocate(info.allocationSize, 16, m_allocation))
+		if (!softwareDevice->GetAllocator().Allocate(info.allocationSize, 256, m_allocation))
 			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 
 		return VK_SUCCESS;
