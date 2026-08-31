@@ -548,11 +548,10 @@ namespace vkd
 		if (fence == VK_NULL_HANDLE)
 			return;
 
-		VKD_FROM_HANDLE(Fence, fenceObj, fence);
 		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_FROM_HANDLE(Fence, fenceObj, fence);
 
-		auto* dispatchable = reinterpret_cast<DispatchableObject<Fence>*>(fence);
-		mem::Delete(pAllocator ? *pAllocator : fenceObj->GetAllocationCallbacks(), dispatchable);
+		mem::Delete(pAllocator ? *pAllocator : fenceObj->GetAllocationCallbacks(), fenceObj);
 	}
 
 	VkResult Device::WaitForFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences, VkBool32 waitAll, uint64_t timeout)
