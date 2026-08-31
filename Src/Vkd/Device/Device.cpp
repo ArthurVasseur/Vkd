@@ -187,6 +187,26 @@ namespace vkd
 		VKD_AUTO_PROFILER_SCOPE();
 
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+		VKD_CHECK(pCreateInfo);
+
+		if (pCreateInfo->enabledExtensionCount > 0)
+			return VK_ERROR_EXTENSION_NOT_PRESENT;
+
+		if (pCreateInfo->pEnabledFeatures)
+		{
+			VkPhysicalDeviceFeatures supportedFeatures{};
+			PhysicalDevice::GetPhysicalDeviceFeatures(pPhysicalDevice, &supportedFeatures);
+
+			constexpr std::size_t featureCount = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
+			const auto* requested = reinterpret_cast<const VkBool32*>(pCreateInfo->pEnabledFeatures);
+			const auto* supported = reinterpret_cast<const VkBool32*>(&supportedFeatures);
+			for (std::size_t i = 0; i < featureCount; ++i)
+			{
+				if (requested[i] && !supported[i])
+					return VK_ERROR_FEATURE_NOT_PRESENT;
+			}
+		}
+
 		if (!pAllocator)
 			pAllocator = &physicalDevice->GetAllocationCallbacks();
 

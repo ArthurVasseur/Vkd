@@ -80,6 +80,14 @@ namespace vkd
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		VKD_CHECK(pCreateInfo);
+
+		if (pCreateInfo->enabledLayerCount > 0)
+			return VK_ERROR_LAYER_NOT_PRESENT;
+
+		if (pCreateInfo->enabledExtensionCount > 0)
+			return VK_ERROR_EXTENSION_NOT_PRESENT;
+
 		if (!pAllocator)
 			pAllocator = &mem::GetDefaultAllocationCallbacks();
 
