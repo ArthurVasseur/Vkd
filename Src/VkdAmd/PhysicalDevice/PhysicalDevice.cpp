@@ -21,6 +21,7 @@
 #include "Vkd/Memory/Memory.hpp"
 
 #include "VkdAmd/Device/Device.hpp"
+#include "VkdAmd/Image/Image.hpp"
 #include "VkdAmd/Shader/Gfx11Descriptors.hpp"
 
 namespace vkd::amd
@@ -178,6 +179,14 @@ namespace vkd::amd
 		// formats need per-aspect copies inside a texel, which DMA can't do. BC formats are copied
 		// block by block (CopyLayout counts texel blocks); they can't be cleared and aren't sampled
 		// yet. Not ETC2/ASTC: GFX11 doesn't decode them (AMDVLK doesn't expose them either).
+		// Depth/stencil formats the DB renders (tiled 2D images, VkdAmd/Image/Image.hpp); GFX11 has no
+		// 24-bit depth (AMDVLK doesn't expose it either).
+		bool IsDepthStencilAttachmentFormat(VkFormat format)
+		{
+			uint32_t depthBytes = 0, stencilBytes = 0;
+			return amd::Image::GetDepthStencilPlanes(format, depthBytes, stencilBytes);
+		}
+
 		bool IsTransferFormat(VkFormat format)
 		{
 			if (vkuFormatIsCompressed_BC(format))
@@ -198,6 +207,16 @@ namespace vkd::amd
 	void PhysicalDevice::GetFormatProperties(VkFormat format, VkFormatProperties& properties) const
 	{
 		vkd::PhysicalDevice::GetFormatProperties(format, properties);
+		if (vkuFormatIsDepthAndStencil(format))
+		{
+			// Combined depth/stencil: tiled planes only (a linear texel interleaves the aspects).
+			if (IsDepthStencilAttachmentFormat(format))
+				properties.optimalTilingFeatures |=
+					VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+			return;
+		}
+		if (IsDepthStencilAttachmentFormat(format))
+			properties.optimalTilingFeatures |= VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		if (!IsTransferFormat(format))
 			return;
 		VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
@@ -234,10 +253,16 @@ namespace vkd::amd
 
 		properties = {};
 		constexpr VkImageUsageFlags kTransferUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		// Depth/stencil attachments are tiled 2D images (and combined formats exist only as those).
+		const bool tiledDepthStencil = IsDepthStencilAttachmentFormat(format) && tiling == VK_IMAGE_TILING_OPTIMAL && type == VK_IMAGE_TYPE_2D;
+		if (vkuFormatIsDepthAndStencil(format) && !tiledDepthStencil)
+			return VK_ERROR_FORMAT_NOT_SUPPORTED;
+		if (tiledDepthStencil)
+			usage &= ~VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		constexpr VkImageCreateFlags kSupportedFlags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT |
 													   VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
-		if (!IsTransferFormat(format) || usage == 0 || (usage & ~kTransferUsage) != 0 || (flags & ~kSupportedFlags) != 0 ||
-			(tiling != VK_IMAGE_TILING_OPTIMAL && tiling != VK_IMAGE_TILING_LINEAR))
+		if (!(IsTransferFormat(format) || tiledDepthStencil) || (usage == 0 && !tiledDepthStencil) || (usage & ~kTransferUsage) != 0 ||
+			(flags & ~kSupportedFlags) != 0 || (tiling != VK_IMAGE_TILING_OPTIMAL && tiling != VK_IMAGE_TILING_LINEAR))
 			return VK_ERROR_FORMAT_NOT_SUPPORTED;
 		if ((flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) && type != VK_IMAGE_TYPE_2D)
 			return VK_ERROR_FORMAT_NOT_SUPPORTED;
