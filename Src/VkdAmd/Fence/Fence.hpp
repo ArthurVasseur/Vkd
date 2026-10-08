@@ -1,0 +1,30 @@
+#pragma once
+
+#include <condition_variable>
+#include <mutex>
+
+#include "Vkd/Synchronization/Fence/Fence.hpp"
+
+CCT_ENABLE_ENUM_FLAGS(VkFenceCreateFlagBits)
+
+namespace vkd::amd
+{
+	class Fence : public vkd::Fence
+	{
+	public:
+		explicit Fence(const VkAllocationCallbacks& allocationCallbacks);
+		~Fence() override = default;
+
+		VkResult Create(Device& owner, const VkFenceCreateInfo& createInfo) override;
+
+		VkResult GetStatus() override;
+		VkResult Wait(uint64_t timeout) override;
+		VkResult Reset() override;
+		VkResult Signal() override;
+
+	private:
+		std::mutex m_mutex;
+		std::condition_variable m_cv;
+		bool m_signaled;
+	};
+} // namespace vkd::amd
