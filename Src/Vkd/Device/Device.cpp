@@ -442,6 +442,13 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdCopyImageToBuffer2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdResolveImage2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdBlitImage2);
+		// VK_KHR_copy_commands2 aliases.
+		VKD_ENTRYPOINT_ALIAS(vkd::CommandBuffer, CmdCopyBuffer2, KHR, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_ALIAS(vkd::CommandBuffer, CmdCopyImage2, KHR, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_ALIAS(vkd::CommandBuffer, CmdCopyBufferToImage2, KHR, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_ALIAS(vkd::CommandBuffer, CmdCopyImageToBuffer2, KHR, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_ALIAS(vkd::CommandBuffer, CmdResolveImage2, KHR, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_ALIAS(vkd::CommandBuffer, CmdBlitImage2, KHR, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdClearDepthStencilImage);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdClearAttachments);
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdResolveImage);
