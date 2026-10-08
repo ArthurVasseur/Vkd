@@ -67,33 +67,34 @@ namespace vkd::software
 		for (cct::UInt32 i = 0; i < info.stageCount; ++i)
 			m_stages.push_back(RegisterStage(*softwareDevice, info.pStages[i]));
 
-		if (info.pVertexInputState)
+		const vkd::GraphicsPipelineStates states = vkd::GetGraphicsPipelineStates(info);
+		if (states.vertexInput)
 		{
-			const VkPipelineVertexInputStateCreateInfo& state = *info.pVertexInputState;
+			const VkPipelineVertexInputStateCreateInfo& state = *states.vertexInput;
 			if (state.vertexBindingDescriptionCount > 0 && state.pVertexBindingDescriptions)
 				m_vertexBindings.assign(state.pVertexBindingDescriptions, state.pVertexBindingDescriptions + state.vertexBindingDescriptionCount);
 			if (state.vertexAttributeDescriptionCount > 0 && state.pVertexAttributeDescriptions)
 				m_vertexAttributes.assign(state.pVertexAttributeDescriptions, state.pVertexAttributeDescriptions + state.vertexAttributeDescriptionCount);
 		}
 
-		if (info.pInputAssemblyState)
+		if (states.inputAssembly)
 		{
-			m_topology = info.pInputAssemblyState->topology;
-			m_primitiveRestartEnable = info.pInputAssemblyState->primitiveRestartEnable;
+			m_topology = states.inputAssembly->topology;
+			m_primitiveRestartEnable = states.inputAssembly->primitiveRestartEnable;
 		}
 
-		if (info.pViewportState)
+		if (states.viewport)
 		{
-			const VkPipelineViewportStateCreateInfo& state = *info.pViewportState;
+			const VkPipelineViewportStateCreateInfo& state = *states.viewport;
 			if (state.viewportCount > 0 && state.pViewports)
 				m_viewports.assign(state.pViewports, state.pViewports + state.viewportCount);
 			if (state.scissorCount > 0 && state.pScissors)
 				m_scissors.assign(state.pScissors, state.pScissors + state.scissorCount);
 		}
 
-		if (info.pDynamicState)
+		if (states.dynamic)
 		{
-			const VkPipelineDynamicStateCreateInfo& state = *info.pDynamicState;
+			const VkPipelineDynamicStateCreateInfo& state = *states.dynamic;
 			for (cct::UInt32 i = 0; i < state.dynamicStateCount; ++i)
 			{
 				if (state.pDynamicStates[i] == VK_DYNAMIC_STATE_VIEWPORT)
@@ -103,26 +104,26 @@ namespace vkd::software
 			}
 		}
 
-		if (info.pRasterizationState)
+		if (states.rasterization)
 		{
-			m_cullMode = info.pRasterizationState->cullMode;
-			m_frontFace = info.pRasterizationState->frontFace;
-			m_polygonMode = info.pRasterizationState->polygonMode;
+			m_cullMode = states.rasterization->cullMode;
+			m_frontFace = states.rasterization->frontFace;
+			m_polygonMode = states.rasterization->polygonMode;
 		}
 
-		if (info.pColorBlendState && info.pColorBlendState->attachmentCount > 0 && info.pColorBlendState->pAttachments)
+		if (states.colorBlend && states.colorBlend->attachmentCount > 0 && states.colorBlend->pAttachments)
 		{
-			const VkPipelineColorBlendStateCreateInfo& state = *info.pColorBlendState;
+			const VkPipelineColorBlendStateCreateInfo& state = *states.colorBlend;
 			m_colorBlendAttachments.assign(state.pAttachments, state.pAttachments + state.attachmentCount);
 		}
 
-		if (info.pMultisampleState)
-			m_rasterizationSamples = info.pMultisampleState->rasterizationSamples;
+		if (states.multisample)
+			m_rasterizationSamples = states.multisample->rasterizationSamples;
 
-		if (info.pDepthStencilState)
+		if (states.depthStencil)
 		{
 			m_hasDepthStencilState = true;
-			m_depthStencilState = *info.pDepthStencilState;
+			m_depthStencilState = *states.depthStencil;
 		}
 
 		VKD_FROM_HANDLE(vkd::RenderPass, renderPassObj, info.renderPass);
