@@ -305,6 +305,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, InvalidateMappedMemoryRanges);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateGraphicsPipelines);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateComputePipelines);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetBufferDeviceAddress);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipeline);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateRenderPass);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyRenderPass);
@@ -1064,6 +1065,24 @@ namespace vkd
 		}
 
 		return firstError;
+	}
+
+	VkDeviceAddress Device::GetBufferAddress(const Buffer& buffer) const
+	{
+		(void)buffer;
+		return 0;
+	}
+
+	VkDeviceAddress Device::GetBufferDeviceAddress(VkDevice device, const VkBufferDeviceAddressInfo* pInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(Device, deviceObj, device);
+		VKD_CHECK(pInfo);
+		VKD_FROM_HANDLE(Buffer, bufferObj, pInfo->buffer);
+		if (!bufferObj || !bufferObj->IsBound())
+			return 0;
+		return deviceObj->GetBufferAddress(*bufferObj);
 	}
 
 	VkResult Device::CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines)

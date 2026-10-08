@@ -100,6 +100,7 @@ namespace vkd
 		static VkResult VKAPI_CALL InvalidateMappedMemoryRanges(VkDevice device, uint32_t memoryRangeCount, const VkMappedMemoryRange* pMemoryRanges);
 
 		static VkResult VKAPI_CALL CreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines);
+		static VkDeviceAddress VKAPI_CALL GetBufferDeviceAddress(VkDevice device, const VkBufferDeviceAddressInfo* pInfo);
 		static VkResult VKAPI_CALL CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines);
 		static void VKAPI_CALL DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator);
 
@@ -166,6 +167,9 @@ namespace vkd
 		virtual Result<Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Pipeline*, VkResult> CreatePipeline(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		// vkGetBufferDeviceAddress: the address shaders use for this (bound) buffer. 0 when the
+		// driver has no GPU address space (the default).
+		virtual VkDeviceAddress GetBufferAddress(const Buffer& buffer) const;
 		// Byte alignment of image rows (Image::GetSubresourceLayout). The CPU rasterizer packs rows
 		// tightly (the default); GPU texture/render units can require padded rows.
 		[[nodiscard]] virtual VkDeviceSize GetImageRowPitchAlignment() const
