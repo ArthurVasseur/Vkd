@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
+
+#include "VkdAmd/ShadowedRegisters.hpp"
 
 namespace vkd::amd
 {
@@ -25,10 +28,14 @@ namespace vkd::amd
 	inline constexpr uint32_t kUconfigRegBase = 0xC000;
 	inline constexpr uint32_t kItDispatchDirect = 0x15;
 	inline constexpr uint32_t kItWriteData = 0x37;
+	inline constexpr uint32_t kItWaitRegMem = 0x3C;
 	inline constexpr uint32_t kItEventWrite = 0x46;
 	inline constexpr uint32_t kItReleaseMem = 0x49;
 	inline constexpr uint32_t kItDmaData = 0x50;
 	inline constexpr uint32_t kItAcquireMem = 0x58;
+	inline constexpr uint32_t kItLoadUconfigReg = 0x5E;
+	inline constexpr uint32_t kItLoadShReg = 0x5F;
+	inline constexpr uint32_t kItLoadContextReg = 0x61;
 	inline constexpr uint32_t kItSetShReg = 0x76;
 	inline constexpr uint32_t kItSetShRegIndex = 0x9B;
 
@@ -52,8 +59,20 @@ namespace vkd::amd
 	inline constexpr uint32_t kComputeDispatchInterleave = 0x2E2F;
 	inline constexpr uint32_t kComputeUserData0 = 0x2E40;
 
-	// VGT_EVENT_TYPE CS_PARTIAL_FLUSH with event_index 4.
+	// VGT_EVENT_TYPE CS_PARTIAL_FLUSH / VS_PARTIAL_FLUSH with event_index 4, VGT_FLUSH.
 	inline constexpr uint32_t kEventCsPartialFlush = 0x407;
+	inline constexpr uint32_t kEventVsPartialFlush = 0x40F;
+	inline constexpr uint32_t kEventVgtFlush = 0x24;
+
+	// Graphics-queue state shadowing (PAL UniversalQueueContext with mid-command-buffer preemption,
+	// LOAD packets in the preamble). With CONTEXT_CONTROL's shadow enables set, the CP mirrors every
+	// register write into the shadow memory -- one dword per register of the user-config, context
+	// and SH spaces, each laid out as its space -- and the preamble's LOAD_*_REG packets reload it:
+	// that is what restores our state when the queue resumes from a preemption.
+	inline constexpr uint64_t kShadowUserConfigOffset = 0;
+	inline constexpr uint64_t kShadowContextOffset = kShadowUserConfigOffset + 0x4000 * 4; // 0xC000-0xFFFF
+	inline constexpr uint64_t kShadowShOffset = kShadowContextOffset + 0x2000 * 4; // 0xA000-0xBFFF
+	inline constexpr uint64_t kShadowMemoryBytes = kShadowShOffset + 0x400 * 4; // 0x2C00-0x2FFF
 
 	inline constexpr uint32_t kPkt3Nop = PkT3(kItNop, 0);
 
@@ -293,6 +312,15 @@ namespace vkd::amd
 			Emit(static_cast<uint32_t>(va >> 32));
 		}
 
+		// CONTEXT_CONTROL with state shadowing (PAL Device::GetContextControl, UseStateShadowing):
+		// load and shadow the user-config, context and SH registers.
+		void ContextControlShadowing()
+		{
+			Emit(PkT3(kItContextControl, 1));
+			Emit(0x81018002u); // update_load_enables | load_cs_sh_regs | load_per_context_state | load_gfx_sh_regs | load_global_uconfig
+			Emit(0x81018003u); // the same shadow enables, plus shadow_global_config
+		}
+
 		// CONTEXT_CONTROL as PAL writes it without state shadowing (Device::GetContextControl):
 		// load per-context state and SH registers, every shadow enable cleared. Without it the CP
 		// keeps whatever shadowing setup the previous user of the graphics pipe left -- shadow
@@ -321,7 +349,8 @@ namespace vkd::amd
 		}
 
 		// AMDVLK's barrier after a render pass (wddm-dump [draw][re][minimal]): end-of-pipe cache
-		// action, then the matching ACQUIRE_MEM, so later CP DMA reads see the color target.
+		// action, then the matching ACQUIRE_MEM, so later CP DMA reads see the color target. Also
+		// the PWS end-of-pipe stall of the per-submit preamble (PAL BuildWaitEopPws).
 		void PostDrawBarrier()
 		{
 			Emit(PkT3(kItReleaseMem, 6));
@@ -352,6 +381,64 @@ namespace vkd::amd
 		{
 			Emit(PkT3(kItEventWrite, 0));
 			Emit(eventDword);
+		}
+
+		// WAIT_REG_MEM on the PFP until the dword at gpuVa equals reference.
+		void WaitMemEqual(uint64_t gpuVa, uint32_t reference)
+		{
+			Emit(PkT3(kItWaitRegMem, 5));
+			Emit(0x00000113u); // function == , memory space, PFP
+			Emit(static_cast<uint32_t>(gpuVa));
+			Emit(static_cast<uint32_t>(gpuVa >> 32));
+			Emit(reference);
+			Emit(0xFFFFFFFFu);
+			Emit(0x0000000Au); // poll interval
+		}
+
+		// LOAD_UCONFIG_REG / LOAD_CONTEXT_REG / LOAD_SH_REG: reload the registers of `ranges` from
+		// the register-space mirror at spaceVa.
+		void LoadRegisters(uint32_t opcode, uint64_t spaceVa, std::span<const ShadowRegisterRange> ranges, bool compute = false)
+		{
+			Emit(PkT3(opcode, 2 * static_cast<uint32_t>(ranges.size()) + 1) | (compute ? kPkt3ShaderTypeCompute : 0u));
+			Emit(static_cast<uint32_t>(spaceVa));
+			Emit(static_cast<uint32_t>(spaceVa >> 32));
+			for (const ShadowRegisterRange& range : ranges)
+			{
+				Emit(range.offset);
+				Emit(range.count);
+			}
+		}
+
+		// The per-submit preamble of a graphics queue with state shadowing, as AMDVLK's (wddm-dump
+		// [submit-records][re], checked by [shadow][vkd-pm4]): wait for the previous submit's
+		// postamble (semaphore back to 0), invalidate the shader caches, drain the pipe before the
+		// ring registers are reloaded, CONTEXT_CONTROL, CLEAR_STATE, reload every shadowed register.
+		void GfxSubmitPreamble(uint64_t shadowVa, uint64_t semaphoreVa)
+		{
+			WaitMemEqual(semaphoreVa, 0);
+			AcquireMemInvalidateShaderCaches();
+			EventWrite(kEventVsPartialFlush);
+			EventWrite(kEventVgtFlush);
+			PostDrawBarrier();
+			ContextControlShadowing();
+			ClearState();
+			LoadRegisters(kItLoadUconfigReg, shadowVa + kShadowUserConfigOffset, kShadowUserConfigRanges);
+			LoadRegisters(kItLoadContextReg, shadowVa + kShadowContextOffset, kShadowContextRanges);
+			LoadRegisters(kItLoadShReg, shadowVa + kShadowShOffset, kShadowGfxShRanges);
+			LoadRegisters(kItLoadShReg, shadowVa + kShadowShOffset, kShadowCsShRanges, true);
+		}
+
+		// The graphics queue's first submit: the preamble, a reload of the zeroed user-config and SH
+		// shadow, then a write of every context register, which the CP shadows -- from then on the
+		// shadow memory holds a value for each register a resumed preemption reloads.
+		void GfxShadowInit(uint64_t shadowVa, uint64_t semaphoreVa)
+		{
+			GfxSubmitPreamble(shadowVa, semaphoreVa);
+			LoadRegisters(kItLoadUconfigReg, shadowVa + kShadowUserConfigOffset, kShadowUserConfigRanges);
+			LoadRegisters(kItLoadShReg, shadowVa + kShadowShOffset, kShadowGfxShRanges);
+			LoadRegisters(kItLoadShReg, shadowVa + kShadowShOffset, kShadowCsShRanges, true);
+			for (uint32_t value : kShadowContextInitPm4)
+				Emit(value);
 		}
 
 		void WriteData(uint64_t gpuVa, uint32_t value)
