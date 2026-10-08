@@ -182,6 +182,23 @@ namespace vkd::amd::gfx11
 			{VK_FORMAT_R4G4B4A4_UNORM_PACK16, 0x47, wzyx}, // 4_4_4_4
 			{VK_FORMAT_B4G4R4A4_UNORM_PACK16, 0x47, yzwx},
 			{VK_FORMAT_R4G4_UNORM_PACK8, 0x48, yx01}, // 4_4
+			// BC: the TA decodes the blocks (width/height in texels, rows of blocks).
+			{VK_FORMAT_BC1_RGB_UNORM_BLOCK, 0x6D, xyz1},
+			{VK_FORMAT_BC1_RGB_SRGB_BLOCK, 0x6E, xyz1},
+			{VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 0x6D, xyzw},
+			{VK_FORMAT_BC1_RGBA_SRGB_BLOCK, 0x6E, xyzw},
+			{VK_FORMAT_BC2_UNORM_BLOCK, 0x6F, xyzw},
+			{VK_FORMAT_BC2_SRGB_BLOCK, 0x70, xyzw},
+			{VK_FORMAT_BC3_UNORM_BLOCK, 0x71, xyzw},
+			{VK_FORMAT_BC3_SRGB_BLOCK, 0x72, xyzw},
+			{VK_FORMAT_BC4_UNORM_BLOCK, 0x73, x001},
+			{VK_FORMAT_BC4_SNORM_BLOCK, 0x74, x001},
+			{VK_FORMAT_BC5_UNORM_BLOCK, 0x75, xy01},
+			{VK_FORMAT_BC5_SNORM_BLOCK, 0x76, xy01},
+			{VK_FORMAT_BC6H_UFLOAT_BLOCK, 0x77, xyz1},
+			{VK_FORMAT_BC6H_SFLOAT_BLOCK, 0x78, xyz1},
+			{VK_FORMAT_BC7_UNORM_BLOCK, 0x79, xyzw},
+			{VK_FORMAT_BC7_SRGB_BLOCK, 0x7A, xyzw},
 		};
 		for (const Entry& e : kFormats)
 		{

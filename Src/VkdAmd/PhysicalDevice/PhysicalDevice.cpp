@@ -207,14 +207,15 @@ namespace vkd::amd
 		// sRGB (neither the shared-exponent, the 96-bit nor R4G4 can be stored). Not for USCALED /
 		// SSCALED: that shader writes saturated values for them -- AMDVLK too, measured
 		// ([blit][vkd][scaled]); AMDVLK only gets 1:1 blits right, by turning them into raw copies.
+		// BC formats are blit sources only: the TA decodes them, nothing writes them.
 		gfx11::ImageFormat imageFormat{};
-		if (!vkuFormatIsCompressed(format) && gfx11::GetImageFormat(format, imageFormat) && !vkuFormatIsUSCALED(format) &&
-			!vkuFormatIsSSCALED(format))
+		if (gfx11::GetImageFormat(format, imageFormat) && !vkuFormatIsUSCALED(format) && !vkuFormatIsSSCALED(format))
 		{
 			features |= VK_FORMAT_FEATURE_BLIT_SRC_BIT;
 			if (!vkuFormatIsUINT(format) && !vkuFormatIsSINT(format) && !vkuFormatIsDepthOrStencil(format))
 				features |= VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-			if (format != VK_FORMAT_E5B9G9R9_UFLOAT_PACK32 && format != VK_FORMAT_R4G4_UNORM_PACK8 && vkuFormatTexelBlockSize(format) != 12)
+			if (!vkuFormatIsCompressed(format) && format != VK_FORMAT_E5B9G9R9_UFLOAT_PACK32 && format != VK_FORMAT_R4G4_UNORM_PACK8 &&
+				vkuFormatTexelBlockSize(format) != 12)
 				features |= VK_FORMAT_FEATURE_BLIT_DST_BIT;
 		}
 		properties.linearTilingFeatures |= features;
