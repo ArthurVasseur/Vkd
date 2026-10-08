@@ -237,6 +237,15 @@ namespace vkd::amd
 			Emit(value);
 		}
 
+		// count consecutive context registers from reg.
+		void SetContextRegs(uint32_t reg, const uint32_t* values, uint32_t count)
+		{
+			Emit(PkT3(kItSetContextReg, count));
+			Emit(reg - kContextRegBase);
+			for (uint32_t i = 0; i < count; ++i)
+				Emit(values[i]);
+		}
+
 		void SetGraphicsShReg(uint32_t reg, uint32_t value)
 		{
 			Emit(PkT3(kItSetShReg, 1));

@@ -534,6 +534,7 @@ namespace vkd::amd
 			// vkCmdSetViewport/vkCmdSetScissor (index 0), used when the pipeline makes them dynamic.
 			VkViewport viewport = {};
 			VkRect2D scissor = {};
+			float blendConstants[4] = {};
 			// vkCmdBindVertexBuffers
 			struct VertexBinding
 			{
@@ -1096,7 +1097,7 @@ namespace vkd::amd
 			const VkRect2D& scissor = gs.dynamicScissor ? state.scissor : gs.scissor;
 			const ViewportRegs vp = ComputeViewportRegs(viewport);
 
-			if (!stream.HasRoom(32 + uint32_t(std::size(kGraphicsInitState) + graphics->drawState.size()) * 3))
+			if (!stream.HasRoom(80 + uint32_t(std::size(kGraphicsInitState) + graphics->drawState.size()) * 3))
 				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 			if (!state.shaderCachesInvalidated)
 			{
@@ -1243,6 +1244,18 @@ namespace vkd::amd
 			}
 			for (const RegWrite& w : graphics->drawState)
 				emit(w);
+			// The pipeline's color blend state over the captured one: SX_MRT0..7_BLEND_OPT and
+			// CB_BLEND0..7_CONTROL are consecutive, as PAL writes them.
+			uint32_t blendControl[2 * kMaxColorTargets];
+			std::copy_n(gs.blend.sxMrtBlendOpt, kMaxColorTargets, blendControl);
+			std::copy_n(gs.blend.cbBlendControl, kMaxColorTargets, blendControl + kMaxColorTargets);
+			stream.SetContextRegs(kSxMrt0BlendOpt, blendControl, 2 * kMaxColorTargets);
+			stream.SetContextReg(kCbTargetMask, gs.blend.cbTargetMask);
+			stream.SetContextReg(kSxBlendOptControl, gs.blend.sxBlendOptControl);
+			stream.SetContextReg(kCbColorControl, gs.cbColorControl);
+			const float* constants = gs.dynamicBlendConstants ? state.blendConstants : gs.blendConstants;
+			const uint32_t constantBits[4] = {FloatBits(constants[0]), FloatBits(constants[1]), FloatBits(constants[2]), FloatBits(constants[3])};
+			stream.SetContextRegs(kCbBlendRed, constantBits, 4);
 			if (op.indexed)
 				stream.DrawIndex2(op.instanceCount, maxIndices, indexVa, op.count);
 			else
@@ -1482,6 +1495,11 @@ namespace vkd::amd
 			{
 				if (setScissor->FirstScissor == 0 && !setScissor->Scissors.empty())
 					state.scissor = setScissor->Scissors[0];
+				return VK_SUCCESS;
+			}
+			if (const auto* blend = std::get_if<vkd::OpSetBlendConstants>(&op))
+			{
+				std::copy_n(blend->Constants, 4, state.blendConstants);
 				return VK_SUCCESS;
 			}
 			if (const auto* push = std::get_if<vkd::OpPushConstants>(&op))
