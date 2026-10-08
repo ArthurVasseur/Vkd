@@ -75,6 +75,20 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDevice);
+		// VK_KHR_get_physical_device_properties2 (core in Vulkan 1.1): both names.
+#define VKD_ENTRYPOINT_LOOKUP_KHR(klass, name) \
+	VKD_ENTRYPOINT_LOOKUP(klass, name);        \
+	if (strcmp(pName, "vk" #name "KHR") == 0)  \
+	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
+
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceFeatures2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceProperties2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceFormatProperties2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceImageFormatProperties2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceQueueFamilyProperties2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceMemoryProperties2);
+		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties2);
+#undef VKD_ENTRYPOINT_LOOKUP_KHR
 
 #undef VKD_ENTRYPOINT_LOOKUP
 

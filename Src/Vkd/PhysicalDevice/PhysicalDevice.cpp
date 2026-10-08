@@ -367,14 +367,55 @@ namespace vkd
 	void PhysicalDevice::GetPhysicalDeviceFormatProperties2(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkFormatProperties2* pFormatProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetPhysicalDeviceFormatProperties2 not implemented (Vulkan 1.1)");
+
+		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
+		CCT_ASSERT(pFormatProperties, "pFormatProperties cannot be null");
+
+		physicalDevice->GetFormatProperties(format, pFormatProperties->formatProperties);
+		const VkFormatProperties& props = pFormatProperties->formatProperties;
+
+		for (auto* next = static_cast<VkBaseOutStructure*>(pFormatProperties->pNext); next; next = next->pNext)
+		{
+			if (next->sType == VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3)
+			{
+				auto* props3 = reinterpret_cast<VkFormatProperties3*>(next);
+				props3->linearTilingFeatures = props.linearTilingFeatures;
+				props3->optimalTilingFeatures = props.optimalTilingFeatures;
+				props3->bufferFeatures = props.bufferFeatures;
+			}
+		}
 	}
 
 	VkResult PhysicalDevice::GetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo, VkImageFormatProperties2* pImageFormatProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetPhysicalDeviceImageFormatProperties2 not implemented (Vulkan 1.1)");
-		return VK_ERROR_FORMAT_NOT_SUPPORTED;
+
+		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
+		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
+		CCT_ASSERT(pImageFormatInfo && pImageFormatProperties, "Invalid pointer");
+
+		// No external memory, no YCbCr: any request for those is unsupported, the outputs are zeroed.
+		for (auto* next = static_cast<const VkBaseInStructure*>(pImageFormatInfo->pNext); next; next = next->pNext)
+		{
+			if (next->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO &&
+				reinterpret_cast<const VkPhysicalDeviceExternalImageFormatInfo*>(next)->handleType != 0)
+			{
+				pImageFormatProperties->imageFormatProperties = {};
+				return VK_ERROR_FORMAT_NOT_SUPPORTED;
+			}
+		}
+		for (auto* next = static_cast<VkBaseOutStructure*>(pImageFormatProperties->pNext); next; next = next->pNext)
+		{
+			if (next->sType == VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES)
+				reinterpret_cast<VkExternalImageFormatProperties*>(next)->externalMemoryProperties = {};
+			else if (next->sType == VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_IMAGE_FORMAT_PROPERTIES)
+				reinterpret_cast<VkSamplerYcbcrConversionImageFormatProperties*>(next)->combinedImageSamplerDescriptorCount = 0;
+		}
+
+		return physicalDevice->GetImageFormatProperties(pImageFormatInfo->format, pImageFormatInfo->type, pImageFormatInfo->tiling,
+														pImageFormatInfo->usage, pImageFormatInfo->flags,
+														pImageFormatProperties->imageFormatProperties);
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties2* pQueueFamilyProperties)
@@ -405,7 +446,9 @@ namespace vkd
 	void PhysicalDevice::GetPhysicalDeviceMemoryProperties2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceMemoryProperties2* pMemoryProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("vkGetPhysicalDeviceMemoryProperties2 not implemented (Vulkan 1.1)");
+		CCT_ASSERT(pMemoryProperties, "pMemoryProperties cannot be null");
+
+		GetPhysicalDeviceMemoryProperties(pPhysicalDevice, &pMemoryProperties->memoryProperties);
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice pPhysicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, uint32_t* pPropertyCount, VkSparseImageFormatProperties2* pProperties)
