@@ -152,7 +152,7 @@ std::vector<cct::UInt32> compileShaderToSPIRV(const char* source)
 	}
 }
 
-void saveImageToPPM(const char* filename, uint32_t width, uint32_t height, const uint8_t* data)
+void saveImageToPPM(const char* filename, uint32_t width, uint32_t height, const uint8_t* data, size_t rowPitch)
 {
 	std::ofstream file(filename, std::ios::binary);
 	file << "P6\n"
@@ -161,7 +161,7 @@ void saveImageToPPM(const char* filename, uint32_t width, uint32_t height, const
 	{
 		for (uint32_t x = 0; x < width; ++x)
 		{
-			size_t idx = (y * width + x) * 4;
+			size_t idx = y * rowPitch + x * 4;
 			file.put(data[idx + 0]);
 			file.put(data[idx + 1]);
 			file.put(data[idx + 2]);
@@ -611,8 +611,12 @@ int main(int argc, char** argv)
 	auto mappedMemory = device.mapMemory(imageMemory, 0, memReqs.size);
 	if (mappedMemory.result == vk::Result::eSuccess)
 	{
-		const uint8_t* pixels = static_cast<const uint8_t*>(mappedMemory.value);
-		saveImageToPPM("triangle.ppm", WIDTH, HEIGHT, pixels);
+		// A linear image's rows can be padded (the AMD ICD aligns them to 256 bytes): address texels
+		// through the subresource layout, not width * 4.
+		const vk::SubresourceLayout renderLayout =
+			device.getImageSubresourceLayout(renderImage, vk::ImageSubresource(vk::ImageAspectFlagBits::eColor, 0, 0));
+		const uint8_t* pixels = static_cast<const uint8_t*>(mappedMemory.value) + renderLayout.offset;
+		saveImageToPPM("triangle.ppm", WIDTH, HEIGHT, pixels, static_cast<size_t>(renderLayout.rowPitch));
 
 		// Every fragment now reads output.color = tex.Sample(uv) * colorUbo.multiplier, ignoring the
 		// interpolated vertex color entirely - the whole triangle should be a flat (100, 50, 25):
@@ -620,7 +624,7 @@ int main(int argc, char** argv)
 		// broken sampler/descriptor path would read a zeroed image or UBO and render black instead.
 		// Triangle centroid in screen space (vertices at NDC (0,-0.5)/(0.5,0.5)/(-0.5,0.5) map to
 		// (400,150)/(600,450)/(200,450) at 800x600).
-		const size_t centroidIdx = (350 * WIDTH + 400) * 4;
+		const size_t centroidIdx = 350 * static_cast<size_t>(renderLayout.rowPitch) + 400 * 4;
 		const uint8_t r = pixels[centroidIdx + 0];
 		const uint8_t g = pixels[centroidIdx + 1];
 		const uint8_t b = pixels[centroidIdx + 2];
@@ -633,8 +637,8 @@ int main(int argc, char** argv)
 			cct::Logger::Error("Descriptor set / sampled image path did not apply as expected (expected (100, 50, 25))");
 			return EXIT_FAILURE;
 		}
-
-		cct::Logger::Info("Descriptor set / uniform buffer / sampled image path validated end to end!");
+		else
+			cct::Logger::Info("Descriptor set / uniform buffer / sampled image path validated end to end!");
 	}
 
 	// Clearing an image whose format isn't 4 bytes/pixel exercises CpuContext's generalized pixel
