@@ -175,9 +175,13 @@ namespace vkd::amd
 	{
 		// Formats whose copies and clears are byte moves of whole texels (CP DMA): the colors
 		// PackColor encodes, and the single-aspect depth/stencil formats. Combined depth/stencil
-		// formats need per-aspect copies inside a texel, which DMA can't do.
+		// formats need per-aspect copies inside a texel, which DMA can't do. BC formats are copied
+		// block by block (CopyLayout counts texel blocks); they can't be cleared and aren't sampled
+		// yet. Not ETC2/ASTC: GFX11 doesn't decode them (AMDVLK doesn't expose them either).
 		bool IsTransferFormat(VkFormat format)
 		{
+			if (vkuFormatIsCompressed_BC(format))
+				return true;
 			switch (format)
 			{
 				case VK_FORMAT_D16_UNORM:
@@ -204,7 +208,8 @@ namespace vkd::amd
 		// SSCALED: that shader writes saturated values for them -- AMDVLK too, measured
 		// ([blit][vkd][scaled]); AMDVLK only gets 1:1 blits right, by turning them into raw copies.
 		gfx11::ImageFormat imageFormat{};
-		if (gfx11::GetImageFormat(format, imageFormat) && !vkuFormatIsUSCALED(format) && !vkuFormatIsSSCALED(format))
+		if (!vkuFormatIsCompressed(format) && gfx11::GetImageFormat(format, imageFormat) && !vkuFormatIsUSCALED(format) &&
+			!vkuFormatIsSSCALED(format))
 		{
 			features |= VK_FORMAT_FEATURE_BLIT_SRC_BIT;
 			if (!vkuFormatIsUINT(format) && !vkuFormatIsSINT(format) && !vkuFormatIsDepthOrStencil(format))
@@ -236,6 +241,8 @@ namespace vkd::amd
 		if ((flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) && type != VK_IMAGE_TYPE_2D)
 			return VK_ERROR_FORMAT_NOT_SUPPORTED;
 		if ((flags & VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT) && type != VK_IMAGE_TYPE_3D)
+			return VK_ERROR_FORMAT_NOT_SUPPORTED;
+		if (vkuFormatIsCompressed(format) && type == VK_IMAGE_TYPE_1D)
 			return VK_ERROR_FORMAT_NOT_SUPPORTED;
 
 		const VkPhysicalDeviceLimits& limits = GetPhysicalDeviceProperties().limits;
