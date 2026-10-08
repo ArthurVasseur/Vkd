@@ -1,4 +1,4 @@
-add_rules("mode.debug", "mode.release")
+add_rules("mode.debug", "mode.release", "mode.releasedbg")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
 
 includes("deps/ConcertoFramework/xmake.lua")
