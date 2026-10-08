@@ -1516,12 +1516,15 @@ namespace vkd
 		if (!pAllocator)
 			pAllocator = &deviceObj->GetAllocationCallbacks();
 
-		auto layoutResult = deviceObj->CreatePipelineLayout(*pAllocator);
+		using PipelineLayoutFactory = Result<PipelineLayout*, VkResult> (Device::*)(const VkAllocationCallbacks&);
+		const PipelineLayoutFactory factory = &Device::CreatePipelineLayout;
+		auto layoutResult = (deviceObj->*factory)(*pAllocator);
 		if (layoutResult.IsError())
 			return layoutResult.GetError();
 
 		auto* layoutObj = std::move(layoutResult).GetValue();
-		VkResult result = layoutObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return layoutObj->PipelineLayout::Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, layoutObj);
