@@ -10,7 +10,6 @@
 #pragma once
 
 #include <functional>
-#include <unordered_map>
 #include <vector>
 
 #include "Vkd/Buffer/Buffer.hpp"
@@ -36,6 +35,7 @@ namespace vkd::software
 		VkResult SetViewport(OpSetViewport op);
 		VkResult SetScissor(OpSetScissor op);
 		VkResult Draw(vkd::OpDraw op);
+		VkResult DrawIndexed(vkd::OpDrawIndexed op);
 		VkResult CopyBuffer(vkd::Buffer::OpCopy op);
 		VkResult CopyBuffer2(vkd::Buffer::OpCopy2 op);
 		VkResult UpdateBuffer(vkd::Buffer::OpUpdate op);
@@ -61,17 +61,20 @@ namespace vkd::software
 		// Restricted to `area` if given (clamped to the image bounds); nullptr clears the whole image.
 		static VkResult ClearImageWithColor(vkd::Image* image, const VkClearColorValue& color, const VkRect2D* area = nullptr);
 
-		const VkAllocationCallbacks* m_allocationCallbacks;
+		// Shared by Draw/DrawIndexed: everything from pipeline/render-pass validation through rasterization,
+		// parameterized only by the primitive count and how to turn a primitive-relative index (0..count-1)
+		// into the actual vertex index (identity for Draw, an index-buffer lookup for DrawIndexed).
+		VkResult DrawPrimitives(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstInstance, const std::function<UInt32(UInt32)>& resolveVertexIndex);
+
 		vkd::Pipeline* m_boundPipeline = nullptr;
-		vkd::vector<Buffer*> m_boundVertexBuffers;
-		vkd::vector<VkDeviceSize> m_vertexBufferOffsets;
+		std::vector<Buffer*> m_boundVertexBuffers;
+		std::vector<VkDeviceSize> m_vertexBufferOffsets;
 		Buffer* m_boundIndexBuffer = nullptr;
 		VkDeviceSize m_indexBufferOffset = 0;
 		VkIndexType m_indexType = VK_INDEX_TYPE_UINT32;
-		vkd::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
-		std::unordered_map<UInt64, UInt32> m_dynamicOffsets;
-		vkd::vector<VkViewport> m_dynamicViewports;
-		vkd::vector<VkRect2D> m_dynamicScissors;
+		std::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
+		std::vector<VkViewport> m_dynamicViewports;
+		std::vector<VkRect2D> m_dynamicScissors;
 
 		vkd::RenderPass* m_currentRenderPass = nullptr;
 		vkd::Framebuffer* m_currentFramebuffer = nullptr;

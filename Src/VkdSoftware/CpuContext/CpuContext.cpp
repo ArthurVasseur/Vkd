@@ -185,6 +185,7 @@ namespace vkd::software
 		see::exec::Value UnpackVertexAttribute(VkFormat format, const UInt8* bytes)
 		{
 			see::exec::Value result;
+			result.m_rows = 4;
 
 			if (vkuFormatIsCompressed(format) || vkuFormatIsMultiplane(format) || vkuFormatIsDepthOrStencil(format))
 				return result;
@@ -199,11 +200,18 @@ namespace vkd::software
 
 			result.m_scalar = isUint || isSint ? see::ir::ScalarKind::Int32 : see::ir::ScalarKind::Float32;
 
+			// Vulkan expands a vertex attribute to (R,G,B,A); components the format doesn't provide
+			// default to 0 except alpha, which defaults to 1 - independent of the format's component count.
+			if (result.m_scalar == see::ir::ScalarKind::Int32)
+				result.SetInt32(3, 1);
+			else
+				result.SetFloat(3, 1.0f);
+
 			const VKU_FORMAT_INFO info = vkuGetFormatInfo(format);
-			result.m_rows = std::min<UInt32>(info.component_count, 4);
+			const UInt32 componentCount = std::min<UInt32>(info.component_count, 4);
 
 			std::size_t byteOffset = 0;
-			for (UInt32 i = 0; i < result.m_rows; ++i)
+			for (UInt32 i = 0; i < componentCount; ++i)
 			{
 				const UInt32 bits = info.components[i].size;
 				const UInt32 byteCount = bits / 8;
@@ -631,6 +639,46 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		return DrawPrimitives(op.VertexCount, op.InstanceCount, op.FirstInstance,
+							  [firstVertex = op.FirstVertex](UInt32 primitiveIndex)
+							  { return firstVertex + primitiveIndex; });
+	}
+
+	VkResult CpuContext::DrawIndexed(vkd::OpDrawIndexed op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		if (!m_boundIndexBuffer || !m_boundIndexBuffer->GetMemory())
+			return VK_SUCCESS;
+
+		const VkDeviceSize indexSize = m_indexType == VK_INDEX_TYPE_UINT16 ? sizeof(UInt16) : sizeof(UInt32);
+		const VkDeviceSize indexBufferSize = m_boundIndexBuffer->GetSize() - m_indexBufferOffset;
+		const VkDeviceSize absoluteOffset = m_boundIndexBuffer->GetMemoryOffset() + m_indexBufferOffset;
+
+		void* mapped = nullptr;
+		if (m_boundIndexBuffer->GetMemory()->Map(absoluteOffset, indexBufferSize, &mapped) != VK_SUCCESS || !mapped)
+			return VK_SUCCESS;
+
+		const auto* indexBytes = reinterpret_cast<const UInt8*>(mapped);
+		const bool isUint16 = m_indexType == VK_INDEX_TYPE_UINT16;
+
+		const VkResult result = DrawPrimitives(op.IndexCount, op.InstanceCount, op.FirstInstance,
+											   [op, indexBytes, indexBufferSize, indexSize, isUint16](UInt32 primitiveIndex) -> UInt32
+											   {
+												   const VkDeviceSize elementOffset = static_cast<VkDeviceSize>(op.FirstIndex + primitiveIndex) * indexSize;
+												   if (elementOffset + indexSize > indexBufferSize)
+													   return 0;
+
+												   const UInt32 rawIndex = isUint16 ? *reinterpret_cast<const UInt16*>(indexBytes + elementOffset) : *reinterpret_cast<const UInt32*>(indexBytes + elementOffset);
+												   return static_cast<UInt32>(static_cast<Int64>(rawIndex) + op.VertexOffset);
+											   });
+
+		m_boundIndexBuffer->GetMemory()->Unmap();
+		return result;
+	}
+
+	VkResult CpuContext::DrawPrimitives(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstInstance, const std::function<UInt32(UInt32)>& resolveVertexIndex)
+	{
 		if (!m_boundPipeline || !m_currentRenderPass || !m_currentFramebuffer)
 			return VK_SUCCESS;
 
@@ -707,18 +755,18 @@ namespace vkd::software
 		const std::unordered_map<UInt32, see::exec::ExternalImage> fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedMemories);
 		const std::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories);
 
-		for (UInt32 instance = 0; instance < op.InstanceCount; ++instance)
+		for (UInt32 instance = 0; instance < instanceCount; ++instance)
 		{
-			const UInt32 instanceIndex = op.FirstInstance + instance;
+			const UInt32 instanceIndex = firstInstance + instance;
 
-			for (UInt32 base = 0; base + 3 <= op.VertexCount; base += 3)
+			for (UInt32 base = 0; base + 3 <= vertexCount; base += 3)
 			{
 				ScreenVertex screenVertices[3];
 				bool allValid = true;
 
 				for (UInt32 i = 0; i < 3; ++i)
 				{
-					const UInt32 vertexIndex = op.FirstVertex + base + i;
+					const UInt32 vertexIndex = resolveVertexIndex(base + i);
 					const std::unordered_map<UInt32, see::exec::Value> vertexAttributes = FetchVertexAttributes(*pipeline, mappedVertexBuffers, vertexIndex, instance);
 					std::optional<see::exec::VertexStageOutput> output =
 						see::exec::RunVertexStage(*vertexModule, *vertexFunction, vertexIndex, instanceIndex, vertexAttributes, vertexUniforms, vertexImages);

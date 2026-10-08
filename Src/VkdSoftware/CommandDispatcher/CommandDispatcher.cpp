@@ -92,8 +92,7 @@ namespace vkd::software
 
 	VkResult CommandDispatcher::operator()(vkd::OpDrawIndexed op)
 	{
-		// TODO: Implement DrawIndexed in CpuContext
-		return VK_SUCCESS;
+		return m_context->DrawIndexed(std::move(op));
 	}
 
 	VkResult CommandDispatcher::operator()(vkd::OpDrawIndirect op)

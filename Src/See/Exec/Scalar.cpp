@@ -820,10 +820,33 @@ namespace see::exec
 
 			for (std::size_t i = 0; i < callee->m_parameters.size(); ++i)
 			{
-				std::optional<Value> argument = ResolveValue(state, instruction.m_args[i + 1]);
-				if (!argument)
+				const cct::UInt32 argId = instruction.m_args[i + 1];
+				const cct::UInt32 paramId = callee->m_parameters[i];
+
+				if (std::optional<Value> argument = ResolveValue(state, argId))
+				{
+					state.m_ssaValues[paramId] = *argument;
+					continue;
+				}
+
+				auto argPointerIt = state.m_pointers.find(argId);
+				if (argPointerIt == state.m_pointers.end())
 					return false;
-				state.m_ssaValues[callee->m_parameters[i]] = *argument;
+
+				std::optional<Value> copy = MakeZeroValue(state.m_module, argPointerIt->second.m_pointeeType);
+				if (!copy)
+					return false;
+
+				const cct::UInt32 wordCount = copy->m_rows * copy->m_columns;
+				const cct::UInt32* source = ResolveWords(state, argPointerIt->second.m_baseVariable, argPointerIt->second.m_wordOffset, wordCount);
+				if (!source)
+					return false;
+
+				for (cct::UInt32 w = 0; w < wordCount && w < 16; ++w)
+					copy->m_bits[w] = source[w];
+
+				state.m_pointers[paramId] = PointerInfo{.m_baseVariable = paramId, .m_wordOffset = 0, .m_pointeeType = argPointerIt->second.m_pointeeType};
+				state.m_variables[paramId] = *copy;
 			}
 
 			BlockWalkOutcome outcome = RunBlocks(state, *callee);
