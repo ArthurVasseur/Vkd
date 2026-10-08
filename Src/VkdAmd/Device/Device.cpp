@@ -48,6 +48,7 @@ namespace vkd::amd
 
 	AmdDevice::~AmdDevice()
 	{
+		DestroyQueues();
 		DestroyCompanionDevice();
 	}
 
