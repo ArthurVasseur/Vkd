@@ -15,6 +15,8 @@
 #include "Vkd/PipelineLayout/PipelineLayout.hpp"
 #include "Vkd/QueryPool/QueryPool.hpp"
 #include "Vkd/Sampler/Sampler.hpp"
+#include "Vkd/Synchronization/Event/HostEvent.hpp"
+#include "Vkd/Synchronization/Semaphore/HostSemaphore.hpp"
 #include "VkdSoftware/Buffer/Buffer.hpp"
 #include "VkdSoftware/BufferView/BufferView.hpp"
 #include "VkdSoftware/CommandPool/CommandPool.hpp"
@@ -26,9 +28,7 @@
 #include "VkdSoftware/Queue/Queue.hpp"
 #include "VkdSoftware/RenderPass/RenderPass.hpp"
 #include "VkdSoftware/ShaderModule/ShaderModule.hpp"
-#include "VkdSoftware/Synchronization/Event/Event.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
-#include "VkdSoftware/Synchronization/Semaphore/Semaphore.hpp"
 #include "VkdUtils/System/System.hpp"
 
 namespace vkd::software
@@ -123,7 +123,7 @@ namespace vkd::software
 
 	Result<vkd::Semaphore*, VkResult> SoftwareDevice::CreateSemaphore(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* semaphore = mem::NewObject<Semaphore>(allocationCallbacks);
+		auto* semaphore = mem::NewObject<HostSemaphore>(allocationCallbacks);
 		if (!semaphore)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Semaphore");
@@ -135,7 +135,7 @@ namespace vkd::software
 
 	Result<vkd::Event*, VkResult> SoftwareDevice::CreateEvent(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* event = mem::NewObject<Event>(allocationCallbacks);
+		auto* event = mem::NewObject<HostEvent>(allocationCallbacks);
 		if (!event)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Event");

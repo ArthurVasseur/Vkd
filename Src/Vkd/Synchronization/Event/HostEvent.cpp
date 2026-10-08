@@ -1,20 +1,20 @@
 /**
- * @file Event.cpp
- * @brief Implementation of software renderer event
- * @date 2026-08-30
+ * @file HostEvent.cpp
+ * @brief Implementation of the CPU event
+ * @date 2026-10-07
  */
 
-#include "VkdSoftware/Synchronization/Event/Event.hpp"
+#include "Vkd/Synchronization/Event/HostEvent.hpp"
 
-namespace vkd::software
+namespace vkd
 {
-	Event::Event(const VkAllocationCallbacks& allocationCallbacks) :
-		vkd::Event(allocationCallbacks),
+	HostEvent::HostEvent(const VkAllocationCallbacks& allocationCallbacks) :
+		Event(allocationCallbacks),
 		m_signaled(false)
 	{
 	}
 
-	VkResult Event::GetStatus()
+	VkResult HostEvent::GetStatus()
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -22,7 +22,7 @@ namespace vkd::software
 		return m_signaled ? VK_EVENT_SET : VK_EVENT_RESET;
 	}
 
-	VkResult Event::Set()
+	VkResult HostEvent::Set()
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -31,7 +31,7 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
-	VkResult Event::Reset()
+	VkResult HostEvent::Reset()
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
@@ -39,4 +39,4 @@ namespace vkd::software
 		m_signaled = false;
 		return VK_SUCCESS;
 	}
-} // namespace vkd::software
+} // namespace vkd

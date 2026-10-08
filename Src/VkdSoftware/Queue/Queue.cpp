@@ -6,12 +6,12 @@
 
 #include "VkdSoftware/Queue/Queue.hpp"
 
+#include "Vkd/Synchronization/Semaphore/Semaphore.hpp"
 #include "VkdSoftware/CommandBuffer/CommandBuffer.hpp"
 #include "VkdSoftware/CommandDispatcher/CommandDispatcher.hpp"
 #include "VkdSoftware/CpuContext/CpuContext.hpp"
 #include "VkdSoftware/Device/Device.hpp"
 #include "VkdSoftware/Synchronization/Fence/Fence.hpp"
-#include "VkdSoftware/Synchronization/Semaphore/Semaphore.hpp"
 
 namespace vkd::software
 {

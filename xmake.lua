@@ -72,8 +72,6 @@ drivers = {
             "ShaderModule",
             "Synchronization",
             "Synchronization/Fence",
-            "Synchronization/Semaphore",
-            "Synchronization/Event",
         },
         Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
         Deps = { "see" },
