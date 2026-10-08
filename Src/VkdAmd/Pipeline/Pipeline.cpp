@@ -67,37 +67,38 @@ namespace vkd::amd
 		if (result != VK_SUCCESS)
 			return result;
 
-		if (info.pViewportState)
+		const vkd::GraphicsPipelineStates states = vkd::GetGraphicsPipelineStates(info);
+		if (states.viewport)
 		{
-			if (info.pViewportState->viewportCount > 0 && info.pViewportState->pViewports)
-				m_graphicsState.viewport = info.pViewportState->pViewports[0];
-			if (info.pViewportState->scissorCount > 0 && info.pViewportState->pScissors)
-				m_graphicsState.scissor = info.pViewportState->pScissors[0];
+			if (states.viewport->viewportCount > 0 && states.viewport->pViewports)
+				m_graphicsState.viewport = states.viewport->pViewports[0];
+			if (states.viewport->scissorCount > 0 && states.viewport->pScissors)
+				m_graphicsState.scissor = states.viewport->pScissors[0];
 		}
-		if (info.pDynamicState)
+		if (states.dynamic)
 		{
-			for (uint32_t i = 0; i < info.pDynamicState->dynamicStateCount; ++i)
+			for (uint32_t i = 0; i < states.dynamic->dynamicStateCount; ++i)
 			{
-				const VkDynamicState state = info.pDynamicState->pDynamicStates[i];
+				const VkDynamicState state = states.dynamic->pDynamicStates[i];
 				m_graphicsState.dynamicViewport |= state == VK_DYNAMIC_STATE_VIEWPORT;
 				m_graphicsState.dynamicScissor |= state == VK_DYNAMIC_STATE_SCISSOR;
 			}
 		}
-		if (info.pVertexInputState)
+		if (states.vertexInput)
 		{
-			for (uint32_t i = 0; i < info.pVertexInputState->vertexBindingDescriptionCount; ++i)
+			for (uint32_t i = 0; i < states.vertexInput->vertexBindingDescriptionCount; ++i)
 			{
-				const VkVertexInputBindingDescription& binding = info.pVertexInputState->pVertexBindingDescriptions[i];
+				const VkVertexInputBindingDescription& binding = states.vertexInput->pVertexBindingDescriptions[i];
 				if (binding.binding >= GraphicsPipelineState::kMaxVertexBindings)
 					continue;
 				m_graphicsState.vertexStrides[binding.binding] = binding.stride;
 				m_graphicsState.vertexBindingCount = std::max(m_graphicsState.vertexBindingCount, binding.binding + 1);
 			}
 		}
-		if (info.pRasterizationState)
+		if (states.rasterization)
 		{
-			m_graphicsState.cullMode = info.pRasterizationState->cullMode;
-			m_graphicsState.frontFace = info.pRasterizationState->frontFace;
+			m_graphicsState.cullMode = states.rasterization->cullMode;
+			m_graphicsState.frontFace = states.rasterization->frontFace;
 		}
 
 		uint64_t vertexHash = 0;
