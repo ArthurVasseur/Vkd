@@ -73,6 +73,11 @@ namespace vkd::software
 		return m_context->BindVertexBuffer(std::move(op));
 	}
 
+	VkResult CommandDispatcher::operator()(vkd::OpBindIndexBuffer op)
+	{
+		return m_context->BindIndexBuffer(std::move(op));
+	}
+
 	VkResult CommandDispatcher::operator()(vkd::OpBindDescriptorSets op)
 	{
 		return m_context->BindDescriptorSets(std::move(op));

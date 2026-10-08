@@ -29,6 +29,7 @@ namespace vkd::software
 
 		VkResult BindPipeline(OpBindPipeline op);
 		VkResult BindVertexBuffer(OpBindVertexBuffer buffer);
+		VkResult BindIndexBuffer(OpBindIndexBuffer op);
 		VkResult BindDescriptorSets(OpBindDescriptorSets op);
 		VkResult SetViewport(OpSetViewport op);
 		VkResult SetScissor(OpSetScissor op);
@@ -53,6 +54,9 @@ namespace vkd::software
 		vkd::Pipeline* m_boundPipeline = nullptr;
 		std::vector<Buffer*> m_boundVertexBuffers;
 		std::vector<VkDeviceSize> m_vertexBufferOffsets;
+		Buffer* m_boundIndexBuffer = nullptr;
+		VkDeviceSize m_indexBufferOffset = 0;
+		VkIndexType m_indexType = VK_INDEX_TYPE_UINT32;
 		std::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
 		std::vector<VkViewport> m_dynamicViewports;
 		std::vector<VkRect2D> m_dynamicScissors;

@@ -32,6 +32,13 @@ namespace vkd
 		UInt32 FirstBinding;
 	};
 
+	struct OpBindIndexBuffer
+	{
+		Buffer* BufferHandle;
+		VkDeviceSize Offset;
+		VkIndexType IndexType;
+	};
+
 	struct OpBindDescriptorSets
 	{
 		VkPipelineBindPoint BindPoint;
@@ -105,6 +112,7 @@ namespace vkd
 
 	using Op = Nz::TypeList<
 		OpBindVertexBuffer,
+		OpBindIndexBuffer,
 		OpBindDescriptorSets,
 		OpDraw,
 		OpDrawIndexed,

@@ -436,6 +436,17 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
+	VkResult CpuContext::BindIndexBuffer(OpBindIndexBuffer op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		m_boundIndexBuffer = op.BufferHandle;
+		m_indexBufferOffset = op.Offset;
+		m_indexType = op.IndexType;
+
+		return VK_SUCCESS;
+	}
+
 	VkResult CpuContext::BindDescriptorSets(OpBindDescriptorSets op)
 	{
 		VKD_AUTO_PROFILER_SCOPE();

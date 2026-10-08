@@ -99,8 +99,10 @@ namespace vkd
 		inline void PushClearColorImage(VkImage image, VkImageLayout imageLayout, const VkClearColorValue* pColor, UInt32 rangeCount, const VkImageSubresourceRange* pRanges);
 		inline void PushBindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline);
 		inline void PushBindVertexBuffer(std::span<const VkBuffer> pBuffers, std::span<const VkDeviceSize> pOffsets, UInt32 firstBinding);
+		inline void PushBindIndexBuffer(VkBuffer buffer, VkDeviceSize offset, VkIndexType indexType);
 		inline void PushBindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, UInt32 firstSet, std::span<const VkDescriptorSet> pDescriptorSets);
 		inline void PushDraw(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstVertex, UInt32 firstInstance);
+		inline void PushDrawIndexed(UInt32 indexCount, UInt32 instanceCount, UInt32 firstIndex, cct::Int32 vertexOffset, UInt32 firstInstance);
 		inline void PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport);
 		inline void PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor);
 		inline void PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents);

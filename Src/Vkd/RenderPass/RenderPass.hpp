@@ -40,6 +40,16 @@ namespace vkd
 		std::vector<VkAttachmentDescription> m_attachments;
 		std::vector<VkSubpassDescription> m_subpasses;
 		std::vector<VkSubpassDependency> m_dependencies;
+
+		// Owned storage for the VkAttachmentReference/index arrays that m_subpasses' pInputAttachments,
+		// pColorAttachments, pResolveAttachments, pDepthStencilAttachment and pPreserveAttachments point
+		// into - VkSubpassDescription itself only borrows those pointers from the caller's create-info,
+		// which isn't guaranteed to outlive this call, so they must be deep-copied to stay valid.
+		std::vector<std::vector<VkAttachmentReference>> m_subpassInputAttachments;
+		std::vector<std::vector<VkAttachmentReference>> m_subpassColorAttachments;
+		std::vector<std::vector<VkAttachmentReference>> m_subpassResolveAttachments;
+		std::vector<VkAttachmentReference> m_subpassDepthStencilAttachments;
+		std::vector<std::vector<UInt32>> m_subpassPreserveAttachments;
 	};
 } // namespace vkd
 

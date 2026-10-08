@@ -182,6 +182,17 @@ namespace vkd
 		});
 	}
 
+	inline void CommandBuffer::PushBindIndexBuffer(VkBuffer buffer, VkDeviceSize offset, VkIndexType indexType)
+	{
+		VKD_FROM_HANDLE(Buffer, bufferObject, buffer);
+
+		m_ops.emplace_back(OpBindIndexBuffer{
+			.BufferHandle = bufferObject,
+			.Offset = offset,
+			.IndexType = indexType,
+		});
+	}
+
 	inline void CommandBuffer::PushBindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, UInt32 firstSet, std::span<const VkDescriptorSet> pDescriptorSets)
 	{
 		std::vector<DescriptorSet*> descriptorSets;
@@ -206,6 +217,17 @@ namespace vkd
 			.VertexCount = vertexCount,
 			.InstanceCount = instanceCount,
 			.FirstVertex = firstVertex,
+			.FirstInstance = firstInstance,
+		});
+	}
+
+	inline void CommandBuffer::PushDrawIndexed(UInt32 indexCount, UInt32 instanceCount, UInt32 firstIndex, cct::Int32 vertexOffset, UInt32 firstInstance)
+	{
+		m_ops.emplace_back(OpDrawIndexed{
+			.IndexCount = indexCount,
+			.InstanceCount = instanceCount,
+			.FirstIndex = firstIndex,
+			.VertexOffset = vertexOffset,
 			.FirstInstance = firstInstance,
 		});
 	}
