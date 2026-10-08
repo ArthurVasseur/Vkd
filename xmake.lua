@@ -280,6 +280,20 @@ if has_config("tests") then
             add_deps("vkd-" .. driver_name)
         end
     target_end()
+
+    if is_plat("windows") then
+        -- A triangle presented in a window (VK_KHR_swapchain), through a Vkd ICD loaded directly.
+        target("vkd-window-demo")
+            set_languages("c++20")
+            set_kind("binary")
+            add_files("Src/WindowDemo/main.cpp")
+            add_packages("vulkan-headers")
+            add_syslinks("User32", "Gdi32")
+            for driver_name, driver in pairs(drivers) do
+                add_deps("vkd-" .. driver_name)
+            end
+        target_end()
+    end
 end
 
 includes("xmake/*.lua")
