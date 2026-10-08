@@ -306,6 +306,9 @@ namespace vkd
 	{
 		static constexpr VkExtensionProperties kExtensions[] = {
 			{VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME, VK_EXT_HOST_QUERY_RESET_SPEC_VERSION},
+			// 3D <-> 2D array copies and 2D-array-compatible 3D images (CopyLayout), negative
+			// viewport heights, vkTrimCommandPool.
+			{VK_KHR_MAINTENANCE_1_EXTENSION_NAME, VK_KHR_MAINTENANCE_1_SPEC_VERSION},
 		};
 		return kExtensions;
 	}

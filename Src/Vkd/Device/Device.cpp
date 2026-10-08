@@ -308,6 +308,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateCommandPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyCommandPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetCommandPool);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, TrimCommandPool);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, TrimCommandPool, KHR, VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, AllocateCommandBuffers);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeCommandBuffers);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateFence);
@@ -518,6 +520,10 @@ namespace vkd
 		VKD_FROM_HANDLE(CommandPool, poolObj, commandPool);
 
 		mem::Delete(pAllocator ? *pAllocator : poolObj->GetAllocationCallbacks(), poolObj);
+	}
+
+	void Device::TrimCommandPool(VkDevice, VkCommandPool, VkCommandPoolTrimFlags)
+	{
 	}
 
 	VkResult Device::ResetCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolResetFlags flags)
