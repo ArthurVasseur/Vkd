@@ -320,6 +320,13 @@ namespace vkd
 		});
 	}
 
+	inline void CommandBuffer::PushSetBlendConstants(const float constants[4])
+	{
+		OpSetBlendConstants op{};
+		std::copy_n(constants, 4, op.Constants);
+		Record(std::move(op));
+	}
+
 	inline void CommandBuffer::PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents)
 	{
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, beginInfo.renderPass);

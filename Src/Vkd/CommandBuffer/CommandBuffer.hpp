@@ -121,6 +121,7 @@ namespace vkd
 		inline void PushDrawIndexed(UInt32 indexCount, UInt32 instanceCount, UInt32 firstIndex, cct::Int32 vertexOffset, UInt32 firstInstance);
 		inline void PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport);
 		inline void PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor);
+		inline void PushSetBlendConstants(const float constants[4]);
 		inline void PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents);
 		inline void PushEndRenderPass();
 		inline void PushResetQueryPool(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount);

@@ -123,6 +123,12 @@ namespace vkd::software
 		return m_context->SetScissor(std::move(op));
 	}
 
+	VkResult CommandDispatcher::operator()(vkd::OpSetBlendConstants)
+	{
+		// The software rasterizer doesn't blend.
+		return VK_SUCCESS;
+	}
+
 	VkResult CommandDispatcher::operator()(vkd::OpBeginRenderPass op)
 	{
 		return m_context->BeginRenderPass(std::move(op));

@@ -226,7 +226,8 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdSetBlendConstants(VkCommandBuffer commandBuffer, const float blendConstants[4])
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetBlendConstants: not implemented, ignored");
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetBlendConstants(blendConstants);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetDepthBounds(VkCommandBuffer commandBuffer, float minDepthBounds, float maxDepthBounds)

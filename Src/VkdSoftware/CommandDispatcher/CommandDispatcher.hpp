@@ -42,6 +42,7 @@ namespace vkd::software
 		VkResult operator()(vkd::OpBindPipeline op);
 		VkResult operator()(vkd::OpSetViewport op);
 		VkResult operator()(vkd::OpSetScissor op);
+		VkResult operator()(vkd::OpSetBlendConstants op);
 		VkResult operator()(vkd::OpBeginRenderPass op);
 		VkResult operator()(vkd::OpEndRenderPass op);
 		VkResult operator()(vkd::OpResetQueryPool op);

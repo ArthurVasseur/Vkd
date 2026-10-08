@@ -160,6 +160,11 @@ namespace vkd
 		UInt32 FirstScissor;
 	};
 
+	struct OpSetBlendConstants
+	{
+		float Constants[4];
+	};
+
 	// vkCmdPushConstants: Data lands at Offset in the command buffer's push-constant block.
 	struct OpPushConstants
 	{
@@ -211,6 +216,7 @@ namespace vkd
 		OpBindPipeline,
 		OpSetViewport,
 		OpSetScissor,
+		OpSetBlendConstants,
 		OpBeginRenderPass,
 		OpEndRenderPass,
 		OpResetQueryPool,
