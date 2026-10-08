@@ -329,6 +329,16 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageSparseMemoryRequirements);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageSubresourceLayout);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindImageMemory);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetBufferMemoryRequirements2);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, GetBufferMemoryRequirements2, KHR, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageMemoryRequirements2);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, GetImageMemoryRequirements2, KHR, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetImageSparseMemoryRequirements2);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, GetImageSparseMemoryRequirements2, KHR, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindBufferMemory2);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, BindBufferMemory2, KHR, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, BindImageMemory2);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, BindImageMemory2, KHR, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, AllocateMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, FreeMemory);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceMemoryCommitment);
@@ -961,6 +971,73 @@ namespace vkd
 
 		imageObj->BindImageMemory(*memoryObj, memoryOffset);
 
+		return VK_SUCCESS;
+	}
+
+	namespace
+	{
+		// Every resource suballocates fine: a dedicated allocation is neither preferred nor required.
+		void FillDedicatedRequirements(VkMemoryRequirements2& requirements)
+		{
+			for (auto* next = static_cast<VkBaseOutStructure*>(requirements.pNext); next; next = next->pNext)
+			{
+				if (next->sType == VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS)
+				{
+					auto* dedicated = reinterpret_cast<VkMemoryDedicatedRequirements*>(next);
+					dedicated->prefersDedicatedAllocation = VK_FALSE;
+					dedicated->requiresDedicatedAllocation = VK_FALSE;
+				}
+			}
+		}
+	} // namespace
+
+	void Device::GetBufferMemoryRequirements2(VkDevice device, const VkBufferMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_CHECK(pInfo && pMemoryRequirements);
+		GetBufferMemoryRequirements(device, pInfo->buffer, &pMemoryRequirements->memoryRequirements);
+		FillDedicatedRequirements(*pMemoryRequirements);
+	}
+
+	void Device::GetImageMemoryRequirements2(VkDevice device, const VkImageMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_CHECK(pInfo && pMemoryRequirements);
+		GetImageMemoryRequirements(device, pInfo->image, &pMemoryRequirements->memoryRequirements);
+		FillDedicatedRequirements(*pMemoryRequirements);
+	}
+
+	void Device::GetImageSparseMemoryRequirements2(VkDevice device, const VkImageSparseMemoryRequirementsInfo2* pInfo, uint32_t* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements2* pSparseMemoryRequirements)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_CHECK(pSparseMemoryRequirementCount);
+		*pSparseMemoryRequirementCount = 0;
+	}
+
+	VkResult Device::BindBufferMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindBufferMemoryInfo* pBindInfos)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		for (uint32_t i = 0; i < bindInfoCount; ++i)
+		{
+			if (const VkResult result = BindBufferMemory(device, pBindInfos[i].buffer, pBindInfos[i].memory, pBindInfos[i].memoryOffset); result != VK_SUCCESS)
+				return result;
+		}
+		return VK_SUCCESS;
+	}
+
+	VkResult Device::BindImageMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindImageMemoryInfo* pBindInfos)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		for (uint32_t i = 0; i < bindInfoCount; ++i)
+		{
+			if (const VkResult result = BindImageMemory(device, pBindInfos[i].image, pBindInfos[i].memory, pBindInfos[i].memoryOffset); result != VK_SUCCESS)
+				return result;
+		}
 		return VK_SUCCESS;
 	}
 
