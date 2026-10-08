@@ -275,6 +275,9 @@ if has_config("tests") then
         add_defines("VK_NO_PROTOTYPES")
         add_defines("VULKAN_HPP_TYPESAFE_CONVERSION=1")
         add_files("Src/TestApp/main.cpp")
+        if is_plat("windows") then
+            add_ldflags("/STACK:16777216", { force = true })
+        end
 
         for driver_name, driver in pairs(drivers) do
             add_deps("vkd-" .. driver_name)
