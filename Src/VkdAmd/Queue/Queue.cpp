@@ -41,6 +41,13 @@ namespace vkd::amd
 		// allocations are only ever read by the GPU).
 		if (!device.AllocateGpuMemory(0x10000, kSurfaceFlagsHostVisible, m_semaphore) || m_semaphore.GetGpuVa() == 0)
 			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+		// The graphics preamble waits for it to be 0 (the previous submit's postamble done): the
+		// first submit must not wait.
+		void* semaphore = m_semaphore.MapToHost();
+		if (!semaphore)
+			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+		std::memset(semaphore, 0, 0x1000);
+		m_semaphore.UnmapFromHost();
 
 		auto* base = static_cast<uint8_t*>(m_submitIbs.MapToHost());
 		if (!base)
