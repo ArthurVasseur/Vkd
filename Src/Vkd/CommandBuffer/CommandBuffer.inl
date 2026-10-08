@@ -475,7 +475,7 @@ namespace vkd
 	{
 		try
 		{
-			Record(std::forward<OpT>(op));
+			m_ops.emplace_back(std::forward<OpT>(op));
 		}
 		catch (const std::bad_alloc&)
 		{
