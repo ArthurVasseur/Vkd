@@ -334,6 +334,65 @@ namespace vkd
 		commandBufferObj->PushWaitEvents(eventCount, pEvents);
 	}
 
+	void VKAPI_CALL CommandBuffer::CmdCopyImage2(VkCommandBuffer commandBuffer, const VkCopyImageInfo2* pCopyImageInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		vkd::vector<VkImageCopy> regions(CommandAllocator<VkImageCopy>(commandBufferObj->GetAllocationCallbacks()));
+		for (uint32_t i = 0; i < pCopyImageInfo->regionCount; ++i)
+		{
+			const VkImageCopy2& r = pCopyImageInfo->pRegions[i];
+			regions.push_back(VkImageCopy{r.srcSubresource, r.srcOffset, r.dstSubresource, r.dstOffset, r.extent});
+		}
+		commandBufferObj->PushCopyImage(pCopyImageInfo->srcImage, pCopyImageInfo->srcImageLayout, pCopyImageInfo->dstImage,
+										pCopyImageInfo->dstImageLayout, static_cast<uint32_t>(regions.size()), regions.data());
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdCopyBufferToImage2(VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		vkd::vector<VkBufferImageCopy> regions(CommandAllocator<VkBufferImageCopy>(commandBufferObj->GetAllocationCallbacks()));
+		for (uint32_t i = 0; i < pCopyBufferToImageInfo->regionCount; ++i)
+		{
+			const VkBufferImageCopy2& r = pCopyBufferToImageInfo->pRegions[i];
+			regions.push_back(VkBufferImageCopy{r.bufferOffset, r.bufferRowLength, r.bufferImageHeight, r.imageSubresource, r.imageOffset, r.imageExtent});
+		}
+		commandBufferObj->PushCopyBufferToImage(pCopyBufferToImageInfo->srcBuffer, pCopyBufferToImageInfo->dstImage,
+												pCopyBufferToImageInfo->dstImageLayout, static_cast<uint32_t>(regions.size()), regions.data());
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdCopyImageToBuffer2(VkCommandBuffer commandBuffer, const VkCopyImageToBufferInfo2* pCopyImageToBufferInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		vkd::vector<VkBufferImageCopy> regions(CommandAllocator<VkBufferImageCopy>(commandBufferObj->GetAllocationCallbacks()));
+		for (uint32_t i = 0; i < pCopyImageToBufferInfo->regionCount; ++i)
+		{
+			const VkBufferImageCopy2& r = pCopyImageToBufferInfo->pRegions[i];
+			regions.push_back(VkBufferImageCopy{r.bufferOffset, r.bufferRowLength, r.bufferImageHeight, r.imageSubresource, r.imageOffset, r.imageExtent});
+		}
+		commandBufferObj->PushCopyImageToBuffer(pCopyImageToBufferInfo->srcImage, pCopyImageToBufferInfo->srcImageLayout,
+												pCopyImageToBufferInfo->dstBuffer, static_cast<uint32_t>(regions.size()), regions.data());
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		vkd::vector<VkImageResolve> regions(CommandAllocator<VkImageResolve>(commandBufferObj->GetAllocationCallbacks()));
+		for (uint32_t i = 0; i < pResolveImageInfo->regionCount; ++i)
+		{
+			const VkImageResolve2& r = pResolveImageInfo->pRegions[i];
+			regions.push_back(VkImageResolve{r.srcSubresource, r.srcOffset, r.dstSubresource, r.dstOffset, r.extent});
+		}
+		commandBufferObj->PushResolveImage(pResolveImageInfo->srcImage, pResolveImageInfo->dstImage, static_cast<uint32_t>(regions.size()), regions.data());
+	}
+
 	void VKAPI_CALL CommandBuffer::CmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageBlit* pRegions, VkFilter filter)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
