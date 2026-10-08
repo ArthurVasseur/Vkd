@@ -1342,6 +1342,69 @@ namespace vkd::amd
 			uint32_t firstIndex;
 		};
 
+		// The subpass's depth/stencil attachment as PAL's DepthStencilView programs an image without
+		// HTILE (Gfx10DepthStencilView::InitRegisters), then the pipeline's tests (DepthStencil.hpp).
+		// Without an attachment the replayed state stands: DB_Z_INFO invalid, tests off.
+		void EmitDepthStencilTarget(Pm4Stream& stream, const VkSubpassDescription& subpass, std::span<const VkImageView> views, const GraphicsPipelineState& gs)
+		{
+			if (!subpass.pDepthStencilAttachment || subpass.pDepthStencilAttachment->attachment >= views.size())
+				return;
+			VKD_FROM_HANDLE(vkd::ImageView, view, views[subpass.pDepthStencilAttachment->attachment]);
+			VKD_FROM_HANDLE(vkd::Image, image, view->GetImage());
+			const auto* tiled = static_cast<const amd::Image*>(image);
+			const uint64_t imageVa = IsBound(image) && tiled->IsTiled() ? TiledImageVa(*tiled) : 0;
+			if (imageVa == 0)
+			{
+				static bool warned = false;
+				if (!warned)
+				{
+					warned = true;
+					cct::Logger::Warning("AmdCommandBuffer: depth/stencil attachment that isn't a tiled image, ignored");
+				}
+				return;
+			}
+			const gfx11::SurfaceLayout& depth = tiled->DepthPlane();
+			const gfx11::SurfaceLayout& stencil = tiled->StencilPlane();
+			const uint64_t zVa = depth.bytesPerElement ? imageVa : 0;
+			const uint64_t sVa = stencil.bytesPerElement ? imageVa + tiled->StencilPlaneOffset() : 0;
+			const VkImageSubresourceRange& range = view->GetSubresourceRange();
+			const uint32_t firstLayer = range.baseArrayLayer;
+			const uint32_t lastLayer = firstLayer + vkd::ResolveLayerCount(*image, range.baseArrayLayer, range.layerCount) - 1;
+
+			// Z_16 / Z_32_FLOAT, SW_MODE, MAXMIP, ITERATE_256; no TILE_SURFACE_ENABLE (HTILE).
+			const uint32_t zFormat = depth.bytesPerElement == 4 ? 3u : (depth.bytesPerElement == 2 ? 1u : 0u);
+			const uint32_t zInfo = zFormat | (gfx11::kSwMode64KbZX << 4) | ((image->GetMipLevels() - 1) << 16) | (1u << 20);
+			// STENCIL_8, SW_MODE, ITERATE_256, TILE_STENCIL_DISABLE.
+			const uint32_t stencilInfo = (stencil.bytesPerElement ? 1u : 0u) | (gfx11::kSwMode64KbZX << 4) | (1u << 20) | (1u << 29);
+			// SLICE_START(_HI), SLICE_MAX(_HI), MIPID.
+			const uint32_t depthView = (firstLayer & 0x7FFu) | (((firstLayer >> 11) & 3u) << 11) | ((lastLayer & 0x7FFu) << 13) |
+									   ((range.baseMipLevel & 0xFu) << 26) | (((lastLayer >> 11) & 3u) << 30);
+			const DepthStencilRegs& ds = gs.depthStencil;
+
+			stream.SetContextReg(kDbRenderControl, 0x60); // DEPTH_COMPRESS_DISABLE | STENCIL_COMPRESS_DISABLE
+			stream.SetContextReg(kDbDepthView, depthView);
+			stream.SetContextReg(kDbRenderOverride, 0x2A); // FORCE_HIZ_ENABLE, FORCE_HIS_ENABLE0/1 = FORCE_DISABLE
+			stream.SetContextReg(kDbHtileDataBase, 0);
+			const uint32_t sizeAndBounds[3] = {(image->GetExtent().width - 1) | ((image->GetExtent().height - 1) << 16), FloatBits(ds.depthBoundsMin),
+											   FloatBits(ds.depthBoundsMax)};
+			stream.SetContextRegs(kDbDepthSizeXy, sizeAndBounds, 3);
+			const uint32_t bases[6] = {zInfo,
+									   stencilInfo,
+									   static_cast<uint32_t>(zVa >> 8),
+									   static_cast<uint32_t>(sVa >> 8),
+									   static_cast<uint32_t>(zVa >> 8),
+									   static_cast<uint32_t>(sVa >> 8)};
+			stream.SetContextRegs(kDbZInfo, bases, 6);
+			const uint32_t basesHi[5] = {static_cast<uint32_t>(zVa >> 40), static_cast<uint32_t>(sVa >> 40), static_cast<uint32_t>(zVa >> 40),
+										 static_cast<uint32_t>(sVa >> 40), 0};
+			stream.SetContextRegs(kDbZReadBaseHi, basesHi, 5);
+			const uint32_t stencilRegs[3] = {ds.dbStencilControl, ds.dbStencilRefMask, ds.dbStencilRefMaskBf};
+			stream.SetContextRegs(kDbStencilControl, stencilRegs, 3);
+			stream.SetContextReg(kDbDepthControl, ds.dbDepthControl);
+			// POLY_OFFSET_NEG_NUM_DB_BITS (-16 / -23), POLY_OFFSET_DB_IS_FLOAT_FMT; AMDVLK's -24 without depth.
+			stream.SetContextReg(kPaSuPolyOffsetDbFmtCntl, depth.bytesPerElement == 4 ? 0x1E9u : (depth.bytesPerElement == 2 ? 0xF0u : 0xE8u));
+		}
+
 		VkResult EncodeDraw(Pm4Stream& stream, const DrawParams& op, EncodeState& state)
 		{
 			const amd::Pipeline* pipeline = state.graphicsPipeline;
@@ -1448,7 +1511,7 @@ namespace vkd::amd
 			const VkRect2D& scissor = gs.dynamicScissor ? state.scissor : gs.scissor;
 			const ViewportRegs vp = ComputeViewportRegs(viewport);
 
-			if (!stream.HasRoom(80 + uint32_t(std::size(kGraphicsInitState) + graphics->drawState.size()) * 3))
+			if (!stream.HasRoom(130 + uint32_t(std::size(kGraphicsInitState) + graphics->drawState.size()) * 3))
 				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 			if (!state.shaderCachesInvalidated)
 			{
@@ -1607,6 +1670,7 @@ namespace vkd::amd
 			const float* constants = gs.dynamicBlendConstants ? state.blendConstants : gs.blendConstants;
 			const uint32_t constantBits[4] = {FloatBits(constants[0]), FloatBits(constants[1]), FloatBits(constants[2]), FloatBits(constants[3])};
 			stream.SetContextRegs(kCbBlendRed, constantBits, 4);
+			EmitDepthStencilTarget(stream, subpass, views, gs);
 			if (op.indexed)
 				stream.DrawIndex2(op.instanceCount, maxIndices, indexVa, op.count);
 			else

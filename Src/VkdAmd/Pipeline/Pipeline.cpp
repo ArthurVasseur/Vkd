@@ -92,6 +92,7 @@ namespace vkd::amd
 			std::copy_n(states.colorBlend->blendConstants, 4, m_graphicsState.blendConstants);
 		}
 		m_graphicsState.blend = ComputeColorBlendRegs(blendAttachments);
+		m_graphicsState.depthStencil = ComputeDepthStencilRegs(states.depthStencil);
 		if (states.vertexInput)
 		{
 			for (uint32_t i = 0; i < states.vertexInput->vertexBindingDescriptionCount; ++i)

@@ -3,6 +3,7 @@
 #include "Vkd/Pipeline/Pipeline.hpp"
 
 #include "VkdAmd/Pipeline/ColorBlend.hpp"
+#include "VkdAmd/Pipeline/DepthStencil.hpp"
 #include "VkdAmd/Shader/PrecompiledGraphics.hpp"
 #include "VkdAmd/Shader/PrecompiledShaders.hpp"
 #include "VkdAmd/Wddm/WddmAllocation.hpp"
@@ -29,6 +30,9 @@ namespace vkd::amd
 		uint32_t cbColorControl = 0;
 		float blendConstants[4] = {};
 		bool dynamicBlendConstants = false;
+		// Depth/stencil tests, written over the captured (disabled) ones when the subpass has a
+		// depth/stencil attachment (DepthStencil.hpp).
+		DepthStencilRegs depthStencil;
 	};
 
 	// A pipeline owns its shaders' GFX11 code in a GPU allocation. There's no SPIR-V compiler yet:
