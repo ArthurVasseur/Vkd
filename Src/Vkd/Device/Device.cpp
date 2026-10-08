@@ -570,38 +570,42 @@ namespace vkd
 		for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; ++i)
 			pCommandBuffers[i] = VK_NULL_HANDLE;
 
+		auto freeAllocated = [&](uint32_t count)
+		{
+			for (uint32_t j = 0; j < count; ++j)
+			{
+				auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
+				poolObj->RemoveCommandBuffer(dispatchable);
+				mem::DeleteDispatchable(dispatchable);
+				pCommandBuffers[j] = VK_NULL_HANDLE;
+			}
+		};
+
 		for (uint32_t i = 0; i < pAllocateInfo->commandBufferCount; ++i)
 		{
 			auto bufferResult = poolObj->AllocateCommandBuffer(pAllocateInfo->level);
 			if (bufferResult.IsError())
 			{
-				for (uint32_t j = 0; j < i; ++j)
-				{
-					auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
-					poolObj->RemoveCommandBuffer(dispatchable);
-					mem::DeleteDispatchable(dispatchable);
-					pCommandBuffers[j] = VK_NULL_HANDLE;
-				}
+				freeAllocated(i);
 				return bufferResult.GetError();
 			}
 
+			// AddCommandBuffer grows the pool's list through the application's allocator, so it can
+			// fail too: the buffer isn't in the pool yet and must be freed with the others.
 			auto* buffer = std::move(bufferResult).GetValue();
 			VkResult result = CreateNoThrow([&]
-											{ return buffer->Object->Create(*poolObj, pAllocateInfo->level); });
+											{
+												VkResult createResult = buffer->Object->Create(*poolObj, pAllocateInfo->level);
+												if (createResult == VK_SUCCESS)
+													poolObj->AddCommandBuffer(buffer);
+												return createResult; });
 			if (result != VK_SUCCESS)
 			{
 				mem::DeleteDispatchable(buffer);
-				for (uint32_t j = 0; j < i; ++j)
-				{
-					auto* dispatchable = reinterpret_cast<DispatchableObject<CommandBuffer>*>(pCommandBuffers[j]);
-					poolObj->RemoveCommandBuffer(dispatchable);
-					mem::DeleteDispatchable(dispatchable);
-					pCommandBuffers[j] = VK_NULL_HANDLE;
-				}
+				freeAllocated(i);
 				return result;
 			}
 
-			poolObj->AddCommandBuffer(buffer);
 			pCommandBuffers[i] = VKD_TO_HANDLE(VkCommandBuffer, buffer);
 		}
 
