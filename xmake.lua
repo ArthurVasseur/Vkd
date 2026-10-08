@@ -258,6 +258,18 @@ for driver_name, driver in pairs(drivers) do
     target_end()
 end
 
+if is_plat("windows") then
+    target("vkd-amd-precontext")
+        set_kind("binary")
+        set_languages("c++20")
+        add_includedirs("Src")
+        add_files("Src/VkdAmd/Wddm/*.cpp")
+        add_files("Src/VkdAmd/Tests/PreContextMain.cpp")
+        add_deps("concerto-core", { public = true })
+        add_syslinks("Gdi32", "User32", "SetupAPI")
+    target_end()
+end
+
 if has_config("tests") then
     target("vkd-tests")
         set_languages("c++20")
