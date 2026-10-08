@@ -32,6 +32,8 @@ namespace vkd
 		VkResult Create(const VkAllocationCallbacks& allocationCallbacks);
 
 		// Vulkan API entry points
+		// Instance extensions every Vkd driver implements (in the shared layer).
+		[[nodiscard]] static std::span<const VkExtensionProperties> GetSupportedExtensions();
 		static VkResult VKAPI_CALL EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties);
 		static VkResult VKAPI_CALL EnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties);
 		static VkResult VKAPI_CALL EnumerateInstanceVersion(uint32_t* pApiVersion);

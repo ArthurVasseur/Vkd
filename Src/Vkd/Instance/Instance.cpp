@@ -7,6 +7,7 @@
 #include "Vkd/Instance/Instance.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <new>
 
 #include "Vkd/Icd/Icd.hpp"
@@ -40,6 +41,18 @@ namespace vkd
 		return m_createResult;
 	}
 
+	std::span<const VkExtensionProperties> Instance::GetSupportedExtensions()
+	{
+		static constexpr VkExtensionProperties kExtensions[] = {
+			{VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_SPEC_VERSION},
+			{VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_SURFACE_SPEC_VERSION},
+#ifdef CCT_PLATFORM_WINDOWS
+			{VK_KHR_WIN32_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_SPEC_VERSION},
+#endif
+		};
+		return kExtensions;
+	}
+
 	VkResult Instance::EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
@@ -49,14 +62,17 @@ namespace vkd
 
 		VKD_CHECK(pPropertyCount);
 
+		const auto extensions = GetSupportedExtensions();
 		if (!pProperties)
 		{
-			*pPropertyCount = 0;
+			*pPropertyCount = static_cast<uint32_t>(extensions.size());
 			return VK_SUCCESS;
 		}
 
-		*pPropertyCount = 0;
-		return VK_SUCCESS;
+		const uint32_t written = std::min(*pPropertyCount, static_cast<uint32_t>(extensions.size()));
+		std::copy_n(extensions.begin(), written, pProperties);
+		*pPropertyCount = written;
+		return written < extensions.size() ? VK_INCOMPLETE : VK_SUCCESS;
 	}
 
 	VkResult Instance::EnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties)
@@ -91,7 +107,19 @@ namespace vkd
 			return VK_ERROR_LAYER_NOT_PRESENT;
 
 		if (pCreateInfo->enabledExtensionCount > 0)
-			return VK_ERROR_EXTENSION_NOT_PRESENT;
+		{
+			for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; ++i)
+			{
+				const char* name = pCreateInfo->ppEnabledExtensionNames[i];
+				if (name && std::strcmp(name, VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME) == 0)
+					continue;
+				const auto extensions = GetSupportedExtensions();
+				if (name && std::any_of(extensions.begin(), extensions.end(), [&](const VkExtensionProperties& e)
+										{ return std::strcmp(e.extensionName, name) == 0; }))
+					continue;
+				return VK_ERROR_EXTENSION_NOT_PRESENT;
+			}
+		}
 
 		if (!pAllocator)
 			pAllocator = &mem::GetDefaultAllocationCallbacks();
