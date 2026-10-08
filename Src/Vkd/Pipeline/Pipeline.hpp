@@ -16,6 +16,21 @@ namespace vkd
 {
 	class Device;
 
+	struct GraphicsPipelineStates
+	{
+		const VkPipelineVertexInputStateCreateInfo* vertexInput = nullptr;
+		const VkPipelineInputAssemblyStateCreateInfo* inputAssembly = nullptr;
+		const VkPipelineTessellationStateCreateInfo* tessellation = nullptr;
+		const VkPipelineViewportStateCreateInfo* viewport = nullptr;
+		const VkPipelineRasterizationStateCreateInfo* rasterization = nullptr;
+		const VkPipelineMultisampleStateCreateInfo* multisample = nullptr;
+		const VkPipelineDepthStencilStateCreateInfo* depthStencil = nullptr;
+		const VkPipelineColorBlendStateCreateInfo* colorBlend = nullptr;
+		const VkPipelineDynamicStateCreateInfo* dynamic = nullptr;
+	};
+
+	[[nodiscard]] GraphicsPipelineStates GetGraphicsPipelineStates(const VkGraphicsPipelineCreateInfo& info);
+
 	class Pipeline : public ObjectBase
 	{
 	public:
