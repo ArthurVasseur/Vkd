@@ -274,6 +274,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyDevice);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceQueue2);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateCommandPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyCommandPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetCommandPool);
