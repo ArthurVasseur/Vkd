@@ -75,6 +75,24 @@ drivers = {
         },
         Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
         Deps = { "see" },
+    },
+    Amd = {
+        Files = {
+            ".",
+            "PhysicalDevice",
+            "Device",
+            "Queue",
+            "Wddm",
+            "DeviceMemory",
+            "Buffer",
+            "CommandPool",
+            "CommandBuffer",
+            "Fence",
+            "Pipeline",
+            "Shader",
+        },
+        Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
+        Deps = { "see" },
     }
 }
 
@@ -224,7 +242,12 @@ for driver_name, driver in pairs(drivers) do
         for _, dir in ipairs(driver.Files) do
             add_files_to_target("Src/Vkd" .. driver_name .. "/" .. dir, false)
         end
+
         add_deps("vkd")
+
+        if driver_name == "Amd" and is_plat("windows") then
+            add_syslinks("Gdi32", "User32", "SetupAPI")
+        end
         
         if is_plat("mingw", "linux", "macosx", "bsd") then
             add_syslinks("pthread")
