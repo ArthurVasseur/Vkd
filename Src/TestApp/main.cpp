@@ -227,7 +227,7 @@ int main(int argc, char** argv)
 	auto instanceResult = vk::createInstance(instanceInfo);
 	if (instanceResult.result != vk::Result::eSuccess)
 	{
-		cct::Logger::Error("Failed to create instance");
+		cct::Logger::Error("Failed to create instance ({})", static_cast<int>(instanceResult.result));
 		return EXIT_FAILURE;
 	}
 
