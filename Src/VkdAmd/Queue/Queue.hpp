@@ -45,8 +45,9 @@ namespace vkd::amd
 
 	private:
 		VkResult CreateSubmitIbs(AmdDevice& device);
-		// False (and the IB dumped to %TEMP%) when the device left the ACTIVE execution state.
-		bool CheckDeviceState(const CommandBuffer& cmd) const;
+		VkResult InitStateShadowing();
+		// False (and cmd's IB dumped to %TEMP%) when the device left the ACTIVE execution state.
+		bool CheckDeviceState(const CommandBuffer* cmd) const;
 
 		PalQueueCreateInfo m_palInfo{};
 		wddm::WddmContext m_context;
@@ -54,5 +55,11 @@ namespace vkd::amd
 		// EOP postamble (record 2), plus the GPU-writable semaphore the postamble writes.
 		wddm::WddmAllocation m_submitIbs;
 		wddm::WddmAllocation m_semaphore;
+		uint32_t m_preambleBytes = 0;
+		// Graphics queues: the register mirror of state shadowing (Pm4.hpp, kShadowMemoryBytes) and
+		// the length of the shadow-init preamble in m_submitIbs.
+		bool m_stateShadowing = false;
+		wddm::WddmAllocation m_shadow;
+		uint32_t m_shadowInitBytes = 0;
 	};
 } // namespace vkd::amd

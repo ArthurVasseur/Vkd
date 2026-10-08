@@ -27,10 +27,28 @@ namespace vkd::amd
 {
 	namespace
 	{
-		// Layout of m_submitIbs (first 4KB, written once at queue creation).
-		constexpr uint32_t kPreambleOffset = 0x000;
-		constexpr uint32_t kPreambleBytes = 0x20;
-		constexpr uint32_t kPostambleOffset = 0x100;
+		// Layout of m_submitIbs (written once at queue creation).
+		constexpr uint32_t kPreambleOffset = 0x000; // per-submit preamble
+		constexpr uint32_t kPreambleCapacity = 0x400;
+		constexpr uint32_t kPostambleOffset = 0x400;
+		constexpr uint32_t kNopIbOffset = 0x480; // main IB of the shadow-init submit
+		constexpr uint32_t kNopIbBytes = 0x20;
+		constexpr uint32_t kShadowInitOffset = 0x1000; // first submit of a graphics queue
+		constexpr uint32_t kShadowInitCapacity = 0x1000;
+		constexpr uint32_t kSubmitIbsBytes = kShadowInitOffset + kShadowInitCapacity;
+
+		// VKD_AMD_STATE_SHADOWING=0: graphics queues without register shadowing, as before it was
+		// implemented (no preemption safety), to tell a shadowing problem apart.
+		bool StateShadowingDisabled()
+		{
+			static const bool disabled = []
+			{
+				char value[8] = {};
+				size_t length = 0;
+				return getenv_s(&length, value, sizeof(value), "VKD_AMD_STATE_SHADOWING") == 0 && length > 1 && value[0] == '0';
+			}();
+			return disabled;
+		}
 	} // namespace
 
 	VkResult Queue::CreateSubmitIbs(AmdDevice& device)
@@ -49,19 +67,53 @@ namespace vkd::amd
 		std::memset(semaphore, 0, 0x1000);
 		m_semaphore.UnmapFromHost();
 
+		// Graphics queues shadow their registers, as AMDVLK's (compute queues rely on the
+		// firmware's compute wave save/restore). The CP writes the mirror, so it starts zeroed.
+		const bool graphics = GetQueueFamilyIndex() == 0;
+		m_stateShadowing = graphics && !StateShadowingDisabled();
+		if (m_stateShadowing)
+		{
+			if (!device.AllocateGpuMemory(kShadowMemoryBytes, kSurfaceFlagsHostVisible, m_shadow) || m_shadow.GetGpuVa() == 0)
+				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+			void* shadow = m_shadow.MapToHost();
+			if (!shadow)
+				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+			std::memset(shadow, 0, kShadowMemoryBytes);
+			m_shadow.UnmapFromHost();
+		}
+
 		auto* base = static_cast<uint8_t*>(m_submitIbs.MapToHost());
 		if (!base)
 			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
-		std::memset(base, 0, 0x1000);
+		std::memset(base, 0, kSubmitIbsBytes);
 
-		// The preamble record (flags 0xC) of every graphics submit: CONTEXT_CONTROL with state
-		// shadowing off, padded with NOPs.
-		Pm4Stream preamble;
-		preamble.dw = reinterpret_cast<uint32_t*>(base + kPreambleOffset);
-		preamble.capacity = kPreambleBytes / sizeof(uint32_t);
-		if (GetQueueFamilyIndex() == 0)
+		// The preamble record (flags 0xC) of every submit, also what the CP replays when the queue
+		// resumes from a preemption. Graphics: the state-shadowing preamble, or CONTEXT_CONTROL with
+		// shadowing off; compute: NOPs.
+		Pm4Stream preamble{reinterpret_cast<uint32_t*>(base + kPreambleOffset), kPreambleCapacity / sizeof(uint32_t)};
+		if (m_stateShadowing)
+			preamble.GfxSubmitPreamble(m_shadow.GetGpuVa(), m_semaphore.GetGpuVa());
+		else if (graphics)
 			preamble.ContextControlNoShadowing();
-		preamble.NopBlock(preamble.capacity - preamble.count);
+		if (preamble.count == 0)
+			preamble.NopBlock(8);
+		preamble.PadTo8Dw();
+		if (preamble.count == preamble.capacity)
+			return VK_ERROR_INITIALIZATION_FAILED;
+		m_preambleBytes = preamble.Bytes();
+
+		if (m_stateShadowing)
+		{
+			Pm4Stream init{reinterpret_cast<uint32_t*>(base + kShadowInitOffset), kShadowInitCapacity / sizeof(uint32_t)};
+			init.GfxShadowInit(m_shadow.GetGpuVa(), m_semaphore.GetGpuVa());
+			init.PadTo8Dw();
+			if (init.count == init.capacity)
+				return VK_ERROR_INITIALIZATION_FAILED;
+			m_shadowInitBytes = init.Bytes();
+
+			Pm4Stream nop{reinterpret_cast<uint32_t*>(base + kNopIbOffset), kNopIbBytes / sizeof(uint32_t)};
+			nop.NopBlock(nop.capacity);
+		}
 
 		Pm4Stream postamble;
 		postamble.dw = reinterpret_cast<uint32_t*>(base + kPostambleOffset);
@@ -72,6 +124,28 @@ namespace vkd::amd
 
 		// Stays CPU-mapped for the queue's lifetime, as AMDVLK keeps its IB allocations.
 		return VK_SUCCESS;
+	}
+
+	// AMDVLK's queue-init submit (wddm-dump [submit-records][re]): the shadow-init preamble, with a
+	// NOP IB in place of a command buffer. Kept apart from the command buffers so that a preemption
+	// never replays the initialization over the state they shadowed.
+	VkResult Queue::InitStateShadowing()
+	{
+		const uint64_t ibs = m_submitIbs.GetGpuVa();
+		const SubmitIb init{ibs + kShadowInitOffset, m_shadowInitBytes};
+		const SubmitPrivateData priv = MakeSubmitPrivateData(init,
+															 SubmitIb{ibs + kNopIbOffset, kNopIbBytes},
+															 SubmitIb{ibs + kPostambleOffset, kSubmitPostambleBytes});
+		const NTSTATUS st = m_context.Submit(init.gpuVa, init.length, &priv, sizeof(priv));
+		if (st != STATUS_SUCCESS)
+		{
+			cct::Logger::Error("AmdQueue: state-shadowing init submit NTSTATUS=0x{:08X}", static_cast<uint32_t>(st));
+			return VK_ERROR_INITIALIZATION_FAILED;
+		}
+		const VkResult idle = WaitIdle();
+		if (idle != VK_SUCCESS)
+			return idle;
+		return CheckDeviceState(nullptr) ? VK_SUCCESS : VK_ERROR_INITIALIZATION_FAILED;
 	}
 
 	VkResult Queue::Create(Device& owner, uint32_t queueFamilyIndex, uint32_t queueIndex, VkDeviceQueueCreateFlags flags)
@@ -100,6 +174,12 @@ namespace vkd::amd
 		{
 			cct::Logger::Error("AmdQueue: failed to create the per-queue submit IBs");
 			return ibs;
+		}
+		if (m_stateShadowing)
+		{
+			const VkResult shadowing = InitStateShadowing();
+			if (shadowing != VK_SUCCESS)
+				return shadowing;
 		}
 
 		cct::Logger::Info("AmdQueue: context created family={} palType={} engineType={} node={} hCtx=0x{:X}",
@@ -172,7 +252,7 @@ namespace vkd::amd
 
 				// Records as AMDVLK and RADV lay them out: the preamble (flags 0xC, also the D3DKMT
 				// CommandBuffer), the command buffer as the main IB, the postamble.
-				const SubmitIb preamble{m_submitIbs.GetGpuVa() + kPreambleOffset, kPreambleBytes};
+				const SubmitIb preamble{m_submitIbs.GetGpuVa() + kPreambleOffset, m_preambleBytes};
 				const SubmitPrivateData priv = MakeSubmitPrivateData(
 					preamble,
 					SubmitIb{cmd->GetGpuVa(), cmd->GetCommandLength()},
@@ -192,7 +272,7 @@ namespace vkd::amd
 				// only shows up asynchronously (the next call fails with 0xC01E0200), so catch it here,
 				// on the command buffer that caused it, and keep its IB for post-mortem.
 				const VkResult idle = WaitIdle();
-				if (idle != VK_SUCCESS || !CheckDeviceState(*cmd))
+				if (idle != VK_SUCCESS || !CheckDeviceState(cmd))
 				{
 					cmd->MarkComplete();
 					return VK_ERROR_DEVICE_LOST;
@@ -220,7 +300,7 @@ namespace vkd::amd
 		return VK_SUCCESS;
 	}
 
-	bool Queue::CheckDeviceState(const CommandBuffer& cmd) const
+	bool Queue::CheckDeviceState(const CommandBuffer* cmd) const
 	{
 		auto* amdDevice = static_cast<AmdDevice*>(GetOwner());
 		D3DKMT_GETDEVICESTATE state = {};
@@ -230,20 +310,25 @@ namespace vkd::amd
 			return true;
 
 		// ExecutionState: 2=RESET 3=HUNG 4=STOPPED 5=OOM 6=DMAFAULT 7=DMAPAGEFAULT
-		std::string ops;
-		for (const vkd::CommandBuffer::Op& op : cmd.GetOps())
-			ops += std::to_string(op.index()) + ' ';
-		static int dumpIndex = 0;
-		char path[MAX_PATH] = {};
-		GetTempPathA(MAX_PATH, path);
-		const std::string file = std::string(path) + "vkd-amd-fault-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(dumpIndex++) + ".bin";
-		if (FILE* f = std::fopen(file.c_str(), "wb"))
+		if (cmd)
 		{
-			std::fwrite(cmd.GetMappedIb(), 1, cmd.GetCommandLength(), f);
-			std::fclose(f);
+			std::string ops;
+			for (const vkd::CommandBuffer::Op& op : cmd->GetOps())
+				ops += std::to_string(op.index()) + ' ';
+			static int dumpIndex = 0;
+			char path[MAX_PATH] = {};
+			GetTempPathA(MAX_PATH, path);
+			const std::string file = std::string(path) + "vkd-amd-fault-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(dumpIndex++) + ".bin";
+			if (FILE* f = std::fopen(file.c_str(), "wb"))
+			{
+				std::fwrite(cmd->GetMappedIb(), 1, cmd->GetCommandLength(), f);
+				std::fclose(f);
+			}
+			cct::Logger::Error("AmdQueue: device execution state {} after command buffer va=0x{:X} len={} (op indices: {}), IB dumped to {}",
+							   static_cast<int>(state.ExecutionState), static_cast<uint64_t>(cmd->GetGpuVa()), cmd->GetCommandLength(), ops, file);
 		}
-		cct::Logger::Error("AmdQueue: device execution state {} after command buffer va=0x{:X} len={} (op indices: {}), IB dumped to {}",
-						   static_cast<int>(state.ExecutionState), static_cast<uint64_t>(cmd.GetGpuVa()), cmd.GetCommandLength(), ops, file);
+		else
+			cct::Logger::Error("AmdQueue: device execution state {} after the state-shadowing init submit", static_cast<int>(state.ExecutionState));
 		if (state.ExecutionState == D3DKMT_DEVICEEXECUTION_ERROR_DMAPAGEFAULT)
 		{
 			// What faulted, as RADV's wddm2 winsys reports it.
