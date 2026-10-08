@@ -7,9 +7,11 @@
 #include "Vkd/Instance/Instance.hpp"
 
 #include <algorithm>
+#include <new>
 
 #include "Vkd/Icd/Icd.hpp"
 #include "Vkd/Memory/AllocationCallbacks.hpp"
+#include "Vkd/Memory/Memory.hpp"
 
 namespace vkd
 {
@@ -22,6 +24,10 @@ namespace vkd
 
 	Instance::~Instance()
 	{
+		for (DispatchableObject<PhysicalDevice>* physicalDevice : m_physicalDevices)
+			mem::DeleteDispatchable(physicalDevice);
+		m_physicalDevices.clear();
+
 		if (cct::Logger::GetContext() == &m_logger)
 			cct::Logger::SetContext(nullptr);
 	}
@@ -159,9 +165,20 @@ namespace vkd
 
 		VkResult result = physicalDevice->Object->Create(*this, GetAllocationCallbacks());
 		if (result != VK_SUCCESS)
+		{
+			mem::DeleteDispatchable(physicalDevice);
 			return result;
+		}
 
-		AddPhysicalDevice(physicalDevice);
+		try
+		{
+			AddPhysicalDevice(physicalDevice);
+		}
+		catch (const std::bad_alloc&)
+		{
+			mem::DeleteDispatchable(physicalDevice);
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
 		m_physicalDevicesAlreadyEnumerated = true;
 		return VK_SUCCESS;
 	}
