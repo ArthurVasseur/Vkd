@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <new>
 #include <string>
 #include <thread>
 #include <utility>
@@ -37,6 +38,25 @@
 
 namespace vkd
 {
+	namespace
+	{
+		// An object's Create can run out of host memory part way (its containers allocate through the
+		// application's callbacks): report it like any other failure, so the caller frees the object
+		// instead of the exception unwinding past it (the CTS's alloc_callback_fail tests count the
+		// leak).
+		template<typename F>
+		VkResult CreateNoThrow(F&& create)
+		{
+			try
+			{
+				return create();
+			}
+			catch (const std::bad_alloc&)
+			{
+				return VK_ERROR_OUT_OF_HOST_MEMORY;
+			}
+		}
+	} // namespace
 	Device::Device(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_owner(nullptr),
@@ -215,7 +235,8 @@ namespace vkd
 			return deviceResult.GetError();
 
 		auto device = std::move(deviceResult).GetValue();
-		VkResult result = device->Object->Create(*physicalDevice, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return device->Object->Create(*physicalDevice, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::DeleteDispatchable(device);
@@ -424,7 +445,8 @@ namespace vkd
 			return poolResult.GetError();
 
 		auto* pool = std::move(poolResult).GetValue();
-		VkResult result = pool->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return pool->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Free(*pAllocator, pool);
@@ -485,7 +507,8 @@ namespace vkd
 			}
 
 			auto* buffer = std::move(bufferResult).GetValue();
-			VkResult result = buffer->Object->Create(*poolObj, pAllocateInfo->level);
+			VkResult result = CreateNoThrow([&]
+											{ return buffer->Object->Create(*poolObj, pAllocateInfo->level); });
 			if (result != VK_SUCCESS)
 			{
 				mem::DeleteDispatchable(buffer);
@@ -540,7 +563,8 @@ namespace vkd
 			return fenceResult.GetError();
 
 		auto* fenceObj = std::move(fenceResult).GetValue();
-		VkResult result = fenceObj->Create(*deviceObj, *pCreateInfo);
+		VkResult result = CreateNoThrow([&]
+										{ return fenceObj->Create(*deviceObj, *pCreateInfo); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Free(*pAllocator, fenceObj);
@@ -707,7 +731,8 @@ namespace vkd
 			return bufferResult.GetError();
 
 		auto* bufferObj = std::move(bufferResult).GetValue();
-		VkResult result = bufferObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return bufferObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, bufferObj);
@@ -771,7 +796,8 @@ namespace vkd
 			return bufferViewResult.GetError();
 
 		auto* bufferViewObj = std::move(bufferViewResult).GetValue();
-		VkResult result = bufferViewObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return bufferViewObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, bufferViewObj);
@@ -810,7 +836,8 @@ namespace vkd
 			return imageResult.GetError();
 
 		auto* imageObj = std::move(imageResult).GetValue();
-		VkResult result = imageObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return imageObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, imageObj);
@@ -896,7 +923,8 @@ namespace vkd
 			return memoryResult.GetError();
 
 		auto* memoryObj = std::move(memoryResult).GetValue();
-		VkResult result = memoryObj->Create(*deviceObj, *pAllocateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return memoryObj->Create(*deviceObj, *pAllocateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, memoryObj);
@@ -1121,7 +1149,8 @@ namespace vkd
 			return renderPassResult.GetError();
 
 		auto* renderPassObj = std::move(renderPassResult).GetValue();
-		VkResult result = renderPassObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return renderPassObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, renderPassObj);
@@ -1172,7 +1201,8 @@ namespace vkd
 			return imageViewResult.GetError();
 
 		auto* imageViewObj = std::move(imageViewResult).GetValue();
-		VkResult result = imageViewObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return imageViewObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, imageViewObj);
@@ -1211,7 +1241,8 @@ namespace vkd
 			return framebufferResult.GetError();
 
 		auto* framebufferObj = std::move(framebufferResult).GetValue();
-		VkResult result = framebufferObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return framebufferObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, framebufferObj);
@@ -1250,7 +1281,8 @@ namespace vkd
 			return shaderModuleResult.GetError();
 
 		auto* shaderModuleObj = std::move(shaderModuleResult).GetValue();
-		VkResult result = shaderModuleObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return shaderModuleObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, shaderModuleObj);
@@ -1289,7 +1321,8 @@ namespace vkd
 			return samplerResult.GetError();
 
 		auto* samplerObj = std::move(samplerResult).GetValue();
-		VkResult result = samplerObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return samplerObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, samplerObj);
@@ -1328,7 +1361,8 @@ namespace vkd
 			return semaphoreResult.GetError();
 
 		auto* semaphoreObj = std::move(semaphoreResult).GetValue();
-		VkResult result = semaphoreObj->Create(*deviceObj, *pCreateInfo);
+		VkResult result = CreateNoThrow([&]
+										{ return semaphoreObj->Create(*deviceObj, *pCreateInfo); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, semaphoreObj);
@@ -1367,7 +1401,8 @@ namespace vkd
 			return eventResult.GetError();
 
 		auto* eventObj = std::move(eventResult).GetValue();
-		VkResult result = eventObj->Create(*deviceObj, *pCreateInfo);
+		VkResult result = CreateNoThrow([&]
+										{ return eventObj->Create(*deviceObj, *pCreateInfo); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, eventObj);
@@ -1436,7 +1471,8 @@ namespace vkd
 			return queryPoolResult.GetError();
 
 		auto* queryPoolObj = std::move(queryPoolResult).GetValue();
-		VkResult result = queryPoolObj->Create(*deviceObj, *pCreateInfo);
+		VkResult result = CreateNoThrow([&]
+										{ return queryPoolObj->Create(*deviceObj, *pCreateInfo); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, queryPoolObj);
@@ -1524,7 +1560,8 @@ namespace vkd
 			return layoutResult.GetError();
 
 		auto* layoutObj = std::move(layoutResult).GetValue();
-		VkResult result = layoutObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return layoutObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, layoutObj);
@@ -1563,7 +1600,8 @@ namespace vkd
 			return poolResult.GetError();
 
 		auto* poolObj = std::move(poolResult).GetValue();
-		VkResult result = poolObj->Create(*deviceObj, *pCreateInfo, *pAllocator);
+		VkResult result = CreateNoThrow([&]
+										{ return poolObj->Create(*deviceObj, *pCreateInfo, *pAllocator); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, poolObj);
@@ -1783,7 +1821,8 @@ namespace vkd
 			return cacheResult.GetError();
 
 		auto* cacheObj = std::move(cacheResult).GetValue();
-		VkResult result = cacheObj->Create(*deviceObj, *pCreateInfo);
+		VkResult result = CreateNoThrow([&]
+										{ return cacheObj->Create(*deviceObj, *pCreateInfo); });
 		if (result != VK_SUCCESS)
 		{
 			mem::Delete(*pAllocator, cacheObj);
