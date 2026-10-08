@@ -17,7 +17,7 @@
 namespace see
 {
 	Executor::Executor() :
-		m_context(spvContextCreate(SPV_ENV_UNIVERSAL_1_5)),
+		m_context(spvContextCreate(SPV_ENV_UNIVERSAL_1_6)),
 		m_nextHandle(1)
 	{
 	}
