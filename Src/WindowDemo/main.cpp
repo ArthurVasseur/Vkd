@@ -3,7 +3,7 @@
  * @brief Windowed demo: a triangle presented through VK_KHR_swapchain
  * @date 2026-10-07
  *
- * Loads a Vkd ICD directly (argv[1] or VKD_ICD, default vkd-Software), opens a Win32 window and
+ * Loads a Vkd ICD directly (argv[1] or VKD_ICD, default vkd-Amd), opens a Win32 window and
  * draws a triangle into each swapchain image -- its viewport moves every frame, the clear color too
  * -- then presents. After the last frame it reads the window back through GDI and checks that the
  * triangle's color reached the screen.
@@ -114,7 +114,7 @@ namespace
 
 int main(int argc, char** argv)
 {
-	std::string driver = "vkd-Software";
+	std::string driver = "vkd-Amd";
 	if (const char* env = std::getenv("VKD_ICD"))
 		driver = env;
 	if (argc > 1)
