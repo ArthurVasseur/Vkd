@@ -95,6 +95,10 @@ namespace vkd
 
 		if (!pAllocator)
 			pAllocator = &mem::GetDefaultAllocationCallbacks();
+		// AMDVLK vkCreateInstance (0x180250830): missing pfnAllocation or pfnFree
+		// returns 0xfffffffd (VK_ERROR_INITIALIZATION_FAILED).
+		if (!pAllocator->pfnAllocation || !pAllocator->pfnFree)
+			return VK_ERROR_INITIALIZATION_FAILED;
 
 		auto* instance = mem::NewInstanceDispatchable<Instance>(*pAllocator);
 		if (!instance)
