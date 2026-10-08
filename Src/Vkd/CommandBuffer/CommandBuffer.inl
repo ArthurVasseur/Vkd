@@ -327,6 +327,21 @@ namespace vkd
 		Record(std::move(op));
 	}
 
+	inline void CommandBuffer::PushSetDepthBias(float constantFactor, float clamp, float slopeFactor)
+	{
+		Record(OpSetDepthBias{.ConstantFactor = constantFactor, .Clamp = clamp, .SlopeFactor = slopeFactor});
+	}
+
+	inline void CommandBuffer::PushSetDepthBounds(float minDepthBounds, float maxDepthBounds)
+	{
+		Record(OpSetDepthBounds{.Min = minDepthBounds, .Max = maxDepthBounds});
+	}
+
+	inline void CommandBuffer::PushSetStencilValue(OpSetStencilValue::Field which, VkStencilFaceFlags faceMask, UInt32 value)
+	{
+		Record(OpSetStencilValue{.Which = which, .FaceMask = faceMask, .Value = value});
+	}
+
 	inline void CommandBuffer::PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents)
 	{
 		VKD_FROM_HANDLE(RenderPass, renderPassObj, beginInfo.renderPass);

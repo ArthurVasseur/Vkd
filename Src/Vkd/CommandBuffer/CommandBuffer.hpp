@@ -122,6 +122,9 @@ namespace vkd
 		inline void PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport);
 		inline void PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor);
 		inline void PushSetBlendConstants(const float constants[4]);
+		inline void PushSetDepthBias(float constantFactor, float clamp, float slopeFactor);
+		inline void PushSetDepthBounds(float minDepthBounds, float maxDepthBounds);
+		inline void PushSetStencilValue(OpSetStencilValue::Field which, VkStencilFaceFlags faceMask, UInt32 value);
 		inline void PushBeginRenderPass(const VkRenderPassBeginInfo& beginInfo, VkSubpassContents contents);
 		inline void PushEndRenderPass();
 		inline void PushResetQueryPool(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount);

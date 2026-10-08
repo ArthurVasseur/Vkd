@@ -165,6 +165,32 @@ namespace vkd
 		float Constants[4];
 	};
 
+	struct OpSetDepthBias
+	{
+		float ConstantFactor;
+		float Clamp;
+		float SlopeFactor;
+	};
+
+	struct OpSetDepthBounds
+	{
+		float Min;
+		float Max;
+	};
+
+	struct OpSetStencilValue
+	{
+		enum class Field : UInt8
+		{
+			CompareMask,
+			WriteMask,
+			Reference,
+		};
+		Field Which;
+		VkStencilFaceFlags FaceMask;
+		UInt32 Value;
+	};
+
 	// vkCmdPushConstants: Data lands at Offset in the command buffer's push-constant block.
 	struct OpPushConstants
 	{
@@ -217,6 +243,9 @@ namespace vkd
 		OpSetViewport,
 		OpSetScissor,
 		OpSetBlendConstants,
+		OpSetDepthBias,
+		OpSetDepthBounds,
+		OpSetStencilValue,
 		OpBeginRenderPass,
 		OpEndRenderPass,
 		OpResetQueryPool,

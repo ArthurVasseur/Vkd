@@ -129,6 +129,22 @@ namespace vkd::software
 		return VK_SUCCESS;
 	}
 
+	VkResult CommandDispatcher::operator()(vkd::OpSetDepthBias)
+	{
+		// The software rasterizer has no depth/stencil attachments.
+		return VK_SUCCESS;
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpSetDepthBounds)
+	{
+		return VK_SUCCESS;
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpSetStencilValue)
+	{
+		return VK_SUCCESS;
+	}
+
 	VkResult CommandDispatcher::operator()(vkd::OpBeginRenderPass op)
 	{
 		return m_context->BeginRenderPass(std::move(op));

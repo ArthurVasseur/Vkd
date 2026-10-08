@@ -220,7 +220,8 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdSetDepthBias(VkCommandBuffer commandBuffer, float depthBiasConstantFactor, float depthBiasClamp, float depthBiasSlopeFactor)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetDepthBias: not implemented, ignored");
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetDepthBias(depthBiasConstantFactor, depthBiasClamp, depthBiasSlopeFactor);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetBlendConstants(VkCommandBuffer commandBuffer, const float blendConstants[4])
@@ -233,25 +234,29 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdSetDepthBounds(VkCommandBuffer commandBuffer, float minDepthBounds, float maxDepthBounds)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetDepthBounds: not implemented, ignored");
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetDepthBounds(minDepthBounds, maxDepthBounds);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetStencilCompareMask(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, uint32_t compareMask)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetStencilCompareMask: not implemented, ignored");
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetStencilValue(OpSetStencilValue::Field::CompareMask, faceMask, compareMask);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetStencilWriteMask(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, uint32_t writeMask)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetStencilWriteMask: not implemented, ignored");
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetStencilValue(OpSetStencilValue::Field::WriteMask, faceMask, writeMask);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetStencilReference(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, uint32_t reference)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdSetStencilReference: not implemented, ignored");
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushSetStencilValue(OpSetStencilValue::Field::Reference, faceMask, reference);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents)
