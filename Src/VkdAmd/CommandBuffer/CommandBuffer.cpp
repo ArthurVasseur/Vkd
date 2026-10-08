@@ -24,6 +24,7 @@
 
 #include "VkdAmd/Device/Device.hpp"
 #include "VkdAmd/DeviceMemory/DeviceMemory.hpp"
+#include "VkdAmd/Image/Image.hpp"
 #include "VkdAmd/Pipeline/Pipeline.hpp"
 #include "VkdAmd/Pm4.hpp"
 #include "VkdAmd/PrivateData.hpp"
@@ -343,7 +344,13 @@ namespace vkd::amd
 		// Render pass load-op clears: the render area of every CLEAR color attachment, on the view's
 		// mip and on each framebuffer layer. Draws aren't executed yet, so the clear is all the
 		// render pass does to its attachments.
-		VkResult EncodeBeginRenderPass(Pm4Stream& stream, const vkd::OpBeginRenderPass& op)
+		struct EncodeState;
+		VkResult EncodeTiledClear(Pm4Stream& stream, const amd::Image& image, VkImageAspectFlagBits aspect, const VkClearDepthStencilValue& value,
+								  uint32_t mipLevel, uint32_t baseLayer, uint32_t layerCount, const VkRect2D& rect, EncodeState& state);
+		template<typename Fn>
+		VkResult ForEachTiledAspect(const amd::Image& image, VkImageAspectFlags mask, Fn&& fn);
+
+		VkResult EncodeBeginRenderPass(Pm4Stream& stream, const vkd::OpBeginRenderPass& op, EncodeState& state)
 		{
 			if (!op.RenderPassObject || !op.FramebufferObject)
 				return VK_SUCCESS;
@@ -352,7 +359,8 @@ namespace vkd::amd
 			const std::size_t count = std::min(attachments.size(), views.size());
 			for (std::size_t i = 0; i < count; ++i)
 			{
-				if (attachments[i].loadOp != VK_ATTACHMENT_LOAD_OP_CLEAR || i >= op.ClearValues.size())
+				if ((attachments[i].loadOp != VK_ATTACHMENT_LOAD_OP_CLEAR && attachments[i].stencilLoadOp != VK_ATTACHMENT_LOAD_OP_CLEAR) ||
+					i >= op.ClearValues.size())
 					continue;
 				VKD_FROM_HANDLE(vkd::ImageView, view, views[i]);
 				VKD_FROM_HANDLE(vkd::Image, image, view->GetImage());
@@ -360,7 +368,19 @@ namespace vkd::amd
 					continue;
 				if (vkuFormatIsDepthOrStencil(image->GetFormat()))
 				{
-					cct::Logger::Warning("AmdCommandBuffer: depth/stencil load-op clear not supported yet, skipped");
+					const auto* tiled = static_cast<const amd::Image*>(image);
+					if (!tiled->IsTiled())
+						continue;
+					const VkImageSubresourceRange& range = view->GetSubresourceRange();
+					const uint32_t viewLayers = vkd::ResolveLayerCount(*image, range.baseArrayLayer, range.layerCount);
+					const uint32_t layers = std::min(viewLayers, std::max(op.FramebufferObject->GetLayers(), 1u));
+					const VkImageAspectFlags cleared = (attachments[i].loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
+													   (attachments[i].stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR ? VK_IMAGE_ASPECT_STENCIL_BIT : 0u);
+					if (const VkResult r = ForEachTiledAspect(*tiled, cleared, [&](VkImageAspectFlagBits aspect)
+															  { return EncodeTiledClear(stream, *tiled, aspect, op.ClearValues[i].depthStencil, range.baseMipLevel,
+																						range.baseArrayLayer, layers, op.RenderArea, state); });
+						r != VK_SUCCESS)
+						return r;
 					continue;
 				}
 				uint8_t texel[32];
@@ -481,10 +501,27 @@ namespace vkd::amd
 			return true;
 		}
 
-		VkResult EncodeClearDepthStencilImage(Pm4Stream& stream, const vkd::Image::OpClearDepthStencilImage& op)
+		VkResult EncodeClearDepthStencilImage(Pm4Stream& stream, const vkd::Image::OpClearDepthStencilImage& op, EncodeState& state)
 		{
 			if (!IsBound(op.image))
 				return VK_ERROR_INITIALIZATION_FAILED;
+			if (const auto* tiled = static_cast<const amd::Image*>(op.image); tiled->IsTiled())
+			{
+				for (const VkImageSubresourceRange& range : op.ranges)
+				{
+					const uint32_t levels = range.levelCount == VK_REMAINING_MIP_LEVELS ? tiled->GetMipLevels() - range.baseMipLevel : range.levelCount;
+					const uint32_t layers = vkd::ResolveLayerCount(*tiled, range.baseArrayLayer, range.layerCount);
+					for (uint32_t level = range.baseMipLevel; level < range.baseMipLevel + levels; ++level)
+					{
+						const VkRect2D whole = {{0, 0}, {std::max(tiled->GetExtent().width >> level, 1u), std::max(tiled->GetExtent().height >> level, 1u)}};
+						if (const VkResult r = ForEachTiledAspect(*tiled, range.aspectMask, [&](VkImageAspectFlagBits aspect)
+																  { return EncodeTiledClear(stream, *tiled, aspect, op.value, level, range.baseArrayLayer, layers, whole, state); });
+							r != VK_SUCCESS)
+							return r;
+					}
+				}
+				return VK_SUCCESS;
+			}
 			const amd::DeviceMemory* memory = AmdMemory(op.image->GetMemory());
 			VkResult result = VK_SUCCESS;
 			for (const VkImageSubresourceRange& range : op.ranges)
@@ -776,11 +813,12 @@ namespace vkd::amd
 		// registers, the internal table in COMPUTE_USER_DATA_1 (ConstBufTblStartReg), user-data
 		// entry 0 (the embedded table) where the metadata maps it. The vector caches are invalidated
 		// first: RPM shaders read images earlier work wrote.
+		// constants go to user-data entries 1..n (consecutive USER_DATA registers after entry 0's).
 		VkResult EncodeRpmDispatch(Pm4Stream& stream, const AmdDevice::RpmProgram& program, uint32_t entry0, const uint32_t (&groups)[3],
-								   const EncodeState& state)
+								   const EncodeState& state, std::span<const uint32_t> constants = {})
 		{
 			const RpmPipeline& pipeline = *program.pipeline;
-			if (!stream.HasRoom(112))
+			if (!stream.HasRoom(112 + constants.size()))
 				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 			stream.AcquireMemInvalidateShaderCaches(state.computeEngine, true);
 
@@ -802,6 +840,8 @@ namespace vkd::amd
 				stream.SetComputeShReg(kComputeUserData0 + 1, static_cast<uint32_t>(program.tableVa));
 			if (pipeline.entryUserData[0] != UINT32_MAX)
 				stream.SetComputeShReg(kComputeUserData0 + pipeline.entryUserData[0], entry0);
+			if (!constants.empty())
+				stream.SetComputeShRegs(kComputeUserData0 + pipeline.entryUserData[1], constants.data(), static_cast<uint32_t>(constants.size()));
 			// COMPUTE_SHADER_EN | FORCE_START_AT_000 | ORDER_MODE | TUNNEL_ENABLE, CS_W32_EN for wave32.
 			stream.DispatchDirect(groups[0], groups[1], groups[2], 0x2045u | (pipeline.wave32 ? 0x8000u : 0u));
 			stream.EventWrite(kEventCsPartialFlush);
@@ -835,8 +875,20 @@ namespace vkd::amd
 		}
 
 		// T# of one subresource (one mip, one layer -- or the whole depth of a 3D mip).
-		bool WriteSubresourceDescriptor(uint8_t* out, const vkd::Image& image, const vkd::SubresourceFootprint& fp, VkFormat format)
+		bool WriteTiledPlaneDescriptor(uint8_t* out, const amd::Image& image, uint64_t planeVa, const gfx11::SurfaceLayout& plane, VkFormat format,
+									   uint32_t mipLevel, uint32_t layer);
+		uint64_t TiledImageVa(const amd::Image& image);
+
+		bool WriteSubresourceDescriptor(uint8_t* out, const vkd::Image& image, const vkd::SubresourceFootprint& fp, VkFormat format, uint32_t mipLevel,
+										uint32_t layer)
 		{
+			if (const auto* tiled = static_cast<const amd::Image*>(&image); tiled->IsTiled())
+			{
+				// Blits sample/store the depth plane (D16, D32: the formats with a T# entry).
+				const uint64_t imageVa = TiledImageVa(*tiled);
+				return imageVa != 0 && tiled->DepthPlane().bytesPerElement != 0 &&
+					   WriteTiledPlaneDescriptor(out, *tiled, imageVa, tiled->DepthPlane(), format, mipLevel, layer);
+			}
 			gfx11::ImageView view{};
 			view.address = AmdMemory(image.GetMemory())->GetGpuVa() + fp.offset;
 			view.format = format;
@@ -948,8 +1000,9 @@ namespace vkd::amd
 					if (tableVa == 0 || (tableVa >> 32) != (program.codeVa >> 32))
 						return VK_ERROR_OUT_OF_POOL_MEMORY;
 					std::memset(table, 0, 3 * kSlotBytes);
-					if (!WriteSubresourceDescriptor(table, *op.dst, dstFp, dstFormat) ||
-						!WriteSubresourceDescriptor(table + kSlotBytes, *op.src, srcFp, srcFormat))
+					if (!WriteSubresourceDescriptor(table, *op.dst, dstFp, dstFormat, r.dstSubresource.mipLevel, r.dstSubresource.baseArrayLayer + layer) ||
+						!WriteSubresourceDescriptor(table + kSlotBytes, *op.src, srcFp, srcFormat, r.srcSubresource.mipLevel,
+													r.srcSubresource.baseArrayLayer + layer))
 					{
 						cct::Logger::Warning("AmdCommandBuffer: blit format {} -> {} not supported yet, skipped", static_cast<int>(srcFormat),
 											 static_cast<int>(op.dst->GetFormat()));
@@ -966,6 +1019,304 @@ namespace vkd::amd
 					if (const VkResult res = EncodeRpmDispatch(stream, program, static_cast<uint32_t>(tableVa), groups, state); res != VK_SUCCESS)
 						return res;
 				}
+			}
+			return VK_SUCCESS;
+		}
+
+		// The plane an aspect of a tiled image lives in, viewed as the raw unsigned format of its
+		// element size; false if the image has no such plane.
+		bool GetTiledPlane(const amd::Image& image, VkImageAspectFlags aspect, const gfx11::SurfaceLayout*& plane, VkDeviceSize& planeOffset,
+						   VkFormat& rawFormat)
+		{
+			const bool stencil = aspect == VK_IMAGE_ASPECT_STENCIL_BIT;
+			plane = stencil ? &image.StencilPlane() : &image.DepthPlane();
+			planeOffset = stencil ? image.StencilPlaneOffset() : 0;
+			switch (plane->bytesPerElement)
+			{
+				case 1:
+					rawFormat = VK_FORMAT_R8_UINT;
+					return true;
+				case 2:
+					rawFormat = VK_FORMAT_R16_UINT;
+					return true;
+				case 4:
+					rawFormat = VK_FORMAT_R32_UINT;
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		// T# of one mip and layer of a tiled plane: the surface's address and mip 0 extent, the
+		// hardware finds the subresource.
+		bool WriteTiledPlaneDescriptor(uint8_t* out, const amd::Image& image, uint64_t planeVa, const gfx11::SurfaceLayout& plane, VkFormat format,
+									   uint32_t mipLevel, uint32_t layer)
+		{
+			gfx11::ImageView view{};
+			view.address = planeVa;
+			view.format = format;
+			view.viewType = image.GetArrayLayers() > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+			view.width = image.GetExtent().width;
+			view.height = image.GetExtent().height;
+			view.depth = 1;
+			view.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+			view.swizzleMode = plane.swizzleMode;
+			view.mipLevels = image.GetMipLevels();
+			view.baseLevel = mipLevel;
+			view.baseArray = layer;
+			return gfx11::WriteImageDescriptor(out, view);
+		}
+
+		// Buffer <-> tiled image copies with PAL's CopyMemToImg2d / CopyImgToMem2d, set up as
+		// RsrcProcMgr::CopyBetweenMemoryAndImageCs: an embedded table {typed buffer V#, plane T#}
+		// (32-byte slots) in user-data entry 0, {x, y, z, row pitch, width, height, depth, depth pitch}
+		// (texels) in entries 1-8, one thread per texel in 8x8 groups, one dispatch per layer.
+		// GPU address of a tiled image, 0 if its memory can't hold it (the swizzles need 64KB alignment).
+		uint64_t TiledImageVa(const amd::Image& image)
+		{
+			VkMemoryRequirements requirements{};
+			image.GetMemoryRequirements(requirements);
+			VkDeviceSize imageBytes = 0;
+			const uint64_t imageVa = AmdMemory(image.GetMemory())->GetGpuVaAt(image.GetMemoryOffset(), imageBytes);
+			if (imageVa == 0 || imageBytes < requirements.size || (imageVa & (gfx11::kBlock64Kb - 1)) != 0)
+			{
+				cct::Logger::Error("AmdCommandBuffer: tiled image memory not 64KB aligned or too small, skipped");
+				return 0;
+			}
+			return imageVa;
+		}
+
+		VkResult EncodeTiledBufferImageCopy(Pm4Stream& stream, const vkd::Buffer& buffer, const amd::Image& image, std::span<const VkBufferImageCopy> regions,
+											bool toImage, EncodeState& state)
+		{
+			AmdDevice::RpmProgram program;
+			if (!state.device->GetRpmProgram(toImage ? RpmPipelineId::CopyMemToImg2d : RpmPipelineId::CopyImgToMem2d, program))
+				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+			const uint64_t imageVa = TiledImageVa(image);
+			if (imageVa == 0)
+				return VK_SUCCESS;
+
+			for (const VkBufferImageCopy& r : regions)
+			{
+				const gfx11::SurfaceLayout* plane = nullptr;
+				VkDeviceSize planeOffset = 0;
+				VkFormat rawFormat = VK_FORMAT_UNDEFINED;
+				if (!GetTiledPlane(image, r.imageSubresource.aspectMask, plane, planeOffset, rawFormat) || r.imageExtent.width == 0 ||
+					r.imageExtent.height == 0)
+					continue;
+				gfx11::ImageFormat rawImgFmt{};
+				gfx11::GetImageFormat(rawFormat, rawImgFmt);
+				const uint32_t bpe = plane->bytesPerElement;
+				const uint32_t rowLength = r.bufferRowLength ? r.bufferRowLength : r.imageExtent.width;
+				const uint32_t imageHeight = r.bufferImageHeight ? r.bufferImageHeight : r.imageExtent.height;
+				const uint64_t elements = uint64_t{rowLength} * (r.imageExtent.height - 1) + r.imageExtent.width;
+				const uint64_t layerBytes = uint64_t{rowLength} * imageHeight * bpe;
+				const uint32_t layers = vkd::ResolveLayerCount(image, r.imageSubresource.baseArrayLayer, r.imageSubresource.layerCount);
+				const uint32_t copyData[8] = {static_cast<uint32_t>(r.imageOffset.x),
+											  static_cast<uint32_t>(r.imageOffset.y),
+											  0u,
+											  rowLength,
+											  r.imageExtent.width,
+											  r.imageExtent.height,
+											  1u,
+											  rowLength * imageHeight};
+				for (uint32_t layer = 0; layer < layers; ++layer)
+				{
+					const VkDeviceSize bufferOffset = buffer.GetMemoryOffset() + r.bufferOffset + layer * layerBytes;
+					VkDeviceSize bufferBytes = 0;
+					const uint64_t bufferVa = AmdMemory(buffer.GetMemory())->GetGpuVaAt(bufferOffset, bufferBytes);
+					if (bufferVa == 0 || bufferBytes < elements * bpe)
+					{
+						cct::Logger::Error("AmdCommandBuffer: buffer range of a tiled image copy out of its memory, skipped");
+						return VK_SUCCESS;
+					}
+
+					constexpr uint32_t kSlotBytes = 32; // PAL SrdDwordAlignment() * 4 on GFX11
+					uint8_t* table = nullptr;
+					const uint64_t tableVa = state.descriptors ? state.descriptors->Allocate(2 * kSlotBytes, table) : 0;
+					if (tableVa == 0 || (tableVa >> 32) != (program.codeVa >> 32))
+						return VK_ERROR_OUT_OF_POOL_MEMORY;
+					std::memset(table, 0, 2 * kSlotBytes);
+					gfx11::WriteTypedBufferDescriptor(table, bufferVa, elements, bpe, rawImgFmt.imgFmt);
+					if (!WriteTiledPlaneDescriptor(table + kSlotBytes, image, imageVa + planeOffset, *plane, rawFormat, r.imageSubresource.mipLevel,
+												   r.imageSubresource.baseArrayLayer + layer))
+						return VK_ERROR_FORMAT_NOT_SUPPORTED;
+
+					const uint32_t groups[3] = {(r.imageExtent.width + 7) / 8, (r.imageExtent.height + 7) / 8, 1};
+					if (const VkResult res = EncodeRpmDispatch(stream, program, static_cast<uint32_t>(tableVa), groups, state, copyData); res != VK_SUCCESS)
+						return res;
+				}
+			}
+			return VK_SUCCESS;
+		}
+
+		// T# of one aspect, mip and layer of an image viewed with a raw format, tiled or linear.
+		bool WriteRawAspectDescriptor(uint8_t* out, const vkd::Image& image, VkImageAspectFlagBits aspect, uint32_t mipLevel, uint32_t layer,
+									  VkFormat rawFormat)
+		{
+			if (const auto* tiled = static_cast<const amd::Image*>(&image); tiled->IsTiled())
+			{
+				const gfx11::SurfaceLayout* plane = nullptr;
+				VkDeviceSize planeOffset = 0;
+				VkFormat planeFormat = VK_FORMAT_UNDEFINED;
+				const uint64_t imageVa = TiledImageVa(*tiled);
+				return imageVa != 0 && GetTiledPlane(*tiled, aspect, plane, planeOffset, planeFormat) && planeFormat == rawFormat &&
+					   WriteTiledPlaneDescriptor(out, *tiled, imageVa + planeOffset, *plane, rawFormat, mipLevel, layer);
+			}
+			if (vkuFormatElementSize(image.GetFormat()) != vkuFormatElementSize(rawFormat))
+				return false; // one aspect of a linear combined depth/stencil texel
+			if (image.GetImageType() == VK_IMAGE_TYPE_3D)
+			{
+				// layer = a z slice of the mip, as a 2D linear image (same rows, 256-byte aligned).
+				const vkd::SubresourceFootprint fp = vkd::GetSubresourceFootprint(image, mipLevel, 0);
+				if (layer >= fp.extent.depth)
+					return false;
+				gfx11::ImageView view{};
+				view.address = AmdMemory(image.GetMemory())->GetGpuVa() + fp.offset + VkDeviceSize{layer} * fp.depthPitch;
+				view.format = rawFormat;
+				view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+				view.width = fp.extent.width;
+				view.height = fp.extent.height;
+				view.depth = 1;
+				view.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+				return gfx11::WriteImageDescriptor(out, view);
+			}
+			return WriteSubresourceDescriptor(out, image, vkd::GetSubresourceFootprint(image, mipLevel, layer), rawFormat, mipLevel, layer);
+		}
+
+		// vkCmdCopyImage with a tiled side, through PAL's CopyImage2d as RsrcProcMgr::CopyImageCompute
+		// sets it up (mip in the descriptors): an embedded table {dst T#, src T#} in user-data entry 0,
+		// {src offset, samples, dst offset, packed mips, width, height} in entries 1-10, 8x8 groups. Both
+		// sides are viewed with the raw format of the aspect's element, one dispatch per layer.
+		VkResult EncodeTiledImageCopy(Pm4Stream& stream, const vkd::Image::OpCopy& op, EncodeState& state)
+		{
+			// Tiled images are 2D; the other side may be a linear 3D image (2D <-> 3D copies: its z
+			// slices pair with the 2D side's layers).
+			if (op.src->GetImageType() == VK_IMAGE_TYPE_1D || op.dst->GetImageType() == VK_IMAGE_TYPE_1D)
+			{
+				cct::Logger::Warning("AmdCommandBuffer: copy between a tiled image and a 1D image, skipped");
+				return VK_SUCCESS;
+			}
+			const bool src3d = op.src->GetImageType() == VK_IMAGE_TYPE_3D;
+			const bool dst3d = op.dst->GetImageType() == VK_IMAGE_TYPE_3D;
+			AmdDevice::RpmProgram program;
+			if (!state.device->GetRpmProgram(RpmPipelineId::CopyImage2d, program))
+				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+			const amd::Image& tiled = *static_cast<const amd::Image*>(static_cast<const amd::Image*>(op.src)->IsTiled() ? op.src : op.dst);
+			for (const VkImageCopy& r : op.regions)
+			{
+				if (r.extent.width == 0 || r.extent.height == 0)
+					continue;
+				const uint32_t layers = src3d ? r.extent.depth : vkd::ResolveLayerCount(*op.src, r.srcSubresource.baseArrayLayer, r.srcSubresource.layerCount);
+				const uint32_t srcFirst = src3d ? static_cast<uint32_t>(r.srcOffset.z) : r.srcSubresource.baseArrayLayer;
+				const uint32_t dstFirst = dst3d ? static_cast<uint32_t>(r.dstOffset.z) : r.dstSubresource.baseArrayLayer;
+				const VkResult res = ForEachTiledAspect(tiled, r.srcSubresource.aspectMask, [&](VkImageAspectFlagBits aspect) -> VkResult
+														{
+					const gfx11::SurfaceLayout* plane = nullptr;
+					VkDeviceSize planeOffset = 0;
+					VkFormat rawFormat = VK_FORMAT_UNDEFINED;
+					if (!GetTiledPlane(tiled, aspect, plane, planeOffset, rawFormat))
+						return VK_SUCCESS;
+					// srcOffset (z = slice, 0: the layer is in the T#), samples, dstOffset, packed mips, extent.
+					const uint32_t constants[10] = {static_cast<uint32_t>(r.srcOffset.x), static_cast<uint32_t>(r.srcOffset.y), 0u, 1u,
+													static_cast<uint32_t>(r.dstOffset.x), static_cast<uint32_t>(r.dstOffset.y), 0u,
+													r.srcSubresource.mipLevel | (r.dstSubresource.mipLevel << 16), r.extent.width, r.extent.height};
+					for (uint32_t layer = 0; layer < layers; ++layer)
+					{
+						constexpr uint32_t kSlotBytes = 32;
+						uint8_t* table = nullptr;
+						const uint64_t tableVa = state.descriptors ? state.descriptors->Allocate(2 * kSlotBytes, table) : 0;
+						if (tableVa == 0 || (tableVa >> 32) != (program.codeVa >> 32))
+							return VK_ERROR_OUT_OF_POOL_MEMORY;
+						std::memset(table, 0, 2 * kSlotBytes);
+						if (!WriteRawAspectDescriptor(table, *op.dst, aspect, r.dstSubresource.mipLevel, dstFirst + layer, rawFormat) ||
+							!WriteRawAspectDescriptor(table + kSlotBytes, *op.src, aspect, r.srcSubresource.mipLevel, srcFirst + layer, rawFormat))
+						{
+							cct::Logger::Warning("AmdCommandBuffer: image copy with a tiled side not supported for these images, skipped");
+							return VK_SUCCESS;
+						}
+						const uint32_t groups[3] = {(r.extent.width + 7) / 8, (r.extent.height + 7) / 8, 1};
+						if (const VkResult e = EncodeRpmDispatch(stream, program, static_cast<uint32_t>(tableVa), groups, state, constants); e != VK_SUCCESS)
+							return e;
+					}
+					return VK_SUCCESS; });
+				if (res != VK_SUCCESS)
+					return res;
+			}
+			return VK_SUCCESS;
+		}
+
+		// A depth/stencil clear value as a plane's raw element: D32 float bits, D16 unorm, stencil byte.
+		uint32_t PackPlaneClearValue(VkImageAspectFlagBits aspect, uint32_t bytesPerElement, const VkClearDepthStencilValue& value)
+		{
+			if (aspect == VK_IMAGE_ASPECT_STENCIL_BIT)
+				return value.stencil & 0xFFu;
+			const float depth = std::clamp(value.depth, 0.0f, 1.0f);
+			if (bytesPerElement == 2)
+				return static_cast<uint32_t>(std::lround(depth * 65535.0f));
+			return FloatBits(depth);
+		}
+
+		// Clears a rectangle of one mip, some layers, of a tiled plane with PAL's ClearImage, set up as
+		// RsrcProcMgr::SlowClearCompute / ClearImageCs: the packed value in user-data entries 0-3, the
+		// packed constants (8x8x1 thread groups, always the windowed path) in 4, the address of the
+		// "slow constants" {disable mask, first texel, last texel} in 5, the T# in 6-13.
+		VkResult EncodeTiledClear(Pm4Stream& stream, const amd::Image& image, VkImageAspectFlagBits aspect, const VkClearDepthStencilValue& value,
+								  uint32_t mipLevel, uint32_t baseLayer, uint32_t layerCount, const VkRect2D& rect, EncodeState& state)
+		{
+			const gfx11::SurfaceLayout* plane = nullptr;
+			VkDeviceSize planeOffset = 0;
+			VkFormat rawFormat = VK_FORMAT_UNDEFINED;
+			if (!GetTiledPlane(image, aspect, plane, planeOffset, rawFormat) || mipLevel >= image.GetMipLevels())
+				return VK_SUCCESS;
+			const uint64_t imageVa = TiledImageVa(image);
+			if (imageVa == 0)
+				return VK_SUCCESS;
+			AmdDevice::RpmProgram program;
+			if (!state.device->GetRpmProgram(RpmPipelineId::ClearImage, program))
+				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+
+			const uint32_t mipWidth = std::max(image.GetExtent().width >> mipLevel, 1u);
+			const uint32_t mipHeight = std::max(image.GetExtent().height >> mipLevel, 1u);
+			const uint32_t x0 = static_cast<uint32_t>(std::clamp<int64_t>(rect.offset.x, 0, mipWidth));
+			const uint32_t y0 = static_cast<uint32_t>(std::clamp<int64_t>(rect.offset.y, 0, mipHeight));
+			const uint32_t x1 = static_cast<uint32_t>(std::clamp<int64_t>(int64_t{rect.offset.x} + rect.extent.width, 0, mipWidth));
+			const uint32_t y1 = static_cast<uint32_t>(std::clamp<int64_t>(int64_t{rect.offset.y} + rect.extent.height, 0, mipHeight));
+			if (x0 >= x1 || y0 >= y1)
+				return VK_SUCCESS;
+			const uint32_t packed = PackPlaneClearValue(aspect, plane->bytesPerElement, value);
+			constexpr uint32_t kPackedConsts = 3u | (3u << 8); // log2 threads 8x8x1, not the fast path, unmasked, 1 sample
+			const uint32_t groups[3] = {(x1 - (x0 & ~7u) + 7) / 8, (y1 - (y0 & ~7u) + 7) / 8, 1};
+
+			for (uint32_t layer = 0; layer < layerCount; ++layer)
+			{
+				uint8_t* slow = nullptr;
+				const uint64_t slowVa = state.descriptors ? state.descriptors->Allocate(64, slow) : 0;
+				if (slowVa == 0 || (slowVa >> 32) != (program.codeVa >> 32))
+					return VK_ERROR_OUT_OF_POOL_MEMORY;
+				const uint32_t slowConsts[12] = {0, 0, 0, 0, x0, y0, 0, 0, x1 - 1, y1 - 1, 0, 0};
+				std::memcpy(slow, slowConsts, sizeof(slowConsts));
+
+				uint32_t constants[13] = {0, 0, 0, kPackedConsts, static_cast<uint32_t>(slowVa)};
+				if (!WriteTiledPlaneDescriptor(reinterpret_cast<uint8_t*>(constants + 5), image, imageVa + planeOffset, *plane, rawFormat, mipLevel,
+											   baseLayer + layer))
+					return VK_ERROR_FORMAT_NOT_SUPPORTED;
+				if (const VkResult res = EncodeRpmDispatch(stream, program, packed, groups, state, constants); res != VK_SUCCESS)
+					return res;
+			}
+			return VK_SUCCESS;
+		}
+
+		// Every aspect of a tiled image a mask selects, among the planes it has.
+		template<typename Fn>
+		VkResult ForEachTiledAspect(const amd::Image& image, VkImageAspectFlags mask, Fn&& fn)
+		{
+			for (const VkImageAspectFlagBits aspect : {VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_ASPECT_STENCIL_BIT})
+			{
+				const bool present = aspect == VK_IMAGE_ASPECT_DEPTH_BIT ? image.DepthPlane().bytesPerElement != 0 : image.StencilPlane().bytesPerElement != 0;
+				if ((mask & aspect) && present)
+					if (const VkResult r = fn(aspect); r != VK_SUCCESS)
+						return r;
 			}
 			return VK_SUCCESS;
 		}
@@ -1335,7 +1686,7 @@ namespace vkd::amd
 
 		// vkCmdClearAttachments: rects of attachments of the current subpass (subpass 0: Vkd doesn't
 		// record vkCmdNextSubpass). A 3D image bound as 2D layers clears z slices.
-		VkResult EncodeClearAttachments(Pm4Stream& stream, const vkd::OpClearAttachments& op, const EncodeState& state)
+		VkResult EncodeClearAttachments(Pm4Stream& stream, const vkd::OpClearAttachments& op, EncodeState& state)
 		{
 			const vkd::OpBeginRenderPass* pass = state.renderPass;
 			if (!pass || !pass->RenderPassObject || !pass->FramebufferObject || pass->RenderPassObject->GetSubpasses().empty())
@@ -1360,6 +1711,17 @@ namespace vkd::amd
 				VKD_FROM_HANDLE(vkd::Image, image, view->GetImage());
 				if (!IsBound(image))
 					continue;
+				if (const auto* tiled = static_cast<const amd::Image*>(image); tiled->IsTiled())
+				{
+					const VkImageSubresourceRange& range = view->GetSubresourceRange();
+					for (const VkClearRect& rect : op.Rects)
+						if (const VkResult r = ForEachTiledAspect(*tiled, clear.aspectMask, [&](VkImageAspectFlagBits aspect)
+																  { return EncodeTiledClear(stream, *tiled, aspect, clear.clearValue.depthStencil, range.baseMipLevel,
+																							range.baseArrayLayer + rect.baseArrayLayer, rect.layerCount, rect.rect, state); });
+							r != VK_SUCCESS)
+							return r;
+					continue;
+				}
 
 				uint32_t texelSize = 0;
 				uint8_t colorTexel[32];
@@ -1417,12 +1779,31 @@ namespace vkd::amd
 
 		VkResult EncodeOps(Pm4Stream& stream, std::span<const vkd::CommandBuffer::Op> ops, EncodeState& state, uint32_t depth);
 
+		bool IsTiled(const vkd::Image* image)
+		{
+			return image && static_cast<const amd::Image*>(image)->IsTiled();
+		}
+
+		// Resolves address images row by row in the linear layout (no tiled path: they need a
+		// multisampled source, which Vkd doesn't create).
+		bool TouchesTiledImage(const vkd::CommandBuffer::Op& op)
+		{
+			if (const auto* resolve = std::get_if<vkd::Image::OpResolve>(&op))
+				return IsTiled(resolve->src) || IsTiled(resolve->dst);
+			return false;
+		}
+
 		VkResult EncodeOp(Pm4Stream& stream, const vkd::CommandBuffer::Op& op, EncodeState& state, uint32_t depth)
 		{
+			if (TouchesTiledImage(op))
+			{
+				cct::Logger::Warning("AmdCommandBuffer: transfer on a tiled depth/stencil image not supported yet, skipped");
+				return VK_SUCCESS;
+			}
 			if (const auto* clear = std::get_if<vkd::Image::OpClearColorImage>(&op))
 				return EncodeClearColorImage(stream, *clear);
 			if (const auto* clearDs = std::get_if<vkd::Image::OpClearDepthStencilImage>(&op))
-				return EncodeClearDepthStencilImage(stream, *clearDs);
+				return EncodeClearDepthStencilImage(stream, *clearDs, state);
 			if (const auto* fill = std::get_if<vkd::Buffer::OpFill>(&op))
 				return EncodeFillBuffer(stream, *fill);
 			if (const auto* update = std::get_if<vkd::Buffer::OpUpdate>(&op))
@@ -1432,11 +1813,23 @@ namespace vkd::amd
 			if (const auto* copy2 = std::get_if<vkd::Buffer::OpCopy2>(&op))
 				return EncodeCopyBuffer(stream, copy2->src, copy2->dst, copy2->regions);
 			if (const auto* toImage = std::get_if<vkd::Buffer::OpCopyBufferToImage>(&op))
+			{
+				if (IsTiled(toImage->dst) && IsBound(toImage->src) && IsBound(toImage->dst))
+					return EncodeTiledBufferImageCopy(stream, *toImage->src, *static_cast<const amd::Image*>(toImage->dst), toImage->regions, true, state);
 				return EncodeCopyBufferToImage(stream, *toImage);
+			}
 			if (const auto* toBuffer = std::get_if<vkd::Buffer::OpCopyImageToBuffer>(&op))
+			{
+				if (IsTiled(toBuffer->src) && IsBound(toBuffer->src) && IsBound(toBuffer->dst))
+					return EncodeTiledBufferImageCopy(stream, *toBuffer->dst, *static_cast<const amd::Image*>(toBuffer->src), toBuffer->regions, false, state);
 				return EncodeCopyImageToBuffer(stream, *toBuffer);
+			}
 			if (const auto* imageCopy = std::get_if<vkd::Image::OpCopy>(&op))
+			{
+				if ((IsTiled(imageCopy->src) || IsTiled(imageCopy->dst)) && IsBound(imageCopy->src) && IsBound(imageCopy->dst))
+					return EncodeTiledImageCopy(stream, *imageCopy, state);
 				return EncodeCopyImage(stream, *imageCopy);
+			}
 			if (const auto* resolve = std::get_if<vkd::Image::OpResolve>(&op))
 				return EncodeResolveImage(stream, *resolve);
 			if (const auto* blit = std::get_if<vkd::Image::OpBlit>(&op))
@@ -1554,7 +1947,7 @@ namespace vkd::amd
 			if (const auto* beginPass = std::get_if<vkd::OpBeginRenderPass>(&op))
 			{
 				state.renderPass = beginPass;
-				return EncodeBeginRenderPass(stream, *beginPass);
+				return EncodeBeginRenderPass(stream, *beginPass, state);
 			}
 			if (std::holds_alternative<vkd::OpEndRenderPass>(op))
 			{
@@ -1611,6 +2004,32 @@ namespace vkd::amd
 
 	// Upper bound of the descriptor tables a command buffer writes: four per dispatch/draw (sets,
 	// vertex buffers), one per blitted layer.
+	// RPM dispatches an op runs on tiled images (one embedded table or slow-constant block each).
+	uint64_t TiledRpmDispatchCount(const vkd::CommandBuffer::Op& op)
+	{
+		uint64_t count = 0;
+		auto layers = [](const vkd::Image& image, uint32_t base, uint32_t n)
+		{ return uint64_t{vkd::ResolveLayerCount(image, base, n)}; };
+		if (const auto* toImage = std::get_if<vkd::Buffer::OpCopyBufferToImage>(&op); toImage && IsTiled(toImage->dst))
+			for (const VkBufferImageCopy& r : toImage->regions)
+				count += layers(*toImage->dst, r.imageSubresource.baseArrayLayer, r.imageSubresource.layerCount);
+		if (const auto* toBuffer = std::get_if<vkd::Buffer::OpCopyImageToBuffer>(&op); toBuffer && IsTiled(toBuffer->src))
+			for (const VkBufferImageCopy& r : toBuffer->regions)
+				count += layers(*toBuffer->src, r.imageSubresource.baseArrayLayer, r.imageSubresource.layerCount);
+		if (const auto* imageCopy = std::get_if<vkd::Image::OpCopy>(&op); imageCopy && (IsTiled(imageCopy->src) || IsTiled(imageCopy->dst)))
+			for (const VkImageCopy& r : imageCopy->regions)
+				count += 2 * std::max<uint64_t>(r.extent.depth, layers(*imageCopy->src, r.srcSubresource.baseArrayLayer, r.srcSubresource.layerCount));
+		if (const auto* clearDs = std::get_if<vkd::Image::OpClearDepthStencilImage>(&op); clearDs && IsTiled(clearDs->image))
+			for (const VkImageSubresourceRange& r : clearDs->ranges)
+				count += 2 * clearDs->image->GetMipLevels() * layers(*clearDs->image, r.baseArrayLayer, r.layerCount);
+		if (const auto* pass = std::get_if<vkd::OpBeginRenderPass>(&op); pass && pass->FramebufferObject)
+			count += 2 * uint64_t{std::max(pass->FramebufferObject->GetLayers(), 1u)};
+		if (const auto* clear = std::get_if<vkd::OpClearAttachments>(&op))
+			for (const VkClearRect& r : clear->Rects)
+				count += 2 * uint64_t{r.layerCount} * clear->Attachments.size();
+		return count;
+	}
+
 	uint64_t DescriptorTableCount(std::span<const vkd::CommandBuffer::Op> ops, uint32_t depth)
 	{
 		if (depth > 4)
@@ -1621,6 +2040,8 @@ namespace vkd::amd
 			if (std::holds_alternative<vkd::OpDispatch>(op) || std::holds_alternative<vkd::OpDraw>(op) ||
 				std::holds_alternative<vkd::OpDrawIndexed>(op))
 				count += 4;
+			else if (const uint64_t tiled = TiledRpmDispatchCount(op))
+				count += tiled;
 			else if (const auto* blit = std::get_if<vkd::Image::OpBlit>(&op))
 			{
 				for (const VkImageBlit& r : blit->regions)
@@ -1643,6 +2064,9 @@ namespace vkd::amd
 		{
 			if (std::holds_alternative<vkd::OpDispatch>(op) || std::holds_alternative<vkd::OpDraw>(op) ||
 				std::holds_alternative<vkd::OpDrawIndexed>(op) || std::holds_alternative<vkd::Image::OpBlit>(op))
+				return true;
+			// Tiled images are copied and cleared by RPM shaders.
+			if (TiledRpmDispatchCount(op) != 0)
 				return true;
 			if (const auto* execute = std::get_if<vkd::OpExecuteCommands>(&op))
 			{

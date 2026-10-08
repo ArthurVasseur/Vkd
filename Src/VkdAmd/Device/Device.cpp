@@ -33,6 +33,7 @@
 #include "VkdAmd/CommandPool/CommandPool.hpp"
 #include "VkdAmd/DeviceMemory/DeviceMemory.hpp"
 #include "VkdAmd/Fence/Fence.hpp"
+#include "VkdAmd/Image/Image.hpp"
 #include "VkdAmd/PhysicalDevice/PhysicalDevice.hpp"
 #include "VkdAmd/Pipeline/Pipeline.hpp"
 #include "VkdAmd/PrivateData.hpp"
@@ -320,7 +321,7 @@ namespace vkd::amd
 
 	Result<vkd::Image*, VkResult> AmdDevice::CreateImage(const VkAllocationCallbacks& allocationCallbacks)
 	{
-		auto* image = mem::NewObject<vkd::Image>(allocationCallbacks);
+		auto* image = mem::NewObject<amd::Image>(allocationCallbacks);
 		if (!image)
 		{
 			CCT_ASSERT_FALSE("Failed to allocate Image");

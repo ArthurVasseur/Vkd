@@ -88,6 +88,7 @@ drivers = {
             "CommandPool",
             "CommandBuffer",
             "Fence",
+            "Image",
             "Pipeline",
             "Shader",
         },
