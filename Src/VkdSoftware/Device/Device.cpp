@@ -48,7 +48,8 @@ namespace vkd::software
 
 	SoftwareDevice::~SoftwareDevice()
 	{
-		m_threadPool.RequestStop();
+		m_rasterThreadPool.RequestStop();
+		m_submitThreadPool.RequestStop();
 	}
 
 	VkResult SoftwareDevice::Create(vkd::PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks)
@@ -62,9 +63,14 @@ namespace vkd::software
 		return Device::Create(owner, pDeviceCreateInfo, allocationCallbacks);
 	}
 
-	ThreadPool& SoftwareDevice::GetThreadPool()
+	ThreadPool& SoftwareDevice::GetSubmitThreadPool()
 	{
-		return m_threadPool;
+		return m_submitThreadPool;
+	}
+
+	ThreadPool& SoftwareDevice::GetRasterThreadPool()
+	{
+		return m_rasterThreadPool;
 	}
 
 	Allocator& SoftwareDevice::GetAllocator()

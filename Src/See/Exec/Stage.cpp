@@ -135,14 +135,20 @@ namespace see::exec
 		return output;
 	}
 
+	StageLocations BuildStageLocations(const ir::Module& module)
+	{
+		return StageLocations{.m_inputs = FindLocationVariables(module, SpvStorageClassInput), .m_outputs = FindLocationVariables(module, SpvStorageClassOutput)};
+	}
+
 	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
-		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
+		const ir::Module& module, const ir::Function& function, const StageLocations& locations,
+		const std::unordered_map<cct::UInt32, Value>& locationInputs,
 		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
 		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
 	{
 		SEE_AUTO_PROFILER_SCOPE();
 		std::unordered_map<cct::UInt32, Value> inputs;
-		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassInput))
+		for (const auto& [variableId, location] : locations.m_inputs)
 		{
 			auto valueIt = locationInputs.find(location);
 			if (valueIt != locationInputs.end())
@@ -154,7 +160,7 @@ namespace see::exec
 			return std::nullopt;
 
 		std::unordered_map<cct::UInt32, Value> outputs;
-		for (const auto& [variableId, location] : FindLocationVariables(module, SpvStorageClassOutput))
+		for (const auto& [variableId, location] : locations.m_outputs)
 		{
 			auto valueIt = result->find(variableId);
 			if (valueIt != result->end())
@@ -162,5 +168,13 @@ namespace see::exec
 		}
 
 		return outputs;
+	}
+
+	std::optional<std::unordered_map<cct::UInt32, Value>> RunFragmentStage(
+		const ir::Module& module, const ir::Function& function, const std::unordered_map<cct::UInt32, Value>& locationInputs,
+		const std::unordered_map<cct::UInt32, ExternalBuffer>& externalBuffers,
+		const std::unordered_map<cct::UInt32, ExternalImage>& externalImages)
+	{
+		return RunFragmentStage(module, function, BuildStageLocations(module), locationInputs, externalBuffers, externalImages);
 	}
 } // namespace see::exec

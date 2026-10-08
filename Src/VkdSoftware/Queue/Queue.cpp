@@ -81,7 +81,7 @@ namespace vkd::software
 		}
 
 		auto* softwareDevice = static_cast<SoftwareDevice*>(GetOwner());
-		auto& threadPool = softwareDevice->GetThreadPool();
+		auto& threadPool = softwareDevice->GetSubmitThreadPool();
 
 		std::lock_guard<std::mutex> lock(m_submitMutex);
 		auto previousSubmit = std::move(m_previousSubmit);

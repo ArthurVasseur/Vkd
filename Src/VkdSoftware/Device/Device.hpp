@@ -25,7 +25,8 @@ namespace vkd::software
 
 		VkResult Create(vkd::PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks) override;
 
-		[[nodiscard]] ThreadPool& GetThreadPool();
+		[[nodiscard]] ThreadPool& GetSubmitThreadPool();
+		[[nodiscard]] ThreadPool& GetRasterThreadPool();
 		[[nodiscard]] Allocator& GetAllocator();
 		[[nodiscard]] see::Executor& GetShaderExecutor();
 
@@ -51,7 +52,8 @@ namespace vkd::software
 		Result<vkd::Sampler*, VkResult> CreateSampler(const VkAllocationCallbacks& allocationCallbacks) override;
 
 	private:
-		ThreadPool m_threadPool;
+		ThreadPool m_submitThreadPool;
+		ThreadPool m_rasterThreadPool;
 		Allocator m_allocator;
 		see::Executor m_shaderExecutor;
 	};

@@ -7,10 +7,13 @@
 #include "VkdSoftware/CpuContext/CpuContext.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <future>
 #include <limits>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include "Vkd/Buffer/Buffer.hpp"
 #include "Vkd/DescriptorSet/DescriptorSet.hpp"
@@ -332,31 +335,52 @@ namespace vkd::software
 			return result;
 		}
 
-		void RasterizeTriangle(cct::UByte* pixels, VkFormat format, const VkExtent3D& extent, const VkRect2D& scissor, const ScreenVertex& v0, const ScreenVertex& v1, const ScreenVertex& v2,
-							   const see::ir::Module& fragmentModule, const see::ir::Function& fragmentFunction, VkCullModeFlags cullMode, VkFrontFace frontFace,
-							   const std::unordered_map<UInt32, see::exec::ExternalBuffer>& fragmentUniforms,
-							   const std::unordered_map<UInt32, see::exec::ExternalImage>& fragmentImages)
+		// Everything a triangle needs from the draw that doesn't vary from one triangle to the next.
+		struct RasterContext
+		{
+			cct::UByte* m_pixels;
+			VkFormat m_format;
+			VkExtent3D m_extent;
+			VkRect2D m_scissor;
+			VkCullModeFlags m_cullMode;
+			VkFrontFace m_frontFace;
+			const see::ir::Module* m_fragmentModule;
+			const see::ir::Function* m_fragmentFunction;
+			const see::exec::StageLocations* m_fragmentLocations;
+			const std::unordered_map<UInt32, see::exec::ExternalBuffer>* m_fragmentUniforms;
+			const std::unordered_map<UInt32, see::exec::ExternalImage>* m_fragmentImages;
+			cct::ThreadPool* m_rasterPool;
+		};
+
+		// Below this, spreading the rows costs more than running them here.
+		constexpr int MinParallelRasterPixels = 256;
+
+		void RasterizeTriangle(const RasterContext& context, const ScreenVertex& v0, const ScreenVertex& v1, const ScreenVertex& v2)
 		{
 			VKD_AUTO_PROFILER_SCOPE();
-			const VkDeviceSize pixelSize = vkuFormatElementSize(format);
-			if (!IsSupportedColorFormat(format))
+			const VkDeviceSize pixelSize = vkuFormatElementSize(context.m_format);
+			if (!IsSupportedColorFormat(context.m_format))
 				return;
 
 			const float area = EdgeFunction(v0.m_x, v0.m_y, v1.m_x, v1.m_y, v2.m_x, v2.m_y);
 			if (area == 0.0f)
 				return;
 
-			if (IsCulled(IsFrontFacing(area, frontFace), cullMode))
+			if (IsCulled(IsFrontFacing(area, context.m_frontFace), context.m_cullMode))
 				return;
 
+			const VkRect2D& scissor = context.m_scissor;
 			const int minX = std::max({static_cast<int>(std::floor(std::min({v0.m_x, v1.m_x, v2.m_x}))), scissor.offset.x, 0});
 			const int minY = std::max({static_cast<int>(std::floor(std::min({v0.m_y, v1.m_y, v2.m_y}))), scissor.offset.y, 0});
-			const int maxX = std::min({static_cast<int>(std::ceil(std::max({v0.m_x, v1.m_x, v2.m_x}))), scissor.offset.x + static_cast<int>(scissor.extent.width), static_cast<int>(extent.width)});
-			const int maxY = std::min({static_cast<int>(std::ceil(std::max({v0.m_y, v1.m_y, v2.m_y}))), scissor.offset.y + static_cast<int>(scissor.extent.height), static_cast<int>(extent.height)});
+			const int maxX = std::min({static_cast<int>(std::ceil(std::max({v0.m_x, v1.m_x, v2.m_x}))), scissor.offset.x + static_cast<int>(scissor.extent.width), static_cast<int>(context.m_extent.width)});
+			const int maxY = std::min({static_cast<int>(std::ceil(std::max({v0.m_y, v1.m_y, v2.m_y}))), scissor.offset.y + static_cast<int>(scissor.extent.height), static_cast<int>(context.m_extent.height)});
+			if (minX >= maxX || minY >= maxY)
+				return;
 
 			const float absArea = std::fabs(area);
 
-			for (int y = minY; y < maxY; ++y)
+			// `interpolated` is reused across pixels: its location set comes from the three vertices, not from the pixel.
+			auto rasterizeRow = [&](int y, std::unordered_map<UInt32, see::exec::Value>& interpolated)
 			{
 				for (int x = minX; x < maxX; ++x)
 				{
@@ -393,7 +417,6 @@ namespace vkd::software
 					const float pl1 = pw1 * invPwSum;
 					const float pl2 = pw2 * invPwSum;
 
-					std::unordered_map<UInt32, see::exec::Value> interpolated;
 					for (const auto& [location, value] : v0.m_output.m_locations)
 					{
 						auto it1 = v1.m_output.m_locations.find(location);
@@ -404,7 +427,8 @@ namespace vkd::software
 						interpolated[location] = InterpolateLocation(value, it1->second, it2->second, pl0, pl1, pl2);
 					}
 
-					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs = see::exec::RunFragmentStage(fragmentModule, fragmentFunction, interpolated, fragmentUniforms, fragmentImages);
+					std::optional<std::unordered_map<UInt32, see::exec::Value>> fragmentOutputs =
+						see::exec::RunFragmentStage(*context.m_fragmentModule, *context.m_fragmentFunction, *context.m_fragmentLocations, interpolated, *context.m_fragmentUniforms, *context.m_fragmentImages);
 					if (!fragmentOutputs)
 						continue;
 
@@ -420,12 +444,42 @@ namespace vkd::software
 					clearValue.float32[3] = color.m_rows > 3 ? color.GetFloat(3) : 1.0f;
 
 					UInt8 pattern[32];
-					PackColor(format, clearValue, pattern);
+					PackColor(context.m_format, clearValue, pattern);
 
-					cct::UByte* pixel = pixels + (static_cast<std::size_t>(y) * extent.width + static_cast<std::size_t>(x)) * pixelSize;
+					cct::UByte* pixel = context.m_pixels + (static_cast<std::size_t>(y) * context.m_extent.width + static_cast<std::size_t>(x)) * pixelSize;
 					std::memcpy(pixel, pattern, pixelSize);
 				}
+			};
+
+			const int rowCount = maxY - minY;
+			const std::size_t workerCount = std::min<std::size_t>(context.m_rasterPool->GetWorkerCount(), static_cast<std::size_t>(rowCount));
+			if (workerCount <= 1 || rowCount * (maxX - minX) < MinParallelRasterPixels)
+			{
+				std::unordered_map<UInt32, see::exec::Value> interpolated;
+				for (int y = minY; y < maxY; ++y)
+					rasterizeRow(y, interpolated);
+				return;
 			}
+
+			// Rows are handed out one at a time rather than in equal bands: a triangle's rows don't cost the same.
+			std::atomic<int> nextRow{minY};
+			auto consumeRows = [&]()
+			{
+				std::unordered_map<UInt32, see::exec::Value> interpolated;
+				for (int y = nextRow.fetch_add(1, std::memory_order_relaxed); y < maxY; y = nextRow.fetch_add(1, std::memory_order_relaxed))
+					rasterizeRow(y, interpolated);
+			};
+
+			std::vector<std::future<void>> pendingRows;
+			pendingRows.reserve(workerCount - 1);
+			for (std::size_t worker = 1; worker < workerCount; ++worker)
+				pendingRows.push_back(context.m_rasterPool->Submit(consumeRows));
+
+			// The calling thread takes a share too, so a stopped or saturated pool only costs time.
+			consumeRows();
+
+			for (std::future<void>& pendingRow : pendingRows)
+				pendingRow.wait();
 		}
 
 		VkResult MapRange(vkd::DeviceMemory* memory, VkDeviceSize offset, VkDeviceSize size, cct::UByte** outData)
@@ -760,6 +814,20 @@ namespace vkd::software
 		const std::unordered_map<UInt32, see::exec::ExternalImage> vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedMemories);
 		const std::unordered_map<UInt32, see::exec::ExternalImage> fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedMemories);
 		const std::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories);
+		const see::exec::StageLocations fragmentLocations = see::exec::BuildStageLocations(*fragmentModule);
+
+		const RasterContext rasterContext{.m_pixels = pixels,
+										  .m_format = format,
+										  .m_extent = extent,
+										  .m_scissor = scissor,
+										  .m_cullMode = pipeline->GetCullMode(),
+										  .m_frontFace = pipeline->GetFrontFace(),
+										  .m_fragmentModule = fragmentModule,
+										  .m_fragmentFunction = fragmentFunction,
+										  .m_fragmentLocations = &fragmentLocations,
+										  .m_fragmentUniforms = &fragmentUniforms,
+										  .m_fragmentImages = &fragmentImages,
+										  .m_rasterPool = &device->GetRasterThreadPool()};
 
 		for (UInt32 instance = 0; instance < instanceCount; ++instance)
 		{
@@ -801,7 +869,7 @@ namespace vkd::software
 				if (!allValid)
 					continue;
 
-				RasterizeTriangle(pixels, format, extent, scissor, screenVertices[0], screenVertices[1], screenVertices[2], *fragmentModule, *fragmentFunction, pipeline->GetCullMode(), pipeline->GetFrontFace(), fragmentUniforms, fragmentImages);
+				RasterizeTriangle(rasterContext, screenVertices[0], screenVertices[1], screenVertices[2]);
 			}
 		}
 
@@ -908,9 +976,9 @@ namespace vkd::software
 			return VK_SUCCESS;
 
 		cct::UByte* data = nullptr;
-		const VkResult mapResult = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset() + op.offset, size, &data);
-		if (mapResult != VK_SUCCESS)
-			return mapResult;
+		const VkResult mapResult = op.dst->GetMemory()->Map(op.dst->GetMemoryOffset() + op.offset, size, reinterpret_cast<void**>(&data));
+		if (mapResult != VK_SUCCESS || data == nullptr)
+			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
 
 		UInt32* data32 = reinterpret_cast<UInt32*>(data);
 		const std::size_t count = size / sizeof(UInt32);

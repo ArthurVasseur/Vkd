@@ -63,8 +63,8 @@ namespace see::exec
 		{
 			const ir::Module& m_module;
 			std::unordered_map<cct::UInt32, Value> m_variables;
-			std::unordered_map<cct::UInt32, ExternalBuffer> m_externalBuffers;
-			std::unordered_map<cct::UInt32, ExternalImage> m_externalImages;
+			const std::unordered_map<cct::UInt32, ExternalBuffer>& m_externalBuffers;
+			const std::unordered_map<cct::UInt32, ExternalImage>& m_externalImages;
 			std::unordered_map<cct::UInt32, Value> m_ssaValues;
 			std::unordered_map<cct::UInt32, PointerInfo> m_pointers;
 		};
