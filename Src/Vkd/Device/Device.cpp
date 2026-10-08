@@ -67,6 +67,11 @@ namespace vkd
 
 	Device::~Device()
 	{
+		DestroyQueues();
+	}
+
+	void Device::DestroyQueues()
+	{
 		for (auto& queueFamily : m_queues)
 		{
 			for (auto* queue : queueFamily.second)

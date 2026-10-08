@@ -200,6 +200,8 @@ namespace vkd
 		// Whether ppEnabledExtensionNames named this extension at vkCreateDevice.
 		[[nodiscard]] bool IsExtensionEnabled(const char* name) const;
 
+		void DestroyQueues();
+
 	private:
 		PhysicalDevice* m_owner;
 		std::vector<std::string> m_enabledExtensions;
