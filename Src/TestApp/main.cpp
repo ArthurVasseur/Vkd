@@ -176,7 +176,7 @@ int main(int argc, char** argv)
 	cct::Logger::SetContext(&logger);
 	cct::Logger::Info("Vulkan Hello Triangle with vulkan.hpp");
 
-	const char* driverName = "vkd-Software";
+	const char* driverName = "vkd-Amd";
 	if (const char* env = std::getenv("VKD_ICD"))
 		driverName = env;
 	else if (argc > 1 && argv[1] && argv[1][0] && argv[1][0] != '-')
