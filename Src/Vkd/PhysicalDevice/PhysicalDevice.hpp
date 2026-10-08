@@ -61,6 +61,8 @@ namespace vkd
 		static void VKAPI_CALL GetPhysicalDeviceProperties2(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceProperties2* pProperties);
 		static void VKAPI_CALL GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice pPhysicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties);
 		static void VKAPI_CALL GetPhysicalDeviceMemoryProperties(VkPhysicalDevice pPhysicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties);
+		// Device extensions every Vkd driver implements (in the shared layer).
+		[[nodiscard]] static std::span<const VkExtensionProperties> GetSupportedExtensions();
 		static VkResult VKAPI_CALL EnumerateDeviceExtensionProperties(VkPhysicalDevice pPhysicalDevice, const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties);
 		static void VKAPI_CALL GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format, VkImageType type, VkSampleCountFlagBits samples, VkImageUsageFlags usage, VkImageTiling tiling, uint32_t* pPropertyCount, VkSparseImageFormatProperties* pProperties);
 		static void VKAPI_CALL DestroyPhysicalDevice(VkPhysicalDevice pPhysicalDevice);
@@ -79,8 +81,6 @@ namespace vkd
 		VkResult Create(Instance& owner, const VkPhysicalDeviceProperties& physicalDeviceProperties, const std::array<VkQueueFamilyProperties, 3>& queueFamilyProperties, const VkAllocationCallbacks& allocationCallbacks);
 
 	private:
-		static std::array<VkExtensionProperties, 0> s_supportedExtensions;
-
 		Instance* m_instance;
 		VkPhysicalDeviceProperties m_physicalDeviceProperties;
 		std::array<VkQueueFamilyProperties, 3 /*(graphics + compute + transfer), graphics, transfer*/> m_queueFamilyProperties;

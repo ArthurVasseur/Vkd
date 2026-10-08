@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -187,8 +188,12 @@ namespace vkd
 		virtual Result<DescriptorPool*, VkResult> CreateDescriptorPool(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Sampler*, VkResult> CreateSampler(const VkAllocationCallbacks& allocationCallbacks) = 0;
 
+		// Whether ppEnabledExtensionNames named this extension at vkCreateDevice.
+		[[nodiscard]] bool IsExtensionEnabled(const char* name) const;
+
 	private:
 		PhysicalDevice* m_owner;
+		std::vector<std::string> m_enabledExtensions;
 
 		// Queues organized by family index, then queue index
 		vkd::unordered_map<UInt32 /*family index*/, vkd::vector<DispatchableObject<Queue>*>> m_queues;

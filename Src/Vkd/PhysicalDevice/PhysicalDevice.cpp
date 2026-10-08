@@ -14,8 +14,6 @@
 namespace vkd
 {
 	// Supported device extensions for the CPU backend
-	std::array<VkExtensionProperties, 0> PhysicalDevice::s_supportedExtensions = {};
-
 	PhysicalDevice::PhysicalDevice(const VkAllocationCallbacks& allocationCallbacks) :
 		ObjectBase(ObjectType, allocationCallbacks),
 		m_instance(nullptr),
@@ -304,6 +302,14 @@ namespace vkd
 		pMemoryProperties->memoryTypes[0].heapIndex = 0; // References the heap defined above
 	}
 
+	std::span<const VkExtensionProperties> PhysicalDevice::GetSupportedExtensions()
+	{
+		static constexpr VkExtensionProperties kExtensions[] = {
+			{VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME, VK_EXT_HOST_QUERY_RESET_SPEC_VERSION},
+		};
+		return kExtensions;
+	}
+
 	VkResult PhysicalDevice::EnumerateDeviceExtensionProperties(VkPhysicalDevice pPhysicalDevice,
 																const char* pLayerName, uint32_t* pPropertyCount,
 																VkExtensionProperties* pProperties)
@@ -318,7 +324,8 @@ namespace vkd
 
 		VKD_CHECK(pPropertyCount);
 
-		const UInt32 available = static_cast<UInt32>(s_supportedExtensions.size());
+		const auto extensions = GetSupportedExtensions();
+		const UInt32 available = static_cast<UInt32>(extensions.size());
 		if (!pProperties)
 		{
 			*pPropertyCount = available;
@@ -327,7 +334,7 @@ namespace vkd
 
 		const UInt32 toWrite = std::min(*pPropertyCount, available);
 		if (toWrite > 0)
-			std::memcpy(pProperties, s_supportedExtensions.data(), toWrite * sizeof(VkExtensionProperties));
+			std::memcpy(pProperties, extensions.data(), toWrite * sizeof(VkExtensionProperties));
 		*pPropertyCount = toWrite;
 		return toWrite < available ? VK_INCOMPLETE : VK_SUCCESS;
 	}

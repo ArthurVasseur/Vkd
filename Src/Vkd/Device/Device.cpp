@@ -80,6 +80,9 @@ namespace vkd
 	VkResult Device::Create(PhysicalDevice& owner, const VkDeviceCreateInfo& pDeviceCreateInfo, const VkAllocationCallbacks& allocationCallbacks)
 	{
 		m_owner = &owner;
+		m_enabledExtensions.clear();
+		for (uint32_t i = 0; i < pDeviceCreateInfo.enabledExtensionCount; ++i)
+			m_enabledExtensions.emplace_back(pDeviceCreateInfo.ppEnabledExtensionNames[i]);
 
 #ifdef VKD_DEBUG_CHECKS
 		m_createResult = VK_SUCCESS; // avoid false positive in AssertValid()
@@ -87,6 +90,11 @@ namespace vkd
 
 		m_createResult = CreateQueues(pDeviceCreateInfo);
 		return m_createResult;
+	}
+
+	bool Device::IsExtensionEnabled(const char* name) const
+	{
+		return std::find(m_enabledExtensions.begin(), m_enabledExtensions.end(), name) != m_enabledExtensions.end();
 	}
 
 	PhysicalDevice* Device::GetOwner() const
@@ -209,8 +217,14 @@ namespace vkd
 		VKD_FROM_HANDLE(PhysicalDevice, physicalDevice, pPhysicalDevice);
 		VKD_CHECK(pCreateInfo);
 
-		if (pCreateInfo->enabledExtensionCount > 0)
-			return VK_ERROR_EXTENSION_NOT_PRESENT;
+		for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; ++i)
+		{
+			const auto extensions = PhysicalDevice::GetSupportedExtensions();
+			const char* name = pCreateInfo->ppEnabledExtensionNames[i];
+			if (!name || std::none_of(extensions.begin(), extensions.end(), [&](const VkExtensionProperties& e)
+									  { return std::strcmp(e.extensionName, name) == 0; }))
+				return VK_ERROR_EXTENSION_NOT_PRESENT;
+		}
 
 		if (pCreateInfo->pEnabledFeatures)
 		{
@@ -267,9 +281,25 @@ namespace vkd
 		if (pName == nullptr)
 			return nullptr;
 
+		// Extension entry points are NULL unless the device enabled their extension.
+		const Device* deviceObj = nullptr;
+		if (pDevice != VK_NULL_HANDLE)
+		{
+			VKD_FROM_HANDLE(Device, device, pDevice);
+			deviceObj = device;
+		}
+		auto extensionEnabled = [&](const char* extension)
+		{ return !deviceObj || deviceObj->IsExtensionEnabled(extension); };
+
 #define VKD_ENTRYPOINT_LOOKUP(klass, name) \
 	if (strcmp(pName, "vk" #name) == 0)    \
 	return (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call)
+#define VKD_ENTRYPOINT_EXT_LOOKUP(klass, name, extension) \
+	if (strcmp(pName, "vk" #name) == 0)                   \
+	return extensionEnabled(extension) ? (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call) : nullptr
+#define VKD_ENTRYPOINT_ALIAS(klass, name, suffix, extension) \
+	if (strcmp(pName, "vk" #name #suffix) == 0)              \
+	return extensionEnabled(extension) ? (PFN_vkVoidFunction) static_cast<PFN_vk##name>(&EntryPointGuard<static_cast<PFN_vk##name>(klass::name)>::Call) : nullptr
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyDevice);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetDeviceProcAddr);
@@ -307,6 +337,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateGraphicsPipelines);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateComputePipelines);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetBufferDeviceAddress);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, GetBufferDeviceAddress, KHR, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, GetBufferDeviceAddress, EXT, VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipeline);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateRenderPass);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyRenderPass);
@@ -330,6 +362,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyQueryPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetQueryPoolResults);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetQueryPool);
+		VKD_ENTRYPOINT_ALIAS(vkd::Device, ResetQueryPool, EXT, VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreatePipelineLayout);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipelineLayout);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDescriptorSetLayout);
@@ -405,6 +438,8 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::CommandBuffer, CmdWaitEvents);
 
 #undef VKD_ENTRYPOINT_LOOKUP
+#undef VKD_ENTRYPOINT_ALIAS
+#undef VKD_ENTRYPOINT_EXT_LOOKUP
 
 		return nullptr;
 	}
