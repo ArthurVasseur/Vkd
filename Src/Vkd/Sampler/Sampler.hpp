@@ -32,6 +32,8 @@ namespace vkd
 		[[nodiscard]] inline VkFilter GetMinFilter() const;
 		[[nodiscard]] inline VkSamplerAddressMode GetAddressModeU() const;
 		[[nodiscard]] inline VkSamplerAddressMode GetAddressModeV() const;
+		// Every VkSamplerCreateInfo field (pNext dropped): what a GPU sampler descriptor encodes.
+		[[nodiscard]] inline const VkSamplerCreateInfo& GetCreateInfo() const;
 
 	protected:
 		Device* m_owner;
@@ -39,6 +41,7 @@ namespace vkd
 		VkFilter m_minFilter;
 		VkSamplerAddressMode m_addressModeU;
 		VkSamplerAddressMode m_addressModeV;
+		VkSamplerCreateInfo m_createInfo;
 	};
 } // namespace vkd
 

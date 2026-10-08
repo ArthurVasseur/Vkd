@@ -17,7 +17,8 @@ namespace vkd
 		m_magFilter(VK_FILTER_NEAREST),
 		m_minFilter(VK_FILTER_NEAREST),
 		m_addressModeU(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
-		m_addressModeV(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
+		m_addressModeV(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE),
+		m_createInfo{}
 	{
 	}
 
@@ -28,6 +29,8 @@ namespace vkd
 		m_minFilter = info.minFilter;
 		m_addressModeU = info.addressModeU;
 		m_addressModeV = info.addressModeV;
+		m_createInfo = info;
+		m_createInfo.pNext = nullptr;
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;
@@ -61,5 +64,11 @@ namespace vkd
 	{
 		AssertValid();
 		return m_addressModeV;
+	}
+
+	inline const VkSamplerCreateInfo& Sampler::GetCreateInfo() const
+	{
+		AssertValid();
+		return m_createInfo;
 	}
 } // namespace vkd
