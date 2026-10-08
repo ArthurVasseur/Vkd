@@ -82,8 +82,16 @@ namespace vkd::amd
 				const VkDynamicState state = states.dynamic->pDynamicStates[i];
 				m_graphicsState.dynamicViewport |= state == VK_DYNAMIC_STATE_VIEWPORT;
 				m_graphicsState.dynamicScissor |= state == VK_DYNAMIC_STATE_SCISSOR;
+				m_graphicsState.dynamicBlendConstants |= state == VK_DYNAMIC_STATE_BLEND_CONSTANTS;
 			}
 		}
+		std::span<const VkPipelineColorBlendAttachmentState> blendAttachments;
+		if (states.colorBlend && states.colorBlend->pAttachments)
+		{
+			blendAttachments = {states.colorBlend->pAttachments, std::min(states.colorBlend->attachmentCount, kMaxColorTargets)};
+			std::copy_n(states.colorBlend->blendConstants, 4, m_graphicsState.blendConstants);
+		}
+		m_graphicsState.blend = ComputeColorBlendRegs(blendAttachments);
 		if (states.vertexInput)
 		{
 			for (uint32_t i = 0; i < states.vertexInput->vertexBindingDescriptionCount; ++i)
@@ -126,6 +134,15 @@ namespace vkd::amd
 		{
 			if (pipeline.vertexSpirvHash == vertexHash && pipeline.fragmentSpirvHash == fragmentHash)
 				m_graphics = &pipeline;
+		}
+		if (m_graphics)
+		{
+			// CB_SHADER_MASK is the PS's: the captured one.
+			uint32_t shaderMask = 0;
+			for (const RegWrite& w : m_graphics->drawState)
+				if (w.reg == kCbShaderMask)
+					shaderMask = w.value;
+			m_graphicsState.cbColorControl = CbColorControl(shaderMask, m_graphicsState.blend.cbTargetMask);
 		}
 		if (!m_graphics)
 		{

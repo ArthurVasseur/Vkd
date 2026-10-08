@@ -2,6 +2,7 @@
 
 #include "Vkd/Pipeline/Pipeline.hpp"
 
+#include "VkdAmd/Pipeline/ColorBlend.hpp"
 #include "VkdAmd/Shader/PrecompiledGraphics.hpp"
 #include "VkdAmd/Shader/PrecompiledShaders.hpp"
 #include "VkdAmd/Wddm/WddmAllocation.hpp"
@@ -23,6 +24,11 @@ namespace vkd::amd
 		static constexpr uint32_t kMaxVertexBindings = 32;
 		uint32_t vertexStrides[kMaxVertexBindings] = {};
 		uint32_t vertexBindingCount = 0;
+		// Color blend state, written over the captured one (ColorBlend.hpp).
+		ColorBlendRegs blend;
+		uint32_t cbColorControl = 0;
+		float blendConstants[4] = {};
+		bool dynamicBlendConstants = false;
 	};
 
 	// A pipeline owns its shaders' GFX11 code in a GPU allocation. There's no SPIR-V compiler yet:
