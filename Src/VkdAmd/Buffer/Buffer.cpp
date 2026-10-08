@@ -1,7 +1,16 @@
 #include "VkdAmd/Buffer/Buffer.hpp"
 
+#include <limits>
+
 namespace vkd::amd
 {
+	VkResult Buffer::Create(Device& owner, const VkBufferCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks)
+	{
+		if (info.size > std::numeric_limits<VkDeviceSize>::max() - 0xFFFFull)
+			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+		return vkd::Buffer::Create(owner, info, allocationCallbacks);
+	}
+
 	void Buffer::GetMemoryRequirements(VkMemoryRequirements& memoryRequirements) const
 	{
 		vkd::Buffer::GetMemoryRequirements(memoryRequirements);
