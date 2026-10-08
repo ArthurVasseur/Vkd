@@ -17,6 +17,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include <Concerto/Core/DynLib/DynLib.hpp>
@@ -169,23 +170,31 @@ void saveImageToPPM(const char* filename, uint32_t width, uint32_t height, const
 	cct::Logger::Info("Saved triangle to {}", filename);
 }
 
-int main()
+int main(int argc, char** argv)
 {
 	cct::Logger logger;
 	cct::Logger::SetContext(&logger);
 	cct::Logger::Info("Vulkan Hello Triangle with vulkan.hpp");
 
+	const char* driverName = "vkd-Software";
+	if (const char* env = std::getenv("VKD_ICD"))
+		driverName = env;
+	else if (argc > 1 && argv[1] && argv[1][0] && argv[1][0] != '-')
+		driverName = argv[1];
+
 	cct::DynLib driver;
-	if (!driver.Load(
-			"./"
+	std::string driverPath =
 #ifdef CCT_PLATFORM_POSIX
-			"lib"
+		std::string("lib") + driverName + CONCERTO_DYNLIB_EXTENSION;
+#else
+		std::string(driverName) + CONCERTO_DYNLIB_EXTENSION;
 #endif
-			"vkd-Software" CONCERTO_DYNLIB_EXTENSION))
+	if (!driver.Load(driverPath))
 	{
-		cct::Logger::Error("Failed to load driver");
+		cct::Logger::Error("Failed to load driver {}", driverPath);
 		return EXIT_FAILURE;
 	}
+	cct::Logger::Info("Loaded ICD {}", driverPath);
 
 	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr =
 		reinterpret_cast<PFN_vkGetInstanceProcAddr>(driver.GetSymbol("vk_icdGetInstanceProcAddr"));
