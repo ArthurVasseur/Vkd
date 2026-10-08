@@ -126,6 +126,49 @@ namespace vkd
 		}
 	}
 
+	void PhysicalDevice::GetFormatProperties(VkFormat format, VkFormatProperties& properties) const
+	{
+		properties = {};
+		if (format == VK_FORMAT_R8G8B8A8_UNORM)
+		{
+			const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+												  VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT |
+												  VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+												  VK_FORMAT_FEATURE_TRANSFER_SRC_BIT |
+												  VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+			properties.linearTilingFeatures = features;
+			properties.optimalTilingFeatures = features;
+			properties.bufferFeatures = VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT;
+		}
+	}
+
+	VkResult PhysicalDevice::GetImageFormatProperties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage,
+													  VkImageCreateFlags flags, VkImageFormatProperties& properties) const
+	{
+		properties = {};
+
+		const VkImageUsageFlags supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+													  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+		if (format != VK_FORMAT_R8G8B8A8_UNORM || type != VK_IMAGE_TYPE_2D ||
+			(tiling != VK_IMAGE_TILING_OPTIMAL && tiling != VK_IMAGE_TILING_LINEAR) ||
+			(usage & ~supportedUsageFlags) != 0 || (flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0)
+			return VK_ERROR_FORMAT_NOT_SUPPORTED;
+
+		const VkPhysicalDeviceLimits& limits = m_physicalDeviceProperties.limits;
+
+		properties.maxExtent = {limits.maxImageDimension2D, limits.maxImageDimension2D, 1};
+		properties.maxMipLevels = std::bit_width(limits.maxImageDimension2D);
+		properties.maxArrayLayers = limits.maxImageArrayLayers;
+		properties.sampleCounts = (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+									  ? limits.framebufferColorSampleCounts
+									  : VK_SAMPLE_COUNT_1_BIT;
+		properties.maxResourceSize = static_cast<VkDeviceSize>(limits.maxImageDimension2D) *
+									 limits.maxImageDimension2D * limits.maxImageArrayLayers * 4;
+
+		return VK_SUCCESS;
+	}
+
 	void PhysicalDevice::GetPhysicalDeviceFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format,
 														   VkFormatProperties* pFormatProperties)
 	{
@@ -135,31 +178,7 @@ namespace vkd
 		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
 		CCT_ASSERT(pFormatProperties, "pFormatProperties cannot be null");
 
-		// Initialize to no support by default
-		pFormatProperties->linearTilingFeatures = 0;
-		pFormatProperties->optimalTilingFeatures = 0;
-		pFormatProperties->bufferFeatures = 0;
-
-		switch (format)
-		{
-			case VK_FORMAT_R8G8B8A8_UNORM:
-			{
-				const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
-													  VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT |
-													  VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-													  VK_FORMAT_FEATURE_TRANSFER_SRC_BIT |
-													  VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-				pFormatProperties->linearTilingFeatures = features;
-				pFormatProperties->optimalTilingFeatures = features;
-				pFormatProperties->bufferFeatures = VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT;
-				break;
-			}
-
-			// All other formats: no support
-			default:
-				// Properties already initialized to 0
-				break;
-		}
+		physicalDevice->GetFormatProperties(format, *pFormatProperties);
 	}
 
 	VkResult PhysicalDevice::GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice pPhysicalDevice, VkFormat format,
@@ -173,28 +192,7 @@ namespace vkd
 		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
 		CCT_ASSERT(pImageFormatProperties, "pImageFormatProperties cannot be null");
 
-		std::memset(pImageFormatProperties, 0, sizeof(VkImageFormatProperties));
-
-		const VkImageUsageFlags supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-													  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-		if (format != VK_FORMAT_R8G8B8A8_UNORM || type != VK_IMAGE_TYPE_2D ||
-			(tiling != VK_IMAGE_TILING_OPTIMAL && tiling != VK_IMAGE_TILING_LINEAR) ||
-			(usage & ~supportedUsageFlags) != 0 || (flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0)
-			return VK_ERROR_FORMAT_NOT_SUPPORTED;
-
-		const VkPhysicalDeviceLimits& limits = physicalDevice->GetPhysicalDeviceProperties().limits;
-
-		pImageFormatProperties->maxExtent = {limits.maxImageDimension2D, limits.maxImageDimension2D, 1};
-		pImageFormatProperties->maxMipLevels = std::bit_width(limits.maxImageDimension2D);
-		pImageFormatProperties->maxArrayLayers = limits.maxImageArrayLayers;
-		pImageFormatProperties->sampleCounts = (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-												   ? limits.framebufferColorSampleCounts
-												   : VK_SAMPLE_COUNT_1_BIT;
-		pImageFormatProperties->maxResourceSize = static_cast<VkDeviceSize>(limits.maxImageDimension2D) *
-												  limits.maxImageDimension2D * limits.maxImageArrayLayers * 4;
-
-		return VK_SUCCESS;
+		return physicalDevice->GetImageFormatProperties(format, type, tiling, usage, flags, *pImageFormatProperties);
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceProperties(VkPhysicalDevice pPhysicalDevice,

@@ -34,6 +34,12 @@ namespace vkd
 		virtual VkResult Create(Instance& owner, const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual DispatchableObjectResult<Device> CreateDevice() = 0;
 
+		// Format support behind vkGetPhysicalDevice(Image)FormatProperties(2). The default is what the
+		// software rasterizer handles (RGBA8 2D images); a driver supporting more overrides these.
+		virtual void GetFormatProperties(VkFormat format, VkFormatProperties& properties) const;
+		virtual VkResult GetImageFormatProperties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage,
+												  VkImageCreateFlags flags, VkImageFormatProperties& properties) const;
+
 		Instance& GetOwner()
 		{
 			CCT_ASSERT(m_instance, "PhysicalDevice has no owner instance");
