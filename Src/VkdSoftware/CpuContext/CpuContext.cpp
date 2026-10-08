@@ -15,6 +15,7 @@
 #include "Vkd/Buffer/Buffer.hpp"
 #include "Vkd/DescriptorSet/DescriptorSet.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
+#include "Vkd/Image/ColorPacking.hpp"
 #include "Vkd/ImageView/ImageView.hpp"
 #include "Vkd/QueryPool/QueryPool.hpp"
 #include "VkdSoftware/Device/Device.hpp"
@@ -28,133 +29,6 @@ namespace vkd::software
 {
 	namespace
 	{
-		// R/G/B/A -> index into VkClearColorValue's per-channel arrays, or -1 for a non-color component.
-		int ComponentChannelIndex(VKU_FORMAT_COMPONENT_TYPE type)
-		{
-			switch (type)
-			{
-				case VKU_FORMAT_COMPONENT_TYPE_R:
-					return 0;
-				case VKU_FORMAT_COMPONENT_TYPE_G:
-					return 1;
-				case VKU_FORMAT_COMPONENT_TYPE_B:
-					return 2;
-				case VKU_FORMAT_COMPONENT_TYPE_A:
-					return 3;
-				default:
-					return -1;
-			}
-		}
-
-		// IEEE 754 binary32 -> binary16, round-to-nearest, subnormals flushed to zero.
-		UInt16 FloatToHalf(float value)
-		{
-			UInt32 bits;
-			std::memcpy(&bits, &value, sizeof(bits));
-
-			const UInt32 sign = (bits >> 16) & 0x8000u;
-			const Int32 exponent = static_cast<Int32>((bits >> 23) & 0xFFu) - 127 + 15;
-			const UInt32 mantissa = bits & 0x7FFFFFu;
-
-			if (exponent <= 0)
-				return static_cast<UInt16>(sign);
-			if (exponent >= 0x1F)
-				return static_cast<UInt16>(sign | 0x7C00u);
-
-			return static_cast<UInt16>(sign | (static_cast<UInt32>(exponent) << 10) | (mantissa >> 13));
-		}
-
-		UInt64 UnsignedMaxForBits(UInt32 bits)
-		{
-			return bits >= 64 ? ~UInt64{0} : (UInt64{1} << bits) - 1;
-		}
-
-		Int64 SignedMaxForBits(UInt32 bits)
-		{
-			return bits >= 64 ? std::numeric_limits<Int64>::max() : (Int64{1} << (bits - 1)) - 1;
-		}
-
-		Int64 SignedMinForBits(UInt32 bits)
-		{
-			return bits >= 64 ? std::numeric_limits<Int64>::min() : -(Int64{1} << (bits - 1));
-		}
-
-		// False for compressed/multiplane/depth-stencil formats and sub-byte-packed layouts (e.g. R5G6B5), which PackColor can't express.
-		bool IsSupportedColorFormat(VkFormat format)
-		{
-			if (vkuFormatIsCompressed(format) || vkuFormatIsMultiplane(format) || vkuFormatIsDepthOrStencil(format))
-				return false;
-
-			if (!vkuFormatIsUNORM(format) && !vkuFormatIsSRGB(format) && !vkuFormatIsSNORM(format) &&
-				!vkuFormatIsUINT(format) && !vkuFormatIsSINT(format) && !vkuFormatIsSFLOAT(format))
-				return false;
-
-			const VKU_FORMAT_INFO info = vkuGetFormatInfo(format);
-			for (UInt32 i = 0; i < info.component_count; ++i)
-			{
-				if (info.components[i].size % 8 != 0)
-					return false;
-				if (ComponentChannelIndex(info.components[i].type) < 0)
-					return false;
-			}
-
-			return true;
-		}
-
-		// Writes vkuFormatElementSize(format) bytes to outBytes; caller must have checked IsSupportedColorFormat(format) first.
-		void PackColor(VkFormat format, const VkClearColorValue& color, UInt8* outBytes)
-		{
-			const bool isSfloat = vkuFormatIsSFLOAT(format);
-			const bool isUnorm = vkuFormatIsUNORM(format) || vkuFormatIsSRGB(format);
-			const bool isSnorm = vkuFormatIsSNORM(format);
-			const bool isUint = vkuFormatIsUINT(format);
-
-			const VKU_FORMAT_INFO info = vkuGetFormatInfo(format);
-
-			std::size_t byteOffset = 0;
-			for (UInt32 i = 0; i < info.component_count; ++i)
-			{
-				const UInt32 bits = info.components[i].size;
-				const UInt32 bytes = bits / 8;
-				const int channel = ComponentChannelIndex(info.components[i].type);
-
-				if (isSfloat)
-				{
-					if (bytes == 4)
-						std::memcpy(outBytes + byteOffset, &color.float32[channel], 4);
-					else
-					{
-						const UInt16 half = FloatToHalf(color.float32[channel]);
-						std::memcpy(outBytes + byteOffset, &half, 2);
-					}
-				}
-				else if (isUnorm)
-				{
-					const float clamped = std::clamp(color.float32[channel], 0.0f, 1.0f);
-					const UInt64 quantized = static_cast<UInt64>(clamped * static_cast<float>(UnsignedMaxForBits(bits)) + 0.5f);
-					std::memcpy(outBytes + byteOffset, &quantized, bytes);
-				}
-				else if (isSnorm)
-				{
-					const float clamped = std::clamp(color.float32[channel], -1.0f, 1.0f);
-					const Int64 quantized = static_cast<Int64>(clamped * static_cast<float>(SignedMaxForBits(bits)));
-					std::memcpy(outBytes + byteOffset, &quantized, bytes);
-				}
-				else if (isUint)
-				{
-					const UInt64 value = std::min(static_cast<UInt64>(color.uint32[channel]), UnsignedMaxForBits(bits));
-					std::memcpy(outBytes + byteOffset, &value, bytes);
-				}
-				else
-				{
-					const Int64 value = std::clamp(static_cast<Int64>(color.int32[channel]), SignedMinForBits(bits), SignedMaxForBits(bits));
-					std::memcpy(outBytes + byteOffset, &value, bytes);
-				}
-
-				byteOffset += bytes;
-			}
-		}
-
 		struct ScreenVertex
 		{
 			float m_x;
