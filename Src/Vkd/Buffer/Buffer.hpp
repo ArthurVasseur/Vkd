@@ -78,7 +78,7 @@ namespace vkd
 
 		virtual VkResult Create(Device& owner, const VkBufferCreateInfo& info, const VkAllocationCallbacks& allocationCallbacks);
 		void BindBufferMemory(DeviceMemory& deviceMemory, VkDeviceSize memoryOffset);
-		void GetMemoryRequirements(VkMemoryRequirements& memoryRequirements) const;
+		virtual void GetMemoryRequirements(VkMemoryRequirements& memoryRequirements) const;
 
 		[[nodiscard]] inline Device* GetOwner() const;
 		[[nodiscard]] inline VkDeviceSize GetSize() const;
