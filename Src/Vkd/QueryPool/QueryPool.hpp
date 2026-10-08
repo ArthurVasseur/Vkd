@@ -37,8 +37,10 @@ namespace vkd
 
 		void Reset(UInt32 firstQuery, UInt32 queryCount);
 		void Begin(UInt32 query, VkQueryControlFlags flags);
-		void End(UInt32 query);
-		void WriteTimestamp(UInt32 query);
+		// value: the query result, for drivers that measure one (0 otherwise).
+		void End(UInt32 query, UInt64 value = 0);
+		// value: the GPU timestamp, for drivers that have one (0 otherwise).
+		void WriteTimestamp(UInt32 query, UInt64 value = 0);
 
 	private:
 		[[nodiscard]] UInt32 ValuesPerQuery() const;

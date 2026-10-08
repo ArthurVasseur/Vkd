@@ -141,26 +141,28 @@ namespace vkd
 		m_available[query] = 0;
 	}
 
-	void QueryPool::End(UInt32 query)
+	void QueryPool::End(UInt32 query, UInt64 value)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 		VKD_CHECK(query < m_queryCount);
 
 		{
 			std::lock_guard lock(m_mutex);
+			if (m_queryType == VK_QUERY_TYPE_OCCLUSION)
+				m_results[query] = value;
 			m_available[query] = 1;
 		}
 		m_cv.notify_all();
 	}
 
-	void QueryPool::WriteTimestamp(UInt32 query)
+	void QueryPool::WriteTimestamp(UInt32 query, UInt64 value)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 		VKD_CHECK(query < m_queryCount);
 
 		{
 			std::lock_guard lock(m_mutex);
-			m_results[query] = 0;
+			m_results[query] = value;
 			m_available[query] = 1;
 		}
 		m_cv.notify_all();
