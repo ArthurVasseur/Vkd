@@ -374,6 +374,16 @@ namespace vkd
 		Record(Image::OpResolve{srcImageObj, dstImageObj, std::move(regions)});
 	}
 
+	inline void CommandBuffer::PushBlitImage(VkImage srcImage, VkImage dstImage, UInt32 regionCount, const VkImageBlit* pRegions, VkFilter filter)
+	{
+		VKD_FROM_HANDLE(Image, srcImageObj, srcImage);
+		VKD_FROM_HANDLE(Image, dstImageObj, dstImage);
+
+		vkd::vector<VkImageBlit> regions(CommandAllocator<VkImageBlit>(GetAllocationCallbacks()));
+		regions.assign(pRegions, pRegions + regionCount);
+		Record(Image::OpBlit{srcImageObj, dstImageObj, std::move(regions), filter});
+	}
+
 	inline void CommandBuffer::PushSetEvent(VkEvent event, bool signaled)
 	{
 		VKD_FROM_HANDLE(Event, eventObj, event);

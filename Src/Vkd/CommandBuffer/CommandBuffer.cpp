@@ -337,7 +337,26 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageBlit* pRegions, VkFilter filter)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdBlitImage: not implemented, ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushBlitImage(srcImage, dstImage, regionCount, pRegions, filter);
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2* pBlitImageInfo)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		VKD_CHECK(pBlitImageInfo);
+		vkd::vector<VkImageBlit> regions(CommandAllocator<VkImageBlit>(commandBufferObj->GetAllocationCallbacks()));
+		regions.reserve(pBlitImageInfo->regionCount);
+		for (uint32_t i = 0; i < pBlitImageInfo->regionCount; ++i)
+		{
+			const VkImageBlit2& r = pBlitImageInfo->pRegions[i];
+			regions.push_back(VkImageBlit{r.srcSubresource, {r.srcOffsets[0], r.srcOffsets[1]}, r.dstSubresource, {r.dstOffsets[0], r.dstOffsets[1]}});
+		}
+		commandBufferObj->PushBlitImage(pBlitImageInfo->srcImage, pBlitImageInfo->dstImage, static_cast<uint32_t>(regions.size()), regions.data(),
+										pBlitImageInfo->filter);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount)

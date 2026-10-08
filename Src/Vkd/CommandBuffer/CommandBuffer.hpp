@@ -96,6 +96,7 @@ namespace vkd
 		static void VKAPI_CALL CmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask);
 		static void VKAPI_CALL CmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask);
 		static void VKAPI_CALL CmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers);
+		static void VKAPI_CALL CmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2* pBlitImageInfo);
 
 		inline VkResult Begin(const VkCommandBufferBeginInfo& beginInfo);
 		inline VkResult End();
@@ -126,6 +127,7 @@ namespace vkd
 		inline void PushClearDepthStencilImage(VkImage image, VkImageLayout imageLayout, const VkClearDepthStencilValue& value, UInt32 rangeCount, const VkImageSubresourceRange* pRanges);
 		inline void PushClearAttachments(UInt32 attachmentCount, const VkClearAttachment* pAttachments, UInt32 rectCount, const VkClearRect* pRects);
 		inline void PushResolveImage(VkImage srcImage, VkImage dstImage, UInt32 regionCount, const VkImageResolve* pRegions);
+		inline void PushBlitImage(VkImage srcImage, VkImage dstImage, UInt32 regionCount, const VkImageBlit* pRegions, VkFilter filter);
 		inline void PushSetEvent(VkEvent event, bool signaled);
 		inline void PushWaitEvents(UInt32 eventCount, const VkEvent* pEvents);
 		inline void PushExecuteCommands(UInt32 commandBufferCount, const VkCommandBuffer* pCommandBuffers);
