@@ -328,6 +328,7 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateQueryPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyQueryPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, GetQueryPoolResults);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Device, ResetQueryPool);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreatePipelineLayout);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DestroyPipelineLayout);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, CreateDescriptorSetLayout);
@@ -1535,6 +1536,15 @@ namespace vkd
 		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
 
 		return queryPoolObj->GetResults(firstQuery, queryCount, dataSize, pData, stride, flags);
+	}
+
+	void Device::ResetQueryPool(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(QueryPool, queryPoolObj, queryPool);
+		(void)device;
+		queryPoolObj->Reset(firstQuery, queryCount);
 	}
 
 	VkResult Device::CreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout)

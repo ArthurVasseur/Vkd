@@ -95,6 +95,12 @@ namespace vkd
 		{
 			switch (pNext->sType)
 			{
+				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES:
+				{
+					// Query state is on the host (QueryPool), so vkResetQueryPool is a host operation.
+					reinterpret_cast<VkPhysicalDeviceHostQueryResetFeatures*>(pNext)->hostQueryReset = VK_TRUE;
+					break;
+				}
 				case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES:
 				{
 					std::memset(reinterpret_cast<char*>(pNext) + sizeof(VkBaseOutStructure), 0,
