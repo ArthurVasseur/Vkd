@@ -685,12 +685,25 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
+		CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
+
+		if (op.offset >= op.dst->GetSize())
+			return VK_SUCCESS;
+
+		// VK_WHOLE_SIZE fills to the end of the buffer, and either way the range is truncated to whole UInt32s.
+		const VkDeviceSize available = op.dst->GetSize() - op.offset;
+		const VkDeviceSize size = std::min(op.size == VK_WHOLE_SIZE ? available : op.size, available) & ~static_cast<VkDeviceSize>(3);
+		if (size == 0)
+			return VK_SUCCESS;
+
 		cct::UByte* data = nullptr;
-		op.dst->GetMemory()->Map(op.offset, op.size, reinterpret_cast<void**>(&data));
+		const VkResult mapResult = op.dst->GetMemory()->Map(op.dst->GetMemoryOffset() + op.offset, size, reinterpret_cast<void**>(&data));
+		if (mapResult != VK_SUCCESS || data == nullptr)
+			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
 
 		UInt32* data32 = reinterpret_cast<UInt32*>(data);
-		size_t count = op.size / sizeof(UInt32);
-		for (size_t i = 0; i < count; ++i)
+		const std::size_t count = size / sizeof(UInt32);
+		for (std::size_t i = 0; i < count; ++i)
 			data32[i] = op.data;
 
 		op.dst->GetMemory()->Unmap();
