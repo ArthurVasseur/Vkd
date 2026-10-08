@@ -137,7 +137,7 @@ namespace vkd::software
 			return std::make_pair(*descriptorSet, *binding);
 		}
 
-		see::exec::ExternalBufferTable ResolveUniformBuffers(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
+		see::exec::ExternalBufferTable ResolveUniformBuffers(const see::ir::Module& module, const vkd::vector<vkd::DescriptorSet*>& boundSets, const std::unordered_map<UInt64, UInt32>& dynamicOffsets, vkd::vector<vkd::DeviceMemory*>& outMappedMemories)
 		{
 			see::exec::ExternalBufferTable result;
 
@@ -312,10 +312,10 @@ namespace vkd::software
 			VkDeviceSize m_size = 0;
 		};
 
-		std::vector<MappedVertexBuffer> MapVertexBuffers(const std::vector<Buffer*>& boundVertexBuffers, const std::vector<VkDeviceSize>& vertexBufferOffsets,
-														 std::vector<vkd::DeviceMemory*>& outMappedMemories)
+		vkd::vector<MappedVertexBuffer> MapVertexBuffers(const vkd::vector<Buffer*>& boundVertexBuffers, const vkd::vector<VkDeviceSize>& vertexBufferOffsets,
+														 vkd::vector<vkd::DeviceMemory*>& outMappedMemories, const VkAllocationCallbacks& allocationCallbacks)
 		{
-			std::vector<MappedVertexBuffer> result(boundVertexBuffers.size());
+			vkd::vector<MappedVertexBuffer> result(boundVertexBuffers.size(), MappedVertexBuffer{}, CommandAllocator<MappedVertexBuffer>(allocationCallbacks));
 			for (std::size_t binding = 0; binding < boundVertexBuffers.size(); ++binding)
 			{
 				vkd::Buffer* buffer = boundVertexBuffers[binding];
@@ -382,6 +382,7 @@ namespace vkd::software
 			const see::exec::ExternalBufferTable* m_fragmentUniforms;
 			const see::exec::ExternalImageTable* m_fragmentImages;
 			cct::ThreadPool* m_rasterPool;
+			const VkAllocationCallbacks* m_allocationCallbacks;
 		};
 
 		// Below this, spreading the rows costs more than running them here.
@@ -512,7 +513,7 @@ namespace vkd::software
 					rasterizeRow(y, interpolated, storage);
 			};
 
-			std::vector<std::future<void>> pendingRows;
+			vkd::vector<std::future<void>> pendingRows(CommandAllocator<std::future<void>>(*context.m_allocationCallbacks));
 			pendingRows.reserve(workerCount - 1);
 			for (std::size_t worker = 1; worker < workerCount; ++worker)
 				pendingRows.push_back(context.m_rasterPool->Submit(consumeRows));
@@ -851,8 +852,8 @@ namespace vkd::software
 			scissor = pipeline->GetScissors()[0];
 
 		vkd::vector<vkd::DeviceMemory*> mappedMemories(CommandAllocator<vkd::DeviceMemory*>(*m_allocationCallbacks));
-		const see::exec::ExternalBufferTable vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, mappedMemories);
-		const see::exec::ExternalBufferTable fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, mappedMemories);
+		const see::exec::ExternalBufferTable vertexUniforms = ResolveUniformBuffers(*vertexModule, m_boundDescriptorSets, m_dynamicOffsets, mappedMemories);
+		const see::exec::ExternalBufferTable fragmentUniforms = ResolveUniformBuffers(*fragmentModule, m_boundDescriptorSets, m_dynamicOffsets, mappedMemories);
 		const see::exec::ExternalImageTable vertexImages = ResolveSampledImages(*vertexModule, m_boundDescriptorSets, mappedMemories);
 		const see::exec::ExternalImageTable fragmentImages = ResolveSampledImages(*fragmentModule, m_boundDescriptorSets, mappedMemories);
 		const vkd::vector<MappedVertexBuffer> mappedVertexBuffers = MapVertexBuffers(m_boundVertexBuffers, m_vertexBufferOffsets, mappedMemories, *m_allocationCallbacks);
@@ -873,7 +874,8 @@ namespace vkd::software
 										  .m_fragmentPrepared = &fragmentPrepared,
 										  .m_fragmentUniforms = &fragmentUniforms,
 										  .m_fragmentImages = &fragmentImages,
-										  .m_rasterPool = &device->GetRasterThreadPool()};
+										  .m_rasterPool = &device->GetRasterThreadPool(),
+										  .m_allocationCallbacks = m_allocationCallbacks};
 
 		for (UInt32 instance = 0; instance < instanceCount; ++instance)
 		{
@@ -1028,9 +1030,9 @@ namespace vkd::software
 			return VK_SUCCESS;
 
 		cct::UByte* data = nullptr;
-		const VkResult mapResult = op.dst->GetMemory()->Map(op.dst->GetMemoryOffset() + op.offset, size, reinterpret_cast<void**>(&data));
-		if (mapResult != VK_SUCCESS || data == nullptr)
-			return mapResult != VK_SUCCESS ? mapResult : VK_ERROR_MEMORY_MAP_FAILED;
+		const VkResult mapResult = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset() + op.offset, size, &data);
+		if (mapResult != VK_SUCCESS)
+			return mapResult;
 
 		UInt32* data32 = reinterpret_cast<UInt32*>(data);
 		const std::size_t count = size / sizeof(UInt32);

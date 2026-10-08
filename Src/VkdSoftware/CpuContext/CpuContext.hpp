@@ -10,6 +10,7 @@
 #pragma once
 
 #include <functional>
+#include <unordered_map>
 #include <vector>
 
 #include "Vkd/Buffer/Buffer.hpp"
@@ -66,15 +67,17 @@ namespace vkd::software
 		// into the actual vertex index (identity for Draw, an index-buffer lookup for DrawIndexed).
 		VkResult DrawPrimitives(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstInstance, const std::function<UInt32(UInt32)>& resolveVertexIndex);
 
+		const VkAllocationCallbacks* m_allocationCallbacks;
 		vkd::Pipeline* m_boundPipeline = nullptr;
-		std::vector<Buffer*> m_boundVertexBuffers;
-		std::vector<VkDeviceSize> m_vertexBufferOffsets;
+		vkd::vector<Buffer*> m_boundVertexBuffers;
+		vkd::vector<VkDeviceSize> m_vertexBufferOffsets;
 		Buffer* m_boundIndexBuffer = nullptr;
 		VkDeviceSize m_indexBufferOffset = 0;
 		VkIndexType m_indexType = VK_INDEX_TYPE_UINT32;
-		std::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
-		std::vector<VkViewport> m_dynamicViewports;
-		std::vector<VkRect2D> m_dynamicScissors;
+		vkd::vector<vkd::DescriptorSet*> m_boundDescriptorSets;
+		std::unordered_map<UInt64, UInt32> m_dynamicOffsets;
+		vkd::vector<VkViewport> m_dynamicViewports;
+		vkd::vector<VkRect2D> m_dynamicScissors;
 
 		vkd::RenderPass* m_currentRenderPass = nullptr;
 		vkd::Framebuffer* m_currentFramebuffer = nullptr;
