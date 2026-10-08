@@ -7,6 +7,7 @@
 #pragma once
 
 #include <new>
+#include <utility>
 
 #include "Vkd/CommandBuffer/CommandBuffer.hpp"
 #include "Vkd/CommandPool/CommandPool.hpp"
@@ -339,6 +340,26 @@ namespace vkd
 	inline void CommandBuffer::PushEndRenderPass()
 	{
 		Record(OpEndRenderPass{});
+	}
+
+	inline void CommandBuffer::PushPushConstants(VkShaderStageFlags stageFlags, UInt32 offset, UInt32 size, const void* pValues)
+	{
+		vkd::vector<UInt8> data(CommandAllocator<UInt8>(GetAllocationCallbacks()));
+		data.assign(static_cast<const UInt8*>(pValues), static_cast<const UInt8*>(pValues) + size);
+		Record(OpPushConstants{
+			.Stages = stageFlags,
+			.Offset = offset,
+			.Data = std::move(data),
+		});
+	}
+
+	inline void CommandBuffer::PushDispatch(UInt32 groupCountX, UInt32 groupCountY, UInt32 groupCountZ)
+	{
+		Record(OpDispatch{
+			.GroupCountX = groupCountX,
+			.GroupCountY = groupCountY,
+			.GroupCountZ = groupCountZ,
+		});
 	}
 
 	inline void CommandBuffer::PushResetQueryPool(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount)

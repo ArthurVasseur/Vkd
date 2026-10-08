@@ -155,4 +155,22 @@ namespace vkd::software
 	{
 		return m_context->CopyQueryPoolResults(std::move(op));
 	}
+	VkResult CommandDispatcher::operator()(vkd::OpPushConstants op)
+	{
+		// The CPU rasterizer doesn't read push constants yet.
+		(void)op;
+		return VK_SUCCESS;
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpDispatch op)
+	{
+		(void)op;
+		static bool warned = false;
+		if (!warned)
+		{
+			warned = true;
+			cct::Logger::Warning("CmdDispatch: compute is not implemented by the software driver, dispatches are ignored");
+		}
+		return VK_SUCCESS;
+	}
 } // namespace vkd::software

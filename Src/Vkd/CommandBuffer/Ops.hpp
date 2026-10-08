@@ -158,6 +158,21 @@ namespace vkd
 		UInt32 FirstScissor;
 	};
 
+	// vkCmdPushConstants: Data lands at Offset in the command buffer's push-constant block.
+	struct OpPushConstants
+	{
+		VkShaderStageFlags Stages;
+		UInt32 Offset;
+		vkd::vector<UInt8> Data;
+	};
+
+	struct OpDispatch
+	{
+		UInt32 GroupCountX;
+		UInt32 GroupCountY;
+		UInt32 GroupCountZ;
+	};
+
 	using Op = Nz::TypeList<
 		OpBindVertexBuffer,
 		OpBindIndexBuffer,
@@ -175,5 +190,7 @@ namespace vkd
 		OpBeginQuery,
 		OpEndQuery,
 		OpWriteTimestamp,
-		OpCopyQueryPoolResults>;
+		OpCopyQueryPoolResults,
+		OpPushConstants,
+		OpDispatch>;
 } // namespace vkd

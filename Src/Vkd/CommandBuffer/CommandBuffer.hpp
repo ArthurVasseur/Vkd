@@ -117,6 +117,8 @@ namespace vkd
 		inline void PushEndQuery(VkQueryPool queryPool, UInt32 query);
 		inline void PushWriteTimestamp(VkPipelineStageFlagBits pipelineStage, VkQueryPool queryPool, UInt32 query);
 		inline void PushCopyQueryPoolResults(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize stride, VkQueryResultFlags flags);
+		inline void PushPushConstants(VkShaderStageFlags stageFlags, UInt32 offset, UInt32 size, const void* pValues);
+		inline void PushDispatch(UInt32 groupCountX, UInt32 groupCountY, UInt32 groupCountZ);
 
 		inline VkResult MarkSubmitted();
 		inline VkResult MarkComplete();

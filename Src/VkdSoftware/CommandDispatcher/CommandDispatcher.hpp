@@ -49,6 +49,8 @@ namespace vkd::software
 		VkResult operator()(vkd::OpEndQuery op);
 		VkResult operator()(vkd::OpWriteTimestamp op);
 		VkResult operator()(vkd::OpCopyQueryPoolResults op);
+		VkResult operator()(vkd::OpPushConstants op);
+		VkResult operator()(vkd::OpDispatch op);
 
 		CpuContext* m_context;
 	};

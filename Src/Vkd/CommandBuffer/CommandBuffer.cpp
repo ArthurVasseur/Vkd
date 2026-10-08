@@ -140,7 +140,9 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void* pValues)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdPushConstants: not implemented, push constants are ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushPushConstants(stageFlags, offset, size, pValues);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers)
@@ -182,7 +184,9 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdDispatch(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdDispatch: not implemented, compute dispatch is ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushDispatch(groupCountX, groupCountY, groupCountZ);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset)
