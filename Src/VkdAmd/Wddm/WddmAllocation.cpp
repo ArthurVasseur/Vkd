@@ -126,8 +126,12 @@ namespace vkd::wddm
 		createAlloc.pAllocationInfo2 = &allocInfo;
 		createAlloc.Flags.Zeroed = 1;
 
-		if (D3DKMTCreateAllocation2(&createAlloc) != STATUS_SUCCESS)
+		const NTSTATUS createSt = D3DKMTCreateAllocation2(&createAlloc);
+		if (createSt != STATUS_SUCCESS)
+		{
+			cct::Logger::Error("WddmAllocation: CreateAllocation2 NTSTATUS=0x{:08X} (size=0x{:X})", static_cast<uint32_t>(createSt), alignedSize);
 			return false;
+		}
 
 		m_device = device;
 		m_adapter = desc.adapter;
@@ -179,7 +183,8 @@ namespace vkd::wddm
 			makeResident.AllocationList = &allocHandle;
 			makeResident.Flags.MustSucceed = 1;
 			const NTSTATUS residentSt = D3DKMTMakeResident(&makeResident);
-			(void)residentSt;
+			if (residentSt != STATUS_SUCCESS && residentSt != STATUS_PENDING)
+				cct::Logger::Error("WddmAllocation: MakeResident NTSTATUS=0x{:08X} (size=0x{:X})", static_cast<uint32_t>(residentSt), alignedSize);
 
 			if (pagingSync != 0 && makeResident.PagingFenceValue > 0 &&
 				!WaitPagingFence(device, pagingSync, makeResident.PagingFenceValue))
@@ -191,6 +196,8 @@ namespace vkd::wddm
 
 			if ((mapSt == STATUS_SUCCESS || mapSt == STATUS_PENDING) && mapVa.VirtualAddress != 0)
 				m_gpuVa = mapVa.VirtualAddress;
+			else
+				cct::Logger::Error("WddmAllocation: MapGpuVirtualAddress NTSTATUS=0x{:08X} (size=0x{:X})", static_cast<uint32_t>(mapSt), alignedSize);
 		}
 		if (LogAllocations())
 			cct::Logger::Info("WddmAllocation: create [0x{:X}, 0x{:X}) hAllocation=0x{:X}", static_cast<uint64_t>(m_gpuVa),
