@@ -299,6 +299,22 @@ namespace vkd::amd
 			return VK_SUCCESS;
 		}
 
+		VkResult FillSubresource(Pm4Stream& stream, const amd::DeviceMemory* memory, const vkd::SubresourceFootprint& fp,
+								 VkDeviceSize bytes, const uint8_t* texel, uint32_t texelSize)
+		{
+			if (fp.rowPitch % texelSize == 0 && fp.depthPitch % texelSize == 0)
+				return FillPattern(stream, memory, fp.offset, bytes, texel, texelSize);
+			const VkRect2D whole{{0, 0}, {fp.extent.width, fp.extent.height}};
+			for (uint32_t z = 0; z < fp.extent.depth; ++z)
+			{
+				vkd::SubresourceFootprint slice = fp;
+				slice.offset += VkDeviceSize{z} * fp.depthPitch;
+				if (const VkResult r = FillRect(stream, memory, slice, whole, texel, texelSize); r != VK_SUCCESS)
+					return r;
+			}
+			return VK_SUCCESS;
+		}
+
 		// vkCmdClearColorImage: each (layer, mip) of each range is one contiguous byte range of the
 		// linear image (Vkd/Image/CopyLayout.hpp).
 		VkResult EncodeClearColorImage(Pm4Stream& stream, const vkd::Image::OpClearColorImage& op)
@@ -319,7 +335,7 @@ namespace vkd::amd
 				vkd::ForEachSubresourceRange(*op.image, range, [&](const vkd::SubresourceFootprint& fp, VkDeviceSize bytes)
 											 {
 					if (result == VK_SUCCESS)
-						result = FillPattern(stream, memory, fp.offset, bytes, texel, texelSize); });
+						result = FillSubresource(stream, memory, fp, bytes, texel, texelSize); });
 			}
 			return result;
 		}
@@ -480,7 +496,7 @@ namespace vkd::amd
 				vkd::ForEachSubresourceRange(*op.image, range, [&](const vkd::SubresourceFootprint& fp, VkDeviceSize bytes)
 											 {
 					if (result == VK_SUCCESS)
-						result = FillPattern(stream, memory, fp.offset, bytes, texel, texelSize); });
+						result = FillSubresource(stream, memory, fp, bytes, texel, texelSize); });
 			}
 			return result;
 		}
