@@ -92,6 +92,8 @@ namespace vkd
 	protected:
 		// Row pitch of a mip level: its rows padded to the device's row alignment.
 		[[nodiscard]] VkDeviceSize LevelRowPitch(UInt32 level) const;
+		[[nodiscard]] VkDeviceSize LevelRows(UInt32 level) const;
+		[[nodiscard]] VkDeviceSize LevelSlices(UInt32 level) const;
 
 		Device* m_owner;
 		VkImageType m_imageType;

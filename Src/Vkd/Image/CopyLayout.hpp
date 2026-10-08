@@ -69,7 +69,14 @@ namespace vkd
 		return vkuFormatElementSize(format);
 	}
 
-	// Byte offset of texel (x, y, z) of one array layer / mip of an image.
+	// Texel blocks covering `texels` texels along one dimension of `blockSize`-texel blocks.
+	inline uint32_t BlockCount(uint32_t texels, uint32_t blockSize)
+	{
+		return (texels + blockSize - 1) / blockSize;
+	}
+
+	// Byte offset of element (x, y, z) of one array layer / mip of an image: a texel, or a texel
+	// block for a compressed format (x, y, z then count blocks).
 	inline VkDeviceSize ImageTexelOffset(const SubresourceFootprint& fp, uint32_t x, uint32_t y, uint32_t z, uint32_t texelSize)
 	{
 		return fp.offset + VkDeviceSize{z} * fp.depthPitch + VkDeviceSize{y} * fp.rowPitch + VkDeviceSize{x} * texelSize;
@@ -86,26 +93,32 @@ namespace vkd
 		if (texelSize == 0)
 			return false;
 
+		// Everything in texel blocks: the region and the buffer's row length / image height are in
+		// texels, a compressed format's rows are rows of blocks.
 		const VkImageSubresourceLayers& sub = region.imageSubresource;
 		const uint32_t layerCount = ResolveLayerCount(image, sub.baseArrayLayer, sub.layerCount);
-		const VkExtent3D& extent = region.imageExtent;
-		const VkDeviceSize rowLength = region.bufferRowLength ? region.bufferRowLength : extent.width;
-		const VkDeviceSize imageHeight = region.bufferImageHeight ? region.bufferImageHeight : extent.height;
-		const VkDeviceSize rowBytes = VkDeviceSize{extent.width} * texelSize;
+		const VkExtent3D block = vkuFormatTexelBlockExtent(image.GetFormat());
+		const uint32_t width = BlockCount(region.imageExtent.width, block.width);
+		const uint32_t height = BlockCount(region.imageExtent.height, block.height);
+		const uint32_t depth = BlockCount(region.imageExtent.depth, block.depth);
+		const VkDeviceSize rowLength = BlockCount(region.bufferRowLength ? region.bufferRowLength : region.imageExtent.width, block.width);
+		const VkDeviceSize imageHeight = BlockCount(region.bufferImageHeight ? region.bufferImageHeight : region.imageExtent.height, block.height);
+		const uint32_t x0 = static_cast<uint32_t>(region.imageOffset.x) / block.width;
+		const uint32_t y0 = static_cast<uint32_t>(region.imageOffset.y) / block.height;
+		const uint32_t z0 = static_cast<uint32_t>(region.imageOffset.z) / block.depth;
+		const VkDeviceSize rowBytes = VkDeviceSize{width} * texelSize;
 		const VkDeviceSize bufferBase = buffer.GetMemoryOffset() + region.bufferOffset;
 
 		for (uint32_t layer = 0; layer < layerCount; ++layer)
 		{
 			const SubresourceFootprint fp = GetSubresourceFootprint(image, sub.mipLevel, sub.baseArrayLayer + layer);
-			for (uint32_t z = 0; z < extent.depth; ++z)
+			for (uint32_t z = 0; z < depth; ++z)
 			{
-				const VkDeviceSize slice = VkDeviceSize{layer} * extent.depth + z;
-				for (uint32_t y = 0; y < extent.height; ++y)
+				const VkDeviceSize slice = VkDeviceSize{layer} * depth + z;
+				for (uint32_t y = 0; y < height; ++y)
 				{
 					const VkDeviceSize bufferOffset = bufferBase + (slice * imageHeight + y) * rowLength * texelSize;
-					const VkDeviceSize imageOffset =
-						ImageTexelOffset(fp, static_cast<uint32_t>(region.imageOffset.x), static_cast<uint32_t>(region.imageOffset.y) + y,
-										 static_cast<uint32_t>(region.imageOffset.z) + z, texelSize);
+					const VkDeviceSize imageOffset = ImageTexelOffset(fp, x0, y0 + y, z0 + z, texelSize);
 					row(bufferOffset, imageOffset, rowBytes);
 				}
 			}
@@ -123,11 +136,21 @@ namespace vkd
 		if (texelSize == 0 || texelSize != CopyTexelSize(dst.GetFormat(), region.dstSubresource.aspectMask))
 			return false;
 
+		// In texel blocks. The extent is in source texels, also when copying between a compressed
+		// and an uncompressed format of the same block size; each side's offsets are in its own texels.
 		const uint32_t srcLayers = ResolveLayerCount(src, region.srcSubresource.baseArrayLayer, region.srcSubresource.layerCount);
-		const uint32_t sliceCount = std::max(region.extent.depth, srcLayers);
+		const VkExtent3D srcBlock = vkuFormatTexelBlockExtent(src.GetFormat());
+		const VkExtent3D dstBlock = vkuFormatTexelBlockExtent(dst.GetFormat());
+		const uint32_t width = BlockCount(region.extent.width, srcBlock.width);
+		const uint32_t height = BlockCount(region.extent.height, srcBlock.height);
+		const uint32_t sliceCount = std::max(BlockCount(region.extent.depth, srcBlock.depth), srcLayers);
 		const bool src3d = src.GetImageType() == VK_IMAGE_TYPE_3D;
 		const bool dst3d = dst.GetImageType() == VK_IMAGE_TYPE_3D;
-		const VkDeviceSize rowBytes = VkDeviceSize{region.extent.width} * texelSize;
+		const uint32_t srcX = static_cast<uint32_t>(region.srcOffset.x) / srcBlock.width;
+		const uint32_t srcY = static_cast<uint32_t>(region.srcOffset.y) / srcBlock.height;
+		const uint32_t dstX = static_cast<uint32_t>(region.dstOffset.x) / dstBlock.width;
+		const uint32_t dstY = static_cast<uint32_t>(region.dstOffset.y) / dstBlock.height;
+		const VkDeviceSize rowBytes = VkDeviceSize{width} * texelSize;
 
 		for (uint32_t s = 0; s < sliceCount; ++s)
 		{
@@ -135,14 +158,12 @@ namespace vkd
 																	   region.srcSubresource.baseArrayLayer + (src3d ? 0 : s));
 			const SubresourceFootprint dstFp = GetSubresourceFootprint(dst, region.dstSubresource.mipLevel,
 																	   region.dstSubresource.baseArrayLayer + (dst3d ? 0 : s));
-			const uint32_t srcZ = src3d ? static_cast<uint32_t>(region.srcOffset.z) + s : 0;
-			const uint32_t dstZ = dst3d ? static_cast<uint32_t>(region.dstOffset.z) + s : 0;
-			for (uint32_t y = 0; y < region.extent.height; ++y)
+			const uint32_t srcZ = src3d ? static_cast<uint32_t>(region.srcOffset.z) / srcBlock.depth + s : 0;
+			const uint32_t dstZ = dst3d ? static_cast<uint32_t>(region.dstOffset.z) / dstBlock.depth + s : 0;
+			for (uint32_t y = 0; y < height; ++y)
 			{
-				const VkDeviceSize srcOffset = ImageTexelOffset(srcFp, static_cast<uint32_t>(region.srcOffset.x),
-																static_cast<uint32_t>(region.srcOffset.y) + y, srcZ, texelSize);
-				const VkDeviceSize dstOffset = ImageTexelOffset(dstFp, static_cast<uint32_t>(region.dstOffset.x),
-																static_cast<uint32_t>(region.dstOffset.y) + y, dstZ, texelSize);
+				const VkDeviceSize srcOffset = ImageTexelOffset(srcFp, srcX, srcY + y, srcZ, texelSize);
+				const VkDeviceSize dstOffset = ImageTexelOffset(dstFp, dstX, dstY + y, dstZ, texelSize);
 				row(srcOffset, dstOffset, rowBytes);
 			}
 		}

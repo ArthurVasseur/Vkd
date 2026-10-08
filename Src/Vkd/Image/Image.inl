@@ -53,21 +53,33 @@ namespace vkd
 		m_memoryOffset = memoryOffset;
 	}
 
+	// Rows, columns and slices count texel blocks: one texel for an uncompressed format, e.g. 4x4
+	// texels for BC (the spec's rowPitch of a compressed linear image is between rows of blocks).
 	inline VkDeviceSize Image::LevelRowPitch(UInt32 level) const
 	{
-		const VkDeviceSize rowBytes = std::max<VkDeviceSize>(m_extent.width >> level, 1) * vkuFormatElementSize(m_format);
+		const VkExtent3D block = vkuFormatTexelBlockExtent(m_format);
+		const VkDeviceSize blocksWide = (std::max<VkDeviceSize>(m_extent.width >> level, 1) + block.width - 1) / block.width;
+		const VkDeviceSize rowBytes = blocksWide * vkuFormatElementSize(m_format);
 		return (rowBytes + m_rowPitchAlignment - 1) / m_rowPitchAlignment * m_rowPitchAlignment;
+	}
+
+	inline VkDeviceSize Image::LevelRows(UInt32 level) const
+	{
+		const VkExtent3D block = vkuFormatTexelBlockExtent(m_format);
+		return (std::max<VkDeviceSize>(m_extent.height >> level, 1) + block.height - 1) / block.height;
+	}
+
+	inline VkDeviceSize Image::LevelSlices(UInt32 level) const
+	{
+		const VkExtent3D block = vkuFormatTexelBlockExtent(m_format);
+		return (std::max<VkDeviceSize>(m_extent.depth >> level, 1) + block.depth - 1) / block.depth;
 	}
 
 	inline void Image::GetMemoryRequirements(VkMemoryRequirements& memoryRequirements) const
 	{
 		VkDeviceSize mipChainSize = 0;
 		for (UInt32 level = 0; level < m_mipLevels; ++level)
-		{
-			const VkDeviceSize mipHeight = std::max<VkDeviceSize>(m_extent.height >> level, 1);
-			const VkDeviceSize mipDepth = std::max<VkDeviceSize>(m_extent.depth >> level, 1);
-			mipChainSize += LevelRowPitch(level) * mipHeight * mipDepth;
-		}
+			mipChainSize += LevelRowPitch(level) * LevelRows(level) * LevelSlices(level);
 
 		memoryRequirements.size = mipChainSize * m_arrayLayers * static_cast<VkDeviceSize>(m_samples);
 		memoryRequirements.alignment = 256;
@@ -84,8 +96,8 @@ namespace vkd
 
 		for (UInt32 level = 0; level < m_mipLevels; ++level)
 		{
-			const VkDeviceSize mipHeight = std::max<VkDeviceSize>(m_extent.height >> level, 1);
-			const VkDeviceSize mipDepth = std::max<VkDeviceSize>(m_extent.depth >> level, 1);
+			const VkDeviceSize mipHeight = LevelRows(level);
+			const VkDeviceSize mipDepth = LevelSlices(level);
 			const VkDeviceSize rowPitch = LevelRowPitch(level);
 			const VkDeviceSize thisLevelSize = rowPitch * mipHeight * mipDepth;
 
