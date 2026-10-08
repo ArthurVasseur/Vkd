@@ -83,6 +83,11 @@ namespace vkd::amd
 				m_graphicsState.dynamicViewport |= state == VK_DYNAMIC_STATE_VIEWPORT;
 				m_graphicsState.dynamicScissor |= state == VK_DYNAMIC_STATE_SCISSOR;
 				m_graphicsState.dynamicBlendConstants |= state == VK_DYNAMIC_STATE_BLEND_CONSTANTS;
+				m_graphicsState.dynamicStencilCompareMask |= state == VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK;
+				m_graphicsState.dynamicStencilWriteMask |= state == VK_DYNAMIC_STATE_STENCIL_WRITE_MASK;
+				m_graphicsState.dynamicStencilReference |= state == VK_DYNAMIC_STATE_STENCIL_REFERENCE;
+				m_graphicsState.dynamicDepthBounds |= state == VK_DYNAMIC_STATE_DEPTH_BOUNDS;
+				m_graphicsState.dynamicDepthBias |= state == VK_DYNAMIC_STATE_DEPTH_BIAS;
 			}
 		}
 		std::span<const VkPipelineColorBlendAttachmentState> blendAttachments;
@@ -108,6 +113,9 @@ namespace vkd::amd
 		{
 			m_graphicsState.cullMode = states.rasterization->cullMode;
 			m_graphicsState.frontFace = states.rasterization->frontFace;
+			m_graphicsState.depthBiasEnable = states.rasterization->depthBiasEnable;
+			m_graphicsState.depthBias = {states.rasterization->depthBiasConstantFactor, states.rasterization->depthBiasClamp,
+										 states.rasterization->depthBiasSlopeFactor};
 		}
 
 		uint64_t vertexHash = 0;

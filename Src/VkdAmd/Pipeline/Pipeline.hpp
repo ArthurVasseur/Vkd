@@ -31,8 +31,16 @@ namespace vkd::amd
 		float blendConstants[4] = {};
 		bool dynamicBlendConstants = false;
 		// Depth/stencil tests, written over the captured (disabled) ones when the subpass has a
-		// depth/stencil attachment (DepthStencil.hpp).
+		// depth/stencil attachment (DepthStencil.hpp), and which of their values are dynamic.
 		DepthStencilRegs depthStencil;
+		bool dynamicStencilCompareMask = false;
+		bool dynamicStencilWriteMask = false;
+		bool dynamicStencilReference = false;
+		bool dynamicDepthBounds = false;
+		// Depth bias (rasterization state), its factors static or dynamic.
+		bool depthBiasEnable = false;
+		bool dynamicDepthBias = false;
+		DepthBias depthBias;
 	};
 
 	// A pipeline owns its shaders' GFX11 code in a GPU allocation. There's no SPIR-V compiler yet:

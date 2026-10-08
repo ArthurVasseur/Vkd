@@ -572,6 +572,11 @@ namespace vkd::amd
 			VkViewport viewport = {};
 			VkRect2D scissor = {};
 			float blendConstants[4] = {};
+			// vkCmdSetStencilCompareMask/WriteMask/Reference (front, back), vkCmdSetDepthBounds,
+			// vkCmdSetDepthBias: used when the pipeline makes them dynamic.
+			StencilFaceValues stencil[2] = {};
+			float depthBounds[2] = {0.0f, 1.0f};
+			DepthBias depthBias;
 			// vkCmdBindVertexBuffers
 			struct VertexBinding
 			{
@@ -1345,7 +1350,8 @@ namespace vkd::amd
 		// The subpass's depth/stencil attachment as PAL's DepthStencilView programs an image without
 		// HTILE (Gfx10DepthStencilView::InitRegisters), then the pipeline's tests (DepthStencil.hpp).
 		// Without an attachment the replayed state stands: DB_Z_INFO invalid, tests off.
-		void EmitDepthStencilTarget(Pm4Stream& stream, const VkSubpassDescription& subpass, std::span<const VkImageView> views, const GraphicsPipelineState& gs)
+		void EmitDepthStencilTarget(Pm4Stream& stream, const VkSubpassDescription& subpass, std::span<const VkImageView> views, const GraphicsPipelineState& gs,
+									const EncodeState& state)
 		{
 			if (!subpass.pDepthStencilAttachment || subpass.pDepthStencilAttachment->attachment >= views.size())
 				return;
@@ -1380,13 +1386,26 @@ namespace vkd::amd
 			const uint32_t depthView = (firstLayer & 0x7FFu) | (((firstLayer >> 11) & 3u) << 11) | ((lastLayer & 0x7FFu) << 13) |
 									   ((range.baseMipLevel & 0xFu) << 26) | (((lastLayer >> 11) & 3u) << 30);
 			const DepthStencilRegs& ds = gs.depthStencil;
+			// The pipeline's stencil values and depth bounds, or the dynamic ones.
+			StencilFaceValues faces[2] = {ds.front, ds.back};
+			for (int face = 0; face < 2; ++face)
+			{
+				if (gs.dynamicStencilCompareMask)
+					faces[face].compareMask = state.stencil[face].compareMask;
+				if (gs.dynamicStencilWriteMask)
+					faces[face].writeMask = state.stencil[face].writeMask;
+				if (gs.dynamicStencilReference)
+					faces[face].reference = state.stencil[face].reference;
+			}
+			const float boundsMin = gs.dynamicDepthBounds ? state.depthBounds[0] : ds.depthBoundsMin;
+			const float boundsMax = gs.dynamicDepthBounds ? state.depthBounds[1] : ds.depthBoundsMax;
 
 			stream.SetContextReg(kDbRenderControl, 0x60); // DEPTH_COMPRESS_DISABLE | STENCIL_COMPRESS_DISABLE
 			stream.SetContextReg(kDbDepthView, depthView);
 			stream.SetContextReg(kDbRenderOverride, 0x2A); // FORCE_HIZ_ENABLE, FORCE_HIS_ENABLE0/1 = FORCE_DISABLE
 			stream.SetContextReg(kDbHtileDataBase, 0);
-			const uint32_t sizeAndBounds[3] = {(image->GetExtent().width - 1) | ((image->GetExtent().height - 1) << 16), FloatBits(ds.depthBoundsMin),
-											   FloatBits(ds.depthBoundsMax)};
+			const uint32_t sizeAndBounds[3] = {(image->GetExtent().width - 1) | ((image->GetExtent().height - 1) << 16), FloatBits(boundsMin),
+											   FloatBits(boundsMax)};
 			stream.SetContextRegs(kDbDepthSizeXy, sizeAndBounds, 3);
 			const uint32_t bases[6] = {zInfo,
 									   stencilInfo,
@@ -1398,11 +1417,21 @@ namespace vkd::amd
 			const uint32_t basesHi[5] = {static_cast<uint32_t>(zVa >> 40), static_cast<uint32_t>(sVa >> 40), static_cast<uint32_t>(zVa >> 40),
 										 static_cast<uint32_t>(sVa >> 40), 0};
 			stream.SetContextRegs(kDbZReadBaseHi, basesHi, 5);
-			const uint32_t stencilRegs[3] = {ds.dbStencilControl, ds.dbStencilRefMask, ds.dbStencilRefMaskBf};
+			const uint32_t stencilRegs[3] = {ds.dbStencilControl, depthstencil::RefMask(faces[0]), depthstencil::RefMask(faces[1])};
 			stream.SetContextRegs(kDbStencilControl, stencilRegs, 3);
 			stream.SetContextReg(kDbDepthControl, ds.dbDepthControl);
-			// POLY_OFFSET_NEG_NUM_DB_BITS (-16 / -23), POLY_OFFSET_DB_IS_FLOAT_FMT; AMDVLK's -24 without depth.
-			stream.SetContextReg(kPaSuPolyOffsetDbFmtCntl, depth.bytesPerElement == 4 ? 0x1E9u : (depth.bytesPerElement == 2 ? 0xF0u : 0xE8u));
+			// POLY_OFFSET_NEG_NUM_DB_BITS, POLY_OFFSET_DB_IS_FLOAT_FMT: -23 and float for D32; -15 for D16 --
+			// PAL's lowZplanePolyOffsetBits, which AMDVLK sets for its draws (a D16 bias unit is 2^-15) --;
+			// AMDVLK's -24 without depth.
+			stream.SetContextReg(kPaSuPolyOffsetDbFmtCntl, depth.bytesPerElement == 4 ? 0x1E9u : (depth.bytesPerElement == 2 ? 0xF1u : 0xE8u));
+			// Depth bias as PAL's CmdSetDepthBiasState: clamp, then front/back slope (x16, the hardware
+			// counts 1/16 pixel) and constant; PA_SU_SC_MODE_CNTL enables it (CullMode patch).
+			const DepthBias& bias = gs.dynamicDepthBias ? state.depthBias : gs.depthBias;
+			const float slope = gs.depthBiasEnable ? bias.slopeFactor * 16.0f : 0.0f;
+			const float constant = gs.depthBiasEnable ? bias.constantFactor : 0.0f;
+			const uint32_t polyOffset[5] = {FloatBits(gs.depthBiasEnable ? bias.clamp : 0.0f), FloatBits(slope), FloatBits(constant), FloatBits(slope),
+											FloatBits(constant)};
+			stream.SetContextRegs(kPaSuPolyOffsetClamp, polyOffset, 5);
 		}
 
 		VkResult EncodeDraw(Pm4Stream& stream, const DrawParams& op, EncodeState& state)
@@ -1604,8 +1633,9 @@ namespace vkd::amd
 								(ScissorCoord(int64_t{scissor.offset.y} + scissor.extent.height) << 16);
 						break;
 					case RegPatch::CullMode:
-						value = (value & ~7u) | ((gs.cullMode & VK_CULL_MODE_FRONT_BIT) ? 1u : 0u) | ((gs.cullMode & VK_CULL_MODE_BACK_BIT) ? 2u : 0u) |
-								(gs.frontFace == VK_FRONT_FACE_CLOCKWISE ? 4u : 0u);
+						value = (value & ~(7u | kPaSuScModeCntlPolyOffsetEnable)) | ((gs.cullMode & VK_CULL_MODE_FRONT_BIT) ? 1u : 0u) |
+								((gs.cullMode & VK_CULL_MODE_BACK_BIT) ? 2u : 0u) | (gs.frontFace == VK_FRONT_FACE_CLOCKWISE ? 4u : 0u) |
+								(gs.depthBiasEnable ? kPaSuScModeCntlPolyOffsetEnable : 0u);
 						break;
 					case RegPatch::BaseVertex:
 						value = static_cast<uint32_t>(op.baseVertex);
@@ -1670,7 +1700,7 @@ namespace vkd::amd
 			const float* constants = gs.dynamicBlendConstants ? state.blendConstants : gs.blendConstants;
 			const uint32_t constantBits[4] = {FloatBits(constants[0]), FloatBits(constants[1]), FloatBits(constants[2]), FloatBits(constants[3])};
 			stream.SetContextRegs(kCbBlendRed, constantBits, 4);
-			EmitDepthStencilTarget(stream, subpass, views, gs);
+			EmitDepthStencilTarget(stream, subpass, views, gs, state);
 			if (op.indexed)
 				stream.DrawIndex2(op.instanceCount, maxIndices, indexVa, op.count);
 			else
@@ -1957,6 +1987,30 @@ namespace vkd::amd
 			if (const auto* blend = std::get_if<vkd::OpSetBlendConstants>(&op))
 			{
 				std::copy_n(blend->Constants, 4, state.blendConstants);
+				return VK_SUCCESS;
+			}
+			if (const auto* bias = std::get_if<vkd::OpSetDepthBias>(&op))
+			{
+				state.depthBias = {bias->ConstantFactor, bias->Clamp, bias->SlopeFactor};
+				return VK_SUCCESS;
+			}
+			if (const auto* bounds = std::get_if<vkd::OpSetDepthBounds>(&op))
+			{
+				state.depthBounds[0] = bounds->Min;
+				state.depthBounds[1] = bounds->Max;
+				return VK_SUCCESS;
+			}
+			if (const auto* stencil = std::get_if<vkd::OpSetStencilValue>(&op))
+			{
+				for (int face = 0; face < 2; ++face)
+				{
+					if (!(stencil->FaceMask & (face == 0 ? VK_STENCIL_FACE_FRONT_BIT : VK_STENCIL_FACE_BACK_BIT)))
+						continue;
+					StencilFaceValues& values = state.stencil[face];
+					(stencil->Which == vkd::OpSetStencilValue::Field::CompareMask ? values.compareMask
+					 : stencil->Which == vkd::OpSetStencilValue::Field::WriteMask ? values.writeMask
+																				  : values.reference) = stencil->Value;
+				}
 				return VK_SUCCESS;
 			}
 			if (const auto* push = std::get_if<vkd::OpPushConstants>(&op))

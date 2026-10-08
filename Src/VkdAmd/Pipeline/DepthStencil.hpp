@@ -20,6 +20,24 @@ namespace vkd::amd
 	inline constexpr uint32_t kDbStencilControl = 0xA10B; // then DB_STENCILREFMASK, DB_STENCILREFMASK_BF
 	inline constexpr uint32_t kDbDepthControl = 0xA200;
 	inline constexpr uint32_t kPaSuPolyOffsetDbFmtCntl = 0xA2DE;
+	inline constexpr uint32_t kPaSuPolyOffsetClamp = 0xA2DF; // then FRONT_SCALE, FRONT_OFFSET, BACK_SCALE, BACK_OFFSET
+	inline constexpr uint32_t kPaSuScModeCntlPolyOffsetEnable = (1u << 11) | (1u << 12); // POLY_OFFSET_FRONT/BACK_ENABLE
+
+	// Depth bias factors, as Vulkan gives them (static, or vkCmdSetDepthBias).
+	struct DepthBias
+	{
+		float constantFactor = 0.0f;
+		float clamp = 0.0f;
+		float slopeFactor = 0.0f;
+	};
+
+	// Stencil test values of one face (static, or vkCmdSetStencilCompareMask/WriteMask/Reference).
+	struct StencilFaceValues
+	{
+		uint32_t compareMask = 0;
+		uint32_t writeMask = 0;
+		uint32_t reference = 0;
+	};
 
 	struct DepthStencilRegs
 	{
@@ -27,6 +45,8 @@ namespace vkd::amd
 		uint32_t dbStencilControl = 0;
 		uint32_t dbStencilRefMask = 0;
 		uint32_t dbStencilRefMaskBf = 0;
+		StencilFaceValues front; // the values behind dbStencilRefMask(Bf), for the dynamic ones to replace
+		StencilFaceValues back;
 		float depthBoundsMin = 0.0f;
 		float depthBoundsMax = 1.0f;
 	};
@@ -42,10 +62,15 @@ namespace vkd::amd
 			return static_cast<uint32_t>(op) < 8 ? kHwStencilOp[op] : 0;
 		}
 
+		// STENCILTESTVAL, STENCILMASK, STENCILWRITEMASK, STENCILOPVAL = 1 (the increment/decrement step).
+		inline uint32_t RefMask(const StencilFaceValues& s)
+		{
+			return (s.reference & 0xFFu) | ((s.compareMask & 0xFFu) << 8) | ((s.writeMask & 0xFFu) << 16) | (1u << 24);
+		}
+
 		inline uint32_t RefMask(const VkStencilOpState& s)
 		{
-			// STENCILTESTVAL, STENCILMASK, STENCILWRITEMASK, STENCILOPVAL = 1 (the increment/decrement step).
-			return (s.reference & 0xFFu) | ((s.compareMask & 0xFFu) << 8) | ((s.writeMask & 0xFFu) << 16) | (1u << 24);
+			return RefMask(StencilFaceValues{s.compareMask, s.writeMask, s.reference});
 		}
 	} // namespace depthstencil
 
@@ -70,6 +95,8 @@ namespace vkd::amd
 		}
 		if (state)
 		{
+			regs.front = {state->front.compareMask, state->front.writeMask, state->front.reference};
+			regs.back = {state->back.compareMask, state->back.writeMask, state->back.reference};
 			regs.dbStencilRefMask = RefMask(state->front);
 			regs.dbStencilRefMaskBf = RefMask(state->back);
 			regs.depthBoundsMin = state->minDepthBounds;
