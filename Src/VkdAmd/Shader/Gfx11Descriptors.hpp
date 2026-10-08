@@ -50,6 +50,20 @@ namespace vkd::amd::gfx11
 		std::memcpy(out, v, sizeof(v));
 	}
 
+	// Typed buffer view of RPM's memory <-> image copies (PAL CreateTypedBufferViewSrds, as AMDVLK
+	// writes it for CopyImgToMem2d): stride = element size, NUM_RECORDS in elements, the element's
+	// format (GFX11 shares the IMG_FMT numbering) read as x001, structured bounds check.
+	inline void WriteTypedBufferDescriptor(uint8_t* out, uint64_t address, uint64_t elements, uint32_t stride, uint32_t imgFmt)
+	{
+		const uint32_t v[4] = {
+			static_cast<uint32_t>(address),
+			(static_cast<uint32_t>(address >> 32) & 0xFFFFu) | ((stride & 0x3FFFu) << 16),
+			static_cast<uint32_t>(std::min<uint64_t>(elements, 0xFFFFFFFFu)),
+			kSelX | (1u << 9) | ((imgFmt & 0x7Fu) << 12) | 0x11000000u,
+		};
+		std::memcpy(out, v, sizeof(v));
+	}
+
 	// The attribute ring as PAL's VertexAttributeRing sets it up (gfx9ShaderRing.cpp): 16-byte
 	// stride, swizzle_enable 3, index stride 32B, BUF_FMT_32_32_32_32_FLOAT.
 	inline void WriteAttributeRingDescriptor(uint8_t* out, uint64_t address, uint64_t sizeBytes)
@@ -242,6 +256,12 @@ namespace vkd::amd::gfx11
 		uint32_t height;
 		uint32_t depth; // 3D: depth of the base mip; arrays/cubes: layer count
 		VkComponentMapping components;
+		// Tiled surfaces (Gfx11Tiling.hpp): the address is the surface's, width/height are mip 0's,
+		// and the hardware finds the view's mip and layers itself.
+		uint32_t swizzleMode = 0;
+		uint32_t mipLevels = 1; // of the surface
+		uint32_t baseLevel = 0;
+		uint32_t baseArray = 0;
 	};
 
 	// T# of a linear view of one mip level (Vkd's mips are laid out by Vkd, not by the hardware's
@@ -288,12 +308,17 @@ namespace vkd::amd::gfx11
 		for (uint32_t c = 0; c < 4; ++c)
 			sel[c] = ComposeSwizzle(components[c], c, format.swizzle);
 
+		// GFX11 (PAL's rtIp2Plus layout): max_mip in dword 1, base/last level and sw_mode in dword 3;
+		// for arrays, depth is the last layer and base_array the first.
+		const uint32_t maxMip = std::max(view.mipLevels, 1u) - 1;
+		const uint32_t lastArray = view.viewType == VK_IMAGE_VIEW_TYPE_3D ? depth : view.baseArray + depth;
 		const uint32_t t[8] = {
 			static_cast<uint32_t>(view.address >> 8),
-			(static_cast<uint32_t>(view.address >> 40) & 0xFFu) | (format.imgFmt << 20) | ((width & 3u) << 30),
+			(static_cast<uint32_t>(view.address >> 40) & 0xFFu) | ((maxMip & 0xFu) << 16) | (format.imgFmt << 20) | ((width & 3u) << 30),
 			((width >> 2) & 0xFFFu) | ((height & 0x3FFFu) << 14),
-			sel[0] | (sel[1] << 3) | (sel[2] << 6) | (sel[3] << 9) | (type << 28), // base/last level 0, SW_LINEAR
-			depth & 0x1FFFu,
+			sel[0] | (sel[1] << 3) | (sel[2] << 6) | (sel[3] << 9) | ((view.baseLevel & 0xFu) << 12) | ((view.baseLevel & 0xFu) << 16) |
+				((view.swizzleMode & 0x1Fu) << 20) | (type << 28),
+			(lastArray & 0x1FFFu) | ((view.baseArray & 0x1FFFu) << 16),
 			4u << 20, // perf_mod, as AMDVLK
 			1u << 10, // iterate_256, as AMDVLK
 			0,
