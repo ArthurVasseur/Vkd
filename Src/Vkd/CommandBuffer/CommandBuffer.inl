@@ -342,6 +342,18 @@ namespace vkd
 		Record(OpEndRenderPass{});
 	}
 
+	inline void CommandBuffer::PushExecuteCommands(UInt32 commandBufferCount, const VkCommandBuffer* pCommandBuffers)
+	{
+		vkd::vector<CommandBuffer*> commandBuffers(CommandAllocator<CommandBuffer*>(GetAllocationCallbacks()));
+		commandBuffers.reserve(commandBufferCount);
+		for (UInt32 i = 0; i < commandBufferCount; ++i)
+		{
+			VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, pCommandBuffers[i]);
+			commandBuffers.push_back(commandBufferObj);
+		}
+		Record(OpExecuteCommands{.CommandBuffers = std::move(commandBuffers)});
+	}
+
 	inline void CommandBuffer::PushPushConstants(VkShaderStageFlags stageFlags, UInt32 offset, UInt32 size, const void* pValues)
 	{
 		vkd::vector<UInt8> data(CommandAllocator<UInt8>(GetAllocationCallbacks()));

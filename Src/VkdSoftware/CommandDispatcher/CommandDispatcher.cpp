@@ -155,6 +155,18 @@ namespace vkd::software
 	{
 		return m_context->CopyQueryPoolResults(std::move(op));
 	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpExecuteCommands op)
+	{
+		for (const vkd::CommandBuffer* secondary : op.CommandBuffers)
+		{
+			if (!secondary)
+				continue;
+			if (const VkResult result = Execute(*secondary); result != VK_SUCCESS)
+				return result;
+		}
+		return VK_SUCCESS;
+	}
 	VkResult CommandDispatcher::operator()(vkd::OpPushConstants op)
 	{
 		// The CPU rasterizer doesn't read push constants yet.

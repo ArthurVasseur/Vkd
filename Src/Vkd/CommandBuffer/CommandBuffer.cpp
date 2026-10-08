@@ -281,7 +281,9 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount, const VkCommandBuffer* pCommandBuffers)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdExecuteCommands: not implemented, secondary command buffers are ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushExecuteCommands(commandBufferCount, pCommandBuffers);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageBlit* pRegions, VkFilter filter)

@@ -25,6 +25,7 @@ namespace vkd
 	class RenderPass;
 	class DescriptorSet;
 	class QueryPool;
+	class CommandBuffer;
 
 	struct OpBindVertexBuffer
 	{
@@ -173,6 +174,12 @@ namespace vkd
 		UInt32 GroupCountZ;
 	};
 
+	// vkCmdExecuteCommands: the secondary command buffers' ops run inline, in order.
+	struct OpExecuteCommands
+	{
+		vkd::vector<CommandBuffer*> CommandBuffers;
+	};
+
 	using Op = Nz::TypeList<
 		OpBindVertexBuffer,
 		OpBindIndexBuffer,
@@ -191,6 +198,7 @@ namespace vkd
 		OpEndQuery,
 		OpWriteTimestamp,
 		OpCopyQueryPoolResults,
+		OpExecuteCommands,
 		OpPushConstants,
 		OpDispatch>;
 } // namespace vkd
