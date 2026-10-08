@@ -25,6 +25,7 @@ namespace vkd
 	class RenderPass;
 	class DescriptorSet;
 	class QueryPool;
+	class Event;
 	class CommandBuffer;
 
 	struct OpBindVertexBuffer
@@ -174,6 +175,18 @@ namespace vkd
 		UInt32 GroupCountZ;
 	};
 
+	// vkCmdSetEvent (Signaled = true) / vkCmdResetEvent (Signaled = false).
+	struct OpSetEvent
+	{
+		Event* EventObject;
+		bool Signaled;
+	};
+
+	struct OpWaitEvents
+	{
+		vkd::vector<Event*> Events;
+	};
+
 	// vkCmdExecuteCommands: the secondary command buffers' ops run inline, in order.
 	struct OpExecuteCommands
 	{
@@ -198,6 +211,8 @@ namespace vkd
 		OpEndQuery,
 		OpWriteTimestamp,
 		OpCopyQueryPoolResults,
+		OpSetEvent,
+		OpWaitEvents,
 		OpExecuteCommands,
 		OpPushConstants,
 		OpDispatch>;

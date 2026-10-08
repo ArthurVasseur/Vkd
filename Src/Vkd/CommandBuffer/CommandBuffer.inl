@@ -17,6 +17,7 @@
 #include "Vkd/Pipeline/Pipeline.hpp"
 #include "Vkd/QueryPool/QueryPool.hpp"
 #include "Vkd/RenderPass/RenderPass.hpp"
+#include "Vkd/Synchronization/Event/Event.hpp"
 
 namespace vkd
 {
@@ -340,6 +341,28 @@ namespace vkd
 	inline void CommandBuffer::PushEndRenderPass()
 	{
 		Record(OpEndRenderPass{});
+	}
+
+	inline void CommandBuffer::PushSetEvent(VkEvent event, bool signaled)
+	{
+		VKD_FROM_HANDLE(Event, eventObj, event);
+
+		Record(OpSetEvent{
+			.EventObject = eventObj,
+			.Signaled = signaled,
+		});
+	}
+
+	inline void CommandBuffer::PushWaitEvents(UInt32 eventCount, const VkEvent* pEvents)
+	{
+		vkd::vector<Event*> events(CommandAllocator<Event*>(GetAllocationCallbacks()));
+		events.reserve(eventCount);
+		for (UInt32 i = 0; i < eventCount; ++i)
+		{
+			VKD_FROM_HANDLE(Event, eventObj, pEvents[i]);
+			events.push_back(eventObj);
+		}
+		Record(OpWaitEvents{.Events = std::move(events)});
 	}
 
 	inline void CommandBuffer::PushExecuteCommands(UInt32 commandBufferCount, const VkCommandBuffer* pCommandBuffers)

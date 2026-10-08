@@ -6,6 +6,8 @@
 
 #include "VkdSoftware/CommandDispatcher/CommandDispatcher.hpp"
 
+#include "Vkd/Synchronization/Event/Event.hpp"
+
 namespace vkd::software
 {
 	VkResult CommandDispatcher::Execute(const vkd::CommandBuffer& cb)
@@ -154,6 +156,19 @@ namespace vkd::software
 	VkResult CommandDispatcher::operator()(vkd::OpCopyQueryPoolResults op)
 	{
 		return m_context->CopyQueryPoolResults(std::move(op));
+	}
+	VkResult CommandDispatcher::operator()(vkd::OpSetEvent op)
+	{
+		CCT_ASSERT(op.EventObject, "Invalid event");
+		return op.Signaled ? op.EventObject->Set() : op.EventObject->Reset();
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpWaitEvents op)
+	{
+		// Commands run in submission order on one thread: events set earlier by this queue are
+		// already set, and host-set events must have been set before the submit to be waited on.
+		(void)op;
+		return VK_SUCCESS;
 	}
 
 	VkResult CommandDispatcher::operator()(vkd::OpExecuteCommands op)
