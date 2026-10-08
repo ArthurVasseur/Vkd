@@ -44,6 +44,9 @@ namespace vkd::software
 		VkResult CopyImageToBuffer(vkd::Buffer::OpCopyImageToBuffer op);
 		VkResult CopyImage(vkd::Image::OpCopy op);
 		VkResult ClearColorImage(vkd::Image::OpClearColorImage op);
+		VkResult ClearDepthStencilImage(vkd::Image::OpClearDepthStencilImage op);
+		VkResult ClearAttachments(vkd::OpClearAttachments op);
+		VkResult ResolveImage(vkd::Image::OpResolve op);
 		VkResult BeginRenderPass(vkd::OpBeginRenderPass op);
 		VkResult EndRenderPass(vkd::OpEndRenderPass op);
 		VkResult ResetQueryPool(vkd::OpResetQueryPool op);

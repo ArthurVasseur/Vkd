@@ -49,6 +49,10 @@ namespace vkd::software
 		VkResult operator()(vkd::OpEndQuery op);
 		VkResult operator()(vkd::OpWriteTimestamp op);
 		VkResult operator()(vkd::OpCopyQueryPoolResults op);
+		VkResult operator()(vkd::Image::OpClearDepthStencilImage op);
+		VkResult operator()(vkd::Image::OpResolve op);
+		VkResult operator()(vkd::Image::OpBlit op);
+		VkResult operator()(vkd::OpClearAttachments op);
 		VkResult operator()(vkd::OpSetEvent op);
 		VkResult operator()(vkd::OpWaitEvents op);
 		VkResult operator()(vkd::OpExecuteCommands op);

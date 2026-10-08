@@ -16,6 +16,7 @@
 #include "Vkd/DescriptorSet/DescriptorSet.hpp"
 #include "Vkd/DeviceMemory/DeviceMemory.hpp"
 #include "Vkd/Image/ColorPacking.hpp"
+#include "Vkd/Image/CopyLayout.hpp"
 #include "Vkd/ImageView/ImageView.hpp"
 #include "Vkd/QueryPool/QueryPool.hpp"
 #include "VkdSoftware/Device/Device.hpp"
@@ -289,6 +290,98 @@ namespace vkd::software
 				return VK_ERROR_MEMORY_MAP_FAILED;
 
 			return VK_SUCCESS;
+		}
+
+		// Maps two memories whole (they may be the same one) for the row helpers of
+		// Vkd/Image/CopyLayout.hpp, whose offsets are relative to the start of the memory, and runs
+		// fn(srcBase, srcSize, dstBase, dstSize).
+		template<typename Fn>
+		VkResult WithMappedMemories(vkd::DeviceMemory* src, vkd::DeviceMemory* dst, Fn&& fn)
+		{
+			CCT_ASSERT(src && dst, "Invalid memory");
+			cct::UByte* srcBase = nullptr;
+			VkResult result = MapRange(src, 0, VK_WHOLE_SIZE, &srcBase);
+			if (result != VK_SUCCESS)
+				return result;
+			cct::UByte* dstBase = srcBase;
+			if (dst != src)
+			{
+				result = MapRange(dst, 0, VK_WHOLE_SIZE, &dstBase);
+				if (result != VK_SUCCESS)
+				{
+					src->Unmap();
+					return result;
+				}
+			}
+			result = fn(srcBase, src->GetSize(), dstBase, dst->GetSize());
+			if (dst != src)
+				dst->Unmap();
+			src->Unmap();
+			return result;
+		}
+
+		// Row mover for CopyLayout.hpp: memmove (src and dst may share a memory), out-of-range rows
+		// are dropped and reported.
+		struct RowCopier
+		{
+			cct::UByte* srcBase;
+			VkDeviceSize srcSize;
+			cct::UByte* dstBase;
+			VkDeviceSize dstSize;
+			bool inRange = true;
+
+			void operator()(VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkDeviceSize bytes)
+			{
+				if (srcOffset + bytes > srcSize || dstOffset + bytes > dstSize)
+				{
+					inRange = false;
+					return;
+				}
+				std::memmove(dstBase + dstOffset, srcBase + srcOffset, static_cast<std::size_t>(bytes));
+			}
+
+			[[nodiscard]] VkResult Result(bool supported) const
+			{
+				if (!supported)
+					return VK_ERROR_FORMAT_NOT_SUPPORTED;
+				return inRange ? VK_SUCCESS : VK_ERROR_UNKNOWN;
+			}
+		};
+
+		// Writes a texel over a rectangle of z slices of one subresource, only the bytes set in
+		// writeMask (a one-aspect clear of a combined depth/stencil format keeps the other aspect).
+		bool FillTexels(cct::UByte* base, VkDeviceSize memorySize, const SubresourceFootprint& fp, VkRect2D rect,
+						UInt32 firstSlice, UInt32 sliceCount, const UInt8* texel, const UInt8* writeMask, UInt32 texelSize)
+		{
+			const Int64 x0 = std::max<Int64>(rect.offset.x, 0);
+			const Int64 y0 = std::max<Int64>(rect.offset.y, 0);
+			const Int64 x1 = std::min<Int64>(Int64{rect.offset.x} + rect.extent.width, fp.extent.width);
+			const Int64 y1 = std::min<Int64>(Int64{rect.offset.y} + rect.extent.height, fp.extent.height);
+			bool fullMask = true;
+			for (UInt32 i = 0; i < texelSize; ++i)
+				fullMask &= writeMask[i] == 0xFF;
+
+			for (UInt32 z = firstSlice; z < firstSlice + sliceCount && z < fp.extent.depth; ++z)
+			{
+				for (Int64 y = y0; y < y1; ++y)
+				{
+					const VkDeviceSize row = ImageTexelOffset(fp, static_cast<UInt32>(x0), static_cast<UInt32>(y), z, texelSize);
+					if (x1 > x0 && row + static_cast<VkDeviceSize>(x1 - x0) * texelSize > memorySize)
+						return false;
+					for (Int64 x = x0; x < x1; ++x)
+					{
+						cct::UByte* dst = base + row + static_cast<VkDeviceSize>(x - x0) * texelSize;
+						if (fullMask)
+							std::memcpy(dst, texel, texelSize);
+						else
+						{
+							for (UInt32 i = 0; i < texelSize; ++i)
+								dst[i] = static_cast<cct::UByte>((dst[i] & ~writeMask[i]) | (texel[i] & writeMask[i]));
+						}
+					}
+				}
+			}
+			return true;
 		}
 	} // namespace
 
@@ -640,164 +733,54 @@ namespace vkd::software
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		for (auto& region : op.regions)
-		{
-			CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
-			CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
+		CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
+		CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
 
-			VkDeviceSize pixelSize = vkuFormatElementSize(op.src->GetFormat());
-			VkDeviceSize srcRowPitch = op.src->GetExtent().width * pixelSize;
-			VkDeviceSize dstRowPitch = op.dst->GetExtent().width * pixelSize;
-
-			VkDeviceSize srcImageSize = srcRowPitch * op.src->GetExtent().height * op.src->GetExtent().depth;
-			VkDeviceSize dstImageSize = dstRowPitch * op.dst->GetExtent().height * op.dst->GetExtent().depth;
-
-			cct::UByte* srcBase = nullptr;
-			VkResult result = MapRange(op.src->GetMemory(), op.src->GetMemoryOffset(), srcImageSize, &srcBase);
-			if (result != VK_SUCCESS)
-				return result;
-
-			cct::UByte* dstBase = nullptr;
-			result = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset(), dstImageSize, &dstBase);
-			if (result != VK_SUCCESS)
-			{
-				op.src->GetMemory()->Unmap();
-				return result;
-			}
-
-			VkDeviceSize rowSize = region.extent.width * pixelSize;
-			for (UInt32 z = 0; z < region.extent.depth; ++z)
-			{
-				for (UInt32 y = 0; y < region.extent.height; ++y)
-				{
-					VkDeviceSize srcOffset = ((region.srcOffset.z + z) * op.src->GetExtent().height +
-											  (region.srcOffset.y + y)) *
-												 srcRowPitch +
-											 region.srcOffset.x * pixelSize;
-					VkDeviceSize dstOffset = ((region.dstOffset.z + z) *
-												  op.dst->GetExtent().height +
-											  (region.dstOffset.y + y)) *
-												 dstRowPitch +
-											 region.dstOffset.x * pixelSize;
-					std::memcpy(dstBase + dstOffset, srcBase + srcOffset, rowSize);
-				}
-			}
-
-			op.dst->GetMemory()->Unmap();
-			op.src->GetMemory()->Unmap();
-		}
-
-		return VK_SUCCESS;
+		return WithMappedMemories(op.src->GetMemory(), op.dst->GetMemory(), [&](cct::UByte* srcBase, VkDeviceSize srcSize, cct::UByte* dstBase, VkDeviceSize dstSize)
+								  {
+			RowCopier rows{srcBase, srcSize, dstBase, dstSize};
+			bool supported = true;
+			for (const VkImageCopy& region : op.regions)
+				supported &= ForEachImageCopyRow(*op.src, *op.dst, region, rows);
+			return rows.Result(supported); });
 	}
 
 	VkResult CpuContext::CopyBufferToImage(vkd::Buffer::OpCopyBufferToImage op)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		for (auto& region : op.regions)
-		{
-			CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
-			CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
+		CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
+		CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
 
-			VkDeviceSize pixelSize = vkuFormatElementSize(op.dst->GetFormat());
-			VkDeviceSize imageRowPitch = op.dst->GetExtent().width * pixelSize;
-			VkDeviceSize imageSize = imageRowPitch * op.dst->GetExtent().height * op.dst->GetExtent().depth;
-
-			UInt32 bufferRowLength = region.bufferRowLength ? region.bufferRowLength : region.imageExtent.width;
-			VkDeviceSize bufferRowPitch = bufferRowLength * pixelSize;
-
-			cct::UByte* srcBase = nullptr;
-			VkResult result = MapRange(op.src->GetMemory(),
-									   op.src->GetMemoryOffset() + region.bufferOffset,
-									   bufferRowPitch * region.imageExtent.height * region.imageExtent.depth,
-									   &srcBase);
-			if (result != VK_SUCCESS)
-				return result;
-
-			cct::UByte* dstBase = nullptr;
-			result = MapRange(op.dst->GetMemory(), op.dst->GetMemoryOffset(), imageSize, &dstBase);
-			if (result != VK_SUCCESS)
-			{
-				op.src->GetMemory()->Unmap();
-				return result;
-			}
-
-			VkDeviceSize rowSize = region.imageExtent.width * pixelSize;
-			for (UInt32 z = 0; z < region.imageExtent.depth; ++z)
-			{
-				for (UInt32 y = 0; y < region.imageExtent.height; ++y)
-				{
-					VkDeviceSize srcOffset = (z * bufferRowLength * region.imageExtent.height + y * bufferRowLength) *
-											 pixelSize;
-					VkDeviceSize dstOffset = ((region.imageOffset.z + z) * op.dst->GetExtent().height +
-											  (region.imageOffset.y + y)) *
-												 imageRowPitch +
-											 region.imageOffset.x * pixelSize;
-
-					std::memcpy(dstBase + dstOffset, srcBase + srcOffset, rowSize);
-				}
-			}
-
-			op.dst->GetMemory()->Unmap();
-			op.src->GetMemory()->Unmap();
-		}
-
-		return VK_SUCCESS;
+		return WithMappedMemories(op.src->GetMemory(), op.dst->GetMemory(), [&](cct::UByte* srcBase, VkDeviceSize srcSize, cct::UByte* dstBase, VkDeviceSize dstSize)
+								  {
+			RowCopier rows{srcBase, srcSize, dstBase, dstSize};
+			bool supported = true;
+			for (const VkBufferImageCopy& region : op.regions)
+				supported &= ForEachBufferImageRow(*op.src, *op.dst, region, rows);
+			return rows.Result(supported); });
 	}
 
 	VkResult CpuContext::CopyImageToBuffer(vkd::Buffer::OpCopyImageToBuffer op)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
 
-		for (auto& region : op.regions)
-		{
-			CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
-			CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
+		CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
+		CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
 
-			VkDeviceSize pixelSize = vkuFormatElementSize(op.src->GetFormat());
-			VkDeviceSize imageRowPitch = op.src->GetExtent().width * pixelSize;
-			VkDeviceSize imageSize = imageRowPitch * op.src->GetExtent().height * op.src->GetExtent().depth;
-
-			UInt32 bufferRowLength = region.bufferRowLength ? region.bufferRowLength : region.imageExtent.width;
-			VkDeviceSize bufferRowPitch = bufferRowLength * pixelSize;
-
-			cct::UByte* srcBase = nullptr;
-			VkResult result = MapRange(op.src->GetMemory(), op.src->GetMemoryOffset(), imageSize, &srcBase);
-			if (result != VK_SUCCESS)
-				return result;
-
-			cct::UByte* dstBase = nullptr;
-			result = MapRange(op.dst->GetMemory(),
-							  op.dst->GetMemoryOffset() + region.bufferOffset,
-							  bufferRowPitch * region.imageExtent.height * region.imageExtent.depth,
-							  &dstBase);
-			if (result != VK_SUCCESS)
+		return WithMappedMemories(op.src->GetMemory(), op.dst->GetMemory(), [&](cct::UByte* srcBase, VkDeviceSize srcSize, cct::UByte* dstBase, VkDeviceSize dstSize)
+								  {
+			RowCopier rows{srcBase, srcSize, dstBase, dstSize};
+			bool supported = true;
+			for (const VkBufferImageCopy& region : op.regions)
 			{
-				op.src->GetMemory()->Unmap();
-				return result;
-			}
-
-			VkDeviceSize rowSize = region.imageExtent.width * pixelSize;
-			for (UInt32 z = 0; z < region.imageExtent.depth; ++z)
-			{
-				for (UInt32 y = 0; y < region.imageExtent.height; ++y)
+				// Same rows as buffer -> image, with source and destination swapped.
+				supported &= ForEachBufferImageRow(*op.dst, *op.src, region, [&](VkDeviceSize bufferOffset, VkDeviceSize imageOffset, VkDeviceSize bytes)
 				{
-					VkDeviceSize srcOffset = ((region.imageOffset.z + z) * op.src->GetExtent().height +
-											  (region.imageOffset.y + y)) *
-												 imageRowPitch +
-											 region.imageOffset.x * pixelSize;
-					VkDeviceSize dstOffset = (z * bufferRowLength * region.imageExtent.height + y * bufferRowLength) *
-											 pixelSize;
-
-					std::memcpy(dstBase + dstOffset, srcBase + srcOffset, rowSize);
-				}
+					rows(imageOffset, bufferOffset, bytes);
+				});
 			}
-
-			op.dst->GetMemory()->Unmap();
-			op.src->GetMemory()->Unmap();
-		}
-
-		return VK_SUCCESS;
+			return rows.Result(supported); });
 	}
 
 	VkResult CpuContext::ClearColorImage(vkd::Image::OpClearColorImage op)
@@ -806,15 +789,143 @@ namespace vkd::software
 
 		CCT_ASSERT(op.image && op.image->GetMemory(), "Invalid pointer");
 
-		for (auto& range : op.ranges)
+		const VkFormat format = op.image->GetFormat();
+		const VkDeviceSize pixelSize = vkuFormatElementSize(format);
+		if (pixelSize == 0 || pixelSize > 32)
+			return VK_ERROR_FORMAT_NOT_SUPPORTED;
+
+		UInt8 pattern[32] = {};
+		if (IsSupportedColorFormat(format))
+			PackColor(format, op.clearColor, pattern);
+		else
+			cct::Logger::Warning("ClearColorImage: unsupported format {}, zeroing memory", static_cast<int>(format));
+
+		vkd::DeviceMemory* memory = op.image->GetMemory();
+		return WithMappedMemories(memory, memory, [&](cct::UByte* base, VkDeviceSize size, cct::UByte*, VkDeviceSize)
+								  {
+			bool inRange = true;
+			for (const VkImageSubresourceRange& range : op.ranges)
+			{
+				ForEachSubresourceRange(*op.image, range, [&](const SubresourceFootprint& fp, VkDeviceSize bytes)
+				{
+					if (fp.offset + bytes > size)
+					{
+						inRange = false;
+						return;
+					}
+					for (VkDeviceSize i = 0; i < bytes; i += pixelSize)
+						std::memcpy(base + fp.offset + i, pattern, static_cast<std::size_t>(pixelSize));
+				});
+			}
+			return inRange ? VK_SUCCESS : VK_ERROR_UNKNOWN; });
+	}
+
+	VkResult CpuContext::ClearDepthStencilImage(vkd::Image::OpClearDepthStencilImage op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.image && op.image->GetMemory(), "Invalid pointer");
+
+		vkd::DeviceMemory* memory = op.image->GetMemory();
+		return WithMappedMemories(memory, memory, [&](cct::UByte* base, VkDeviceSize size, cct::UByte*, VkDeviceSize)
+								  {
+			bool inRange = true;
+			for (const VkImageSubresourceRange& range : op.ranges)
+			{
+				UInt8 texel[8];
+				UInt8 mask[8];
+				const UInt32 texelSize = PackDepthStencil(op.image->GetFormat(), op.value, range.aspectMask, texel, mask);
+				if (texelSize == 0)
+					return VK_ERROR_FORMAT_NOT_SUPPORTED;
+				ForEachSubresourceRange(*op.image, range, [&](const SubresourceFootprint& fp, VkDeviceSize)
+				{
+					const VkRect2D whole{{0, 0}, {fp.extent.width, fp.extent.height}};
+					inRange &= FillTexels(base, size, fp, whole, 0, fp.extent.depth, texel, mask, texelSize);
+				});
+			}
+			return inRange ? VK_SUCCESS : VK_ERROR_UNKNOWN; });
+	}
+
+	VkResult CpuContext::ClearAttachments(vkd::OpClearAttachments op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		if (!m_currentRenderPass || !m_currentFramebuffer || m_currentRenderPass->GetSubpasses().empty())
+			return VK_SUCCESS;
+
+		const VkSubpassDescription& subpass = m_currentRenderPass->GetSubpasses()[0];
+		const auto& views = m_currentFramebuffer->GetAttachments();
+		for (const VkClearAttachment& clear : op.Attachments)
 		{
-			(void)range;
-			VkResult result = ClearImageWithColor(op.image, op.clearColor);
+			UInt32 attachment = VK_ATTACHMENT_UNUSED;
+			if (clear.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT)
+			{
+				if (clear.colorAttachment < subpass.colorAttachmentCount)
+					attachment = subpass.pColorAttachments[clear.colorAttachment].attachment;
+			}
+			else if (subpass.pDepthStencilAttachment)
+				attachment = subpass.pDepthStencilAttachment->attachment;
+			if (attachment == VK_ATTACHMENT_UNUSED || attachment >= views.size())
+				continue;
+
+			VKD_FROM_HANDLE(vkd::ImageView, viewObj, views[attachment]);
+			VKD_FROM_HANDLE(vkd::Image, imageObj, viewObj->GetImage());
+
+			UInt8 texel[32] = {};
+			UInt8 mask[32] = {};
+			UInt32 texelSize = 0;
+			if (clear.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT)
+			{
+				texelSize = static_cast<UInt32>(vkuFormatElementSize(imageObj->GetFormat()));
+				if (texelSize == 0 || texelSize > sizeof(texel))
+					continue;
+				if (IsSupportedColorFormat(imageObj->GetFormat()))
+					PackColor(imageObj->GetFormat(), clear.clearValue.color, texel);
+				std::memset(mask, 0xFF, texelSize);
+			}
+			else
+				texelSize = PackDepthStencil(imageObj->GetFormat(), clear.clearValue.depthStencil, clear.aspectMask, texel, mask);
+			if (texelSize == 0)
+				continue;
+
+			const VkImageSubresourceRange& range = viewObj->GetSubresourceRange();
+			vkd::DeviceMemory* memory = imageObj->GetMemory();
+			const VkResult result = WithMappedMemories(memory, memory, [&](cct::UByte* base, VkDeviceSize size, cct::UByte*, VkDeviceSize)
+													   {
+				bool inRange = true;
+				for (const VkClearRect& rect : op.Rects)
+				{
+					for (UInt32 layer = 0; layer < rect.layerCount; ++layer)
+					{
+						const UInt32 viewLayer = rect.baseArrayLayer + layer;
+						// A 3D image viewed as 2D layers clears z slices; an array image clears layers.
+						const bool is3d = imageObj->GetImageType() == VK_IMAGE_TYPE_3D;
+						const SubresourceFootprint fp = GetSubresourceFootprint(*imageObj, range.baseMipLevel, is3d ? 0 : range.baseArrayLayer + viewLayer);
+						inRange &= FillTexels(base, size, fp, rect.rect, is3d ? viewLayer : 0, 1, texel, mask, texelSize);
+					}
+				}
+				return inRange ? VK_SUCCESS : VK_ERROR_UNKNOWN; });
 			if (result != VK_SUCCESS)
 				return result;
 		}
-
 		return VK_SUCCESS;
+	}
+
+	VkResult CpuContext::ResolveImage(vkd::Image::OpResolve op)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		CCT_ASSERT(op.src && op.src->GetMemory(), "Invalid pointer");
+		CCT_ASSERT(op.dst && op.dst->GetMemory(), "Invalid pointer");
+
+		// Images are single-sampled here (no MSAA rasterization), so a resolve is a copy.
+		return WithMappedMemories(op.src->GetMemory(), op.dst->GetMemory(), [&](cct::UByte* srcBase, VkDeviceSize srcSize, cct::UByte* dstBase, VkDeviceSize dstSize)
+								  {
+			RowCopier rows{srcBase, srcSize, dstBase, dstSize};
+			bool supported = true;
+			for (const VkImageResolve& r : op.regions)
+				supported &= ForEachImageCopyRow(*op.src, *op.dst, VkImageCopy{r.srcSubresource, r.srcOffset, r.dstSubresource, r.dstOffset, r.extent}, rows);
+			return rows.Result(supported); });
 	}
 
 	VkResult CpuContext::BeginRenderPass(vkd::OpBeginRenderPass op)

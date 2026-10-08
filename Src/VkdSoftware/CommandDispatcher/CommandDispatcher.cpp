@@ -157,6 +157,32 @@ namespace vkd::software
 	{
 		return m_context->CopyQueryPoolResults(std::move(op));
 	}
+	VkResult CommandDispatcher::operator()(vkd::Image::OpClearDepthStencilImage op)
+	{
+		return m_context->ClearDepthStencilImage(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::Image::OpResolve op)
+	{
+		return m_context->ResolveImage(std::move(op));
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::Image::OpBlit)
+	{
+		static bool warned = false;
+		if (!warned)
+		{
+			warned = true;
+			cct::Logger::Warning("CmdBlitImage: not implemented by the software driver, ignored");
+		}
+		return VK_SUCCESS;
+	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpClearAttachments op)
+	{
+		return m_context->ClearAttachments(std::move(op));
+	}
+
 	VkResult CommandDispatcher::operator()(vkd::OpSetEvent op)
 	{
 		CCT_ASSERT(op.EventObject, "Invalid event");

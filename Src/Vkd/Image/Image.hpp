@@ -39,7 +39,31 @@ namespace vkd
 			vkd::vector<VkImageSubresourceRange> ranges;
 		};
 
-		using Op = Nz::TypeList<OpCopy, OpClearColorImage>;
+		struct OpClearDepthStencilImage
+		{
+			Image* image;
+			VkImageLayout layout;
+			VkClearDepthStencilValue value;
+			vkd::vector<VkImageSubresourceRange> ranges;
+		};
+
+		struct OpResolve
+		{
+			Image* src;
+			Image* dst;
+			vkd::vector<VkImageResolve> regions;
+		};
+
+		// vkCmdBlitImage: scaled copies, regions as given (offsets may be reversed: mirroring).
+		struct OpBlit
+		{
+			Image* src;
+			Image* dst;
+			vkd::vector<VkImageBlit> regions;
+			VkFilter filter;
+		};
+
+		using Op = Nz::TypeList<OpCopy, OpClearColorImage, OpClearDepthStencilImage, OpResolve, OpBlit>;
 
 		static constexpr VkObjectType ObjectType = VK_OBJECT_TYPE_IMAGE;
 		VKD_NON_DISPATCHABLE_HANDLE(Image);

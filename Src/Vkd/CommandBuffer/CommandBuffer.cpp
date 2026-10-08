@@ -286,6 +286,30 @@ namespace vkd
 		commandBufferObj->PushExecuteCommands(commandBufferCount, pCommandBuffers);
 	}
 
+	void VKAPI_CALL CommandBuffer::CmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout, const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount, const VkImageSubresourceRange* pRanges)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushClearDepthStencilImage(image, imageLayout, *pDepthStencil, rangeCount, pRanges);
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount, const VkClearAttachment* pAttachments, uint32_t rectCount, const VkClearRect* pRects)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushClearAttachments(attachmentCount, pAttachments, rectCount, pRects);
+	}
+
+	void VKAPI_CALL CommandBuffer::CmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount, const VkImageResolve* pRegions)
+	{
+		VKD_AUTO_PROFILER_SCOPE();
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushResolveImage(srcImage, dstImage, regionCount, pRegions);
+	}
+
 	void VKAPI_CALL CommandBuffer::CmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask)
 	{
 		VKD_AUTO_PROFILER_SCOPE();

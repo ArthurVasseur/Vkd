@@ -175,6 +175,13 @@ namespace vkd
 		UInt32 GroupCountZ;
 	};
 
+	// vkCmdClearAttachments: attachments of the current subpass, inside a render pass.
+	struct OpClearAttachments
+	{
+		vkd::vector<VkClearAttachment> Attachments;
+		vkd::vector<VkClearRect> Rects;
+	};
+
 	// vkCmdSetEvent (Signaled = true) / vkCmdResetEvent (Signaled = false).
 	struct OpSetEvent
 	{
@@ -211,6 +218,7 @@ namespace vkd
 		OpEndQuery,
 		OpWriteTimestamp,
 		OpCopyQueryPoolResults,
+		OpClearAttachments,
 		OpSetEvent,
 		OpWaitEvents,
 		OpExecuteCommands,

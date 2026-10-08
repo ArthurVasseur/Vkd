@@ -343,6 +343,37 @@ namespace vkd
 		Record(OpEndRenderPass{});
 	}
 
+	inline void CommandBuffer::PushClearDepthStencilImage(VkImage image, VkImageLayout imageLayout, const VkClearDepthStencilValue& value, UInt32 rangeCount, const VkImageSubresourceRange* pRanges)
+	{
+		VKD_FROM_HANDLE(Image, imageObj, image);
+
+		vkd::vector<VkImageSubresourceRange> ranges(CommandAllocator<VkImageSubresourceRange>(GetAllocationCallbacks()));
+		ranges.assign(pRanges, pRanges + rangeCount);
+		Record(Image::OpClearDepthStencilImage{imageObj, imageLayout, value, std::move(ranges)});
+	}
+
+	inline void CommandBuffer::PushClearAttachments(UInt32 attachmentCount, const VkClearAttachment* pAttachments, UInt32 rectCount, const VkClearRect* pRects)
+	{
+		vkd::vector<VkClearAttachment> attachments(CommandAllocator<VkClearAttachment>(GetAllocationCallbacks()));
+		attachments.assign(pAttachments, pAttachments + attachmentCount);
+		vkd::vector<VkClearRect> rects(CommandAllocator<VkClearRect>(GetAllocationCallbacks()));
+		rects.assign(pRects, pRects + rectCount);
+		Record(OpClearAttachments{
+			.Attachments = std::move(attachments),
+			.Rects = std::move(rects),
+		});
+	}
+
+	inline void CommandBuffer::PushResolveImage(VkImage srcImage, VkImage dstImage, UInt32 regionCount, const VkImageResolve* pRegions)
+	{
+		VKD_FROM_HANDLE(Image, srcImageObj, srcImage);
+		VKD_FROM_HANDLE(Image, dstImageObj, dstImage);
+
+		vkd::vector<VkImageResolve> regions(CommandAllocator<VkImageResolve>(GetAllocationCallbacks()));
+		regions.assign(pRegions, pRegions + regionCount);
+		Record(Image::OpResolve{srcImageObj, dstImageObj, std::move(regions)});
+	}
+
 	inline void CommandBuffer::PushSetEvent(VkEvent event, bool signaled)
 	{
 		VKD_FROM_HANDLE(Event, eventObj, event);
