@@ -237,13 +237,21 @@ namespace vkd::wddm
 			D3DKMTFreeGpuVirtualAddress(&freeVa);
 		}
 
+		// By its handle, as RADV does: Create doesn't set CreateResource, so hResource is 0, and
+		// {hResource 0, no allocation list} succeeds without destroying anything -- every allocation
+		// leaked in the kernel (evicted, its VA freed) until VidMm refused new ones with
+		// STATUS_GRAPHICS_NO_VIDEO_MEMORY, ~330K allocations into a CTS run.
 		D3DKMT_DESTROYALLOCATION2 destroyAlloc = {};
 		destroyAlloc.hDevice = m_device;
 		destroyAlloc.hResource = m_resource;
-		destroyAlloc.AllocationCount = 0;
-		destroyAlloc.phAllocationList = nullptr;
-		destroyAlloc.Flags.Value = 0;
-		D3DKMTDestroyAllocation2(&destroyAlloc);
+		if (m_resource == 0)
+		{
+			destroyAlloc.AllocationCount = 1;
+			destroyAlloc.phAllocationList = &m_allocation;
+		}
+		const NTSTATUS destroySt = D3DKMTDestroyAllocation2(&destroyAlloc);
+		if (destroySt != STATUS_SUCCESS)
+			cct::Logger::Error("WddmAllocation: DestroyAllocation2 NTSTATUS=0x{:08X} (hAllocation=0x{:X})", static_cast<uint32_t>(destroySt), m_allocation);
 		s_liveAllocations.fetch_sub(1);
 		s_liveBytes.fetch_sub(static_cast<int64_t>(m_size));
 
