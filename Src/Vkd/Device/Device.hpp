@@ -166,6 +166,12 @@ namespace vkd
 		virtual Result<Image*, VkResult> CreateImage(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<DeviceMemory*, VkResult> CreateDeviceMemory(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Pipeline*, VkResult> CreatePipeline(const VkAllocationCallbacks& allocationCallbacks) = 0;
+		// Byte alignment of image rows (Image::GetSubresourceLayout). The CPU rasterizer packs rows
+		// tightly (the default); GPU texture/render units can require padded rows.
+		[[nodiscard]] virtual VkDeviceSize GetImageRowPitchAlignment() const
+		{
+			return 1;
+		}
 		virtual Result<RenderPass*, VkResult> CreateRenderPass(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<ImageView*, VkResult> CreateImageView(const VkAllocationCallbacks& allocationCallbacks) = 0;
 		virtual Result<Framebuffer*, VkResult> CreateFramebuffer(const VkAllocationCallbacks& allocationCallbacks) = 0;

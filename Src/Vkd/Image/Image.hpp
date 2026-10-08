@@ -66,6 +66,9 @@ namespace vkd
 		[[nodiscard]] inline bool IsBound() const;
 
 	protected:
+		// Row pitch of a mip level: its rows padded to the device's row alignment.
+		[[nodiscard]] VkDeviceSize LevelRowPitch(UInt32 level) const;
+
 		Device* m_owner;
 		VkImageType m_imageType;
 		VkFormat m_format;
@@ -77,6 +80,7 @@ namespace vkd
 		VkImageUsageFlags m_usage;
 		DeviceMemory* m_memory;
 		VkDeviceSize m_memoryOffset;
+		VkDeviceSize m_rowPitchAlignment;
 	};
 } // namespace vkd
 

@@ -25,7 +25,8 @@ namespace vkd
 		m_tiling(VK_IMAGE_TILING_OPTIMAL),
 		m_usage(0),
 		m_memory(nullptr),
-		m_memoryOffset(0)
+		m_memoryOffset(0),
+		m_rowPitchAlignment(1)
 	{
 	}
 
@@ -40,6 +41,7 @@ namespace vkd
 		m_samples = info.samples;
 		m_tiling = info.tiling;
 		m_usage = info.usage;
+		m_rowPitchAlignment = std::max<VkDeviceSize>(owner.GetImageRowPitchAlignment(), 1);
 
 		m_createResult = VK_SUCCESS;
 		return m_createResult;
@@ -51,17 +53,20 @@ namespace vkd
 		m_memoryOffset = memoryOffset;
 	}
 
+	inline VkDeviceSize Image::LevelRowPitch(UInt32 level) const
+	{
+		const VkDeviceSize rowBytes = std::max<VkDeviceSize>(m_extent.width >> level, 1) * vkuFormatElementSize(m_format);
+		return (rowBytes + m_rowPitchAlignment - 1) / m_rowPitchAlignment * m_rowPitchAlignment;
+	}
+
 	inline void Image::GetMemoryRequirements(VkMemoryRequirements& memoryRequirements) const
 	{
-		const VkDeviceSize pixelSize = vkuFormatElementSize(m_format);
-
 		VkDeviceSize mipChainSize = 0;
 		for (UInt32 level = 0; level < m_mipLevels; ++level)
 		{
-			const VkDeviceSize mipWidth = std::max<VkDeviceSize>(m_extent.width >> level, 1);
 			const VkDeviceSize mipHeight = std::max<VkDeviceSize>(m_extent.height >> level, 1);
 			const VkDeviceSize mipDepth = std::max<VkDeviceSize>(m_extent.depth >> level, 1);
-			mipChainSize += mipWidth * mipHeight * mipDepth * pixelSize;
+			mipChainSize += LevelRowPitch(level) * mipHeight * mipDepth;
 		}
 
 		memoryRequirements.size = mipChainSize * m_arrayLayers * static_cast<VkDeviceSize>(m_samples);
@@ -71,8 +76,6 @@ namespace vkd
 
 	inline void Image::GetSubresourceLayout(const VkImageSubresource& subresource, VkSubresourceLayout& layout) const
 	{
-		const VkDeviceSize pixelSize = vkuFormatElementSize(m_format);
-
 		VkDeviceSize mipChainSize = 0;
 		VkDeviceSize levelOffset = 0;
 		VkDeviceSize levelSize = 0;
@@ -81,17 +84,17 @@ namespace vkd
 
 		for (UInt32 level = 0; level < m_mipLevels; ++level)
 		{
-			const VkDeviceSize mipWidth = std::max<VkDeviceSize>(m_extent.width >> level, 1);
 			const VkDeviceSize mipHeight = std::max<VkDeviceSize>(m_extent.height >> level, 1);
 			const VkDeviceSize mipDepth = std::max<VkDeviceSize>(m_extent.depth >> level, 1);
-			const VkDeviceSize thisLevelSize = mipWidth * mipHeight * mipDepth * pixelSize;
+			const VkDeviceSize rowPitch = LevelRowPitch(level);
+			const VkDeviceSize thisLevelSize = rowPitch * mipHeight * mipDepth;
 
 			if (level == subresource.mipLevel)
 			{
 				levelOffset = mipChainSize;
 				levelSize = thisLevelSize;
-				levelRowPitch = mipWidth * pixelSize;
-				levelDepthPitch = mipWidth * mipHeight * pixelSize;
+				levelRowPitch = rowPitch;
+				levelDepthPitch = rowPitch * mipHeight;
 			}
 
 			mipChainSize += thisLevelSize;
