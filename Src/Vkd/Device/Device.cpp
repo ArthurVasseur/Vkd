@@ -35,6 +35,7 @@
 #include "Vkd/Synchronization/Event/Event.hpp"
 #include "Vkd/Synchronization/Fence/Fence.hpp"
 #include "Vkd/Synchronization/Semaphore/Semaphore.hpp"
+#include "Vkd/Wsi/Wsi.hpp"
 
 namespace vkd
 {
@@ -392,6 +393,11 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP(vkd::Device, DeviceWaitIdle);
 
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueSubmit);
+		VKD_ENTRYPOINT_EXT_LOOKUP(vkd::Wsi, CreateSwapchainKHR, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+		VKD_ENTRYPOINT_EXT_LOOKUP(vkd::Wsi, DestroySwapchainKHR, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+		VKD_ENTRYPOINT_EXT_LOOKUP(vkd::Wsi, GetSwapchainImagesKHR, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+		VKD_ENTRYPOINT_EXT_LOOKUP(vkd::Wsi, AcquireNextImageKHR, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+		VKD_ENTRYPOINT_EXT_LOOKUP(vkd::Wsi, QueuePresentKHR, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueWaitIdle);
 		VKD_ENTRYPOINT_LOOKUP(vkd::Queue, QueueBindSparse);
 

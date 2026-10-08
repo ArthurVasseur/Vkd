@@ -11,6 +11,7 @@
 #include "Vkd/Device/Device.hpp"
 #include "Vkd/Instance/Instance.hpp"
 #include "Vkd/PhysicalDevice/PhysicalDevice.hpp"
+#include "Vkd/Wsi/Wsi.hpp"
 
 namespace
 {
@@ -89,6 +90,15 @@ namespace vkd
 		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceMemoryProperties2);
 		VKD_ENTRYPOINT_LOOKUP_KHR(vkd::PhysicalDevice, GetPhysicalDeviceSparseImageFormatProperties2);
 #undef VKD_ENTRYPOINT_LOOKUP_KHR
+		VKD_ENTRYPOINT_LOOKUP(vkd::Wsi, DestroySurfaceKHR);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Wsi, GetPhysicalDeviceSurfaceSupportKHR);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Wsi, GetPhysicalDeviceSurfaceCapabilitiesKHR);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Wsi, GetPhysicalDeviceSurfaceFormatsKHR);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Wsi, GetPhysicalDeviceSurfacePresentModesKHR);
+#ifdef CCT_PLATFORM_WINDOWS
+		VKD_ENTRYPOINT_LOOKUP(vkd::Wsi, CreateWin32SurfaceKHR);
+		VKD_ENTRYPOINT_LOOKUP(vkd::Wsi, GetPhysicalDeviceWin32PresentationSupportKHR);
+#endif
 
 #undef VKD_ENTRYPOINT_LOOKUP
 

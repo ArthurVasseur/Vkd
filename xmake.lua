@@ -146,7 +146,7 @@ target("vkd")
     end
 
     if is_plat("windows") then
-        add_syslinks("Gdi32", "SetupAPI")
+        add_syslinks("Gdi32", "User32", "SetupAPI")
     end
 
     if has_config("debug-checks") then
