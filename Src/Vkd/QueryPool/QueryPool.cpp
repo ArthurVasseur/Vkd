@@ -80,16 +80,20 @@ namespace vkd
 			const bool available = m_available[query] != 0;
 			for (UInt32 valueIndex = 0; valueIndex < valuesPerQuery; ++valueIndex)
 			{
-				const UInt64 value = (available || partial) ? m_results[static_cast<std::size_t>(query) * valuesPerQuery + valueIndex] : 0;
+				// An unavailable query's values are left untouched unless PARTIAL asks for them.
+				const bool writeValue = available || partial;
+				const UInt64 value = writeValue ? m_results[static_cast<std::size_t>(query) * valuesPerQuery + valueIndex] : 0;
 				if (want64)
 				{
-					std::memcpy(record, &value, sizeof(UInt64));
+					if (writeValue)
+						std::memcpy(record, &value, sizeof(UInt64));
 					record += sizeof(UInt64);
 				}
 				else
 				{
 					const UInt32 narrow = static_cast<UInt32>(value);
-					std::memcpy(record, &narrow, sizeof(UInt32));
+					if (writeValue)
+						std::memcpy(record, &narrow, sizeof(UInt32));
 					record += sizeof(UInt32);
 				}
 			}
