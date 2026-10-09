@@ -20,6 +20,7 @@ namespace vkd::amd
 		uint32_t binding;
 		VkDescriptorType type;
 		uint32_t offset;
+		uint32_t count = 1;
 	};
 
 	inline constexpr uint32_t kMaxPrecompiledSets = 4;

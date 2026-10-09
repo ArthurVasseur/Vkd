@@ -563,11 +563,13 @@ namespace vkd::amd
 			const vkd::OpBeginRenderPass* renderPass = nullptr;
 			const amd::Pipeline* computePipeline = nullptr;
 			const vkd::DescriptorSet* computeSets[kMaxPrecompiledSets] = {};
+			std::vector<vkd::DynamicOffsetEntry> computeDynamicOffsets;
 			uint8_t pushConstants[256] = {};
 			bool shaderCachesInvalidated = false;
 			bool computeEngine = false; // queue families 1/2 run on the compute engine (node 2)
 			const amd::Pipeline* graphicsPipeline = nullptr;
 			const vkd::DescriptorSet* graphicsSets[kMaxPrecompiledSets] = {};
+			std::vector<vkd::DynamicOffsetEntry> graphicsDynamicOffsets;
 			// vkCmdSetViewport/vkCmdSetScissor (index 0), used when the pipeline makes them dynamic.
 			VkViewport viewport = {};
 			VkRect2D scissor = {};
@@ -673,13 +675,23 @@ namespace vkd::amd
 		// capture, PrecompiledDescriptor) and returns the 32-bit pointer its user-data SGPR gets. The
 		// table must share the code's 4GB window -- the shader takes the high half of the address
 		// from its own PC. 0 when the arena is full.
+		uint32_t DynamicOffset(std::span<const vkd::DynamicOffsetEntry> dynamicOffsets, uint32_t set, uint32_t binding, uint32_t element)
+		{
+			for (const vkd::DynamicOffsetEntry& entry : dynamicOffsets)
+			{
+				if (entry.SetIndex == set && entry.Binding == binding && entry.ArrayElement == element)
+					return entry.Offset;
+			}
+			return 0;
+		}
+
 		uint32_t BuildDescriptorTable(std::span<const PrecompiledDescriptor> descriptors, uint32_t set, const vkd::DescriptorSet* bound,
-									  uint64_t codeVa, DescriptorArena* arena)
+									  std::span<const vkd::DynamicOffsetEntry> dynamicOffsets, uint64_t codeVa, DescriptorArena* arena)
 		{
 			uint64_t tableBytes = 16;
 			for (const PrecompiledDescriptor& d : descriptors)
 				if (d.set == set)
-					tableBytes = std::max<uint64_t>(tableBytes, d.offset + DescriptorBytes(d.type));
+					tableBytes = std::max<uint64_t>(tableBytes, d.offset + uint64_t{d.count} * DescriptorBytes(d.type));
 			uint8_t* table = nullptr;
 			const uint64_t tableVa = arena ? arena->Allocate(tableBytes, table) : 0;
 			if (tableVa == 0 || (tableVa >> 32) != (codeVa >> 32))
@@ -692,36 +704,42 @@ namespace vkd::amd
 			{
 				if (d.set != set)
 					continue;
-				uint8_t* out = table + d.offset;
-				switch (d.type)
+				for (uint32_t element = 0; element < d.count; ++element)
 				{
-					case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-					case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+					uint8_t* out = table + d.offset + element * DescriptorBytes(d.type);
+					switch (d.type)
 					{
-						const vkd::DescriptorSet::BufferBinding* b = bound->FindBufferBinding(d.binding);
-						if (!b || !IsBound(b->buffer))
+						case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+						case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+						{
+							const vkd::DescriptorSet::BufferBinding* b = bound->FindBufferBinding(d.binding, element);
+							if (!b || !IsBound(b->buffer))
+								break;
+							const uint64_t offset = b->offset + DynamicOffset(dynamicOffsets, set, d.binding, element);
+							if (offset > b->buffer->GetSize())
+								break;
+							const uint64_t address = AmdMemory(b->buffer->GetMemory())->GetGpuVa() + b->buffer->GetMemoryOffset() + offset;
+							const uint64_t range = b->range == VK_WHOLE_SIZE ? b->buffer->GetSize() - offset : b->range;
+							gfx11::WriteBufferDescriptor(out, address, range);
 							break;
-						const uint64_t address = AmdMemory(b->buffer->GetMemory())->GetGpuVa() + b->buffer->GetMemoryOffset() + b->offset;
-						const uint64_t range = b->range == VK_WHOLE_SIZE ? b->buffer->GetSize() - b->offset : b->range;
-						gfx11::WriteBufferDescriptor(out, address, range);
-						break;
-					}
-					case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-					case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-					case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-					case VK_DESCRIPTOR_TYPE_SAMPLER:
-					{
-						const vkd::DescriptorSet::ImageBinding* b = bound->FindImageBinding(d.binding);
-						if (!b)
+						}
+						case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+						case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+						case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+						case VK_DESCRIPTOR_TYPE_SAMPLER:
+						{
+							const vkd::DescriptorSet::ImageBinding* b = bound->FindImageBinding(d.binding, element);
+							if (!b)
+								break;
+							if (d.type != VK_DESCRIPTOR_TYPE_SAMPLER && b->imageView)
+								WriteImageViewDescriptor(out, *b->imageView);
+							if (b->sampler && (d.type == VK_DESCRIPTOR_TYPE_SAMPLER || d.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER))
+								gfx11::WriteSamplerDescriptor(d.type == VK_DESCRIPTOR_TYPE_SAMPLER ? out : out + 32, b->sampler->GetCreateInfo());
 							break;
-						if (d.type != VK_DESCRIPTOR_TYPE_SAMPLER && b->imageView)
-							WriteImageViewDescriptor(out, *b->imageView);
-						if (b->sampler && (d.type == VK_DESCRIPTOR_TYPE_SAMPLER || d.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER))
-							gfx11::WriteSamplerDescriptor(d.type == VK_DESCRIPTOR_TYPE_SAMPLER ? out : out + 32, b->sampler->GetCreateInfo());
-						break;
+						}
+						default:
+							break;
 					}
-					default:
-						break;
 				}
 			}
 			return static_cast<uint32_t>(tableVa);
@@ -736,7 +754,7 @@ namespace vkd::amd
 				tablePointers[set] = 0;
 				if (shader.setTableUserData[set] == 0)
 					continue;
-				tablePointers[set] = BuildDescriptorTable(shader.descriptors, set, state.computeSets[set], codeVa, state.descriptors);
+				tablePointers[set] = BuildDescriptorTable(shader.descriptors, set, state.computeSets[set], state.computeDynamicOffsets, codeVa, state.descriptors);
 				if (tablePointers[set] == 0)
 					return false;
 			}
@@ -1496,7 +1514,8 @@ namespace vkd::amd
 											  { return d.set == set; });
 				if (!used)
 					continue;
-				setTables[set] = BuildDescriptorTable(graphics->descriptors, set, state.graphicsSets[set], pipeline->GetCodeVa(), state.descriptors);
+				setTables[set] = BuildDescriptorTable(graphics->descriptors, set, state.graphicsSets[set], state.graphicsDynamicOffsets, pipeline->GetCodeVa(),
+													  state.descriptors);
 				if (setTables[set] == 0)
 				{
 					cct::Logger::Error("AmdCommandBuffer: no room for the draw's descriptor tables in the shader VA window");
@@ -1956,7 +1975,18 @@ namespace vkd::amd
 			}
 			if (const auto* bindSets = std::get_if<vkd::OpBindDescriptorSets>(&op))
 			{
-				const vkd::DescriptorSet** sets = bindSets->BindPoint == VK_PIPELINE_BIND_POINT_COMPUTE ? state.computeSets : state.graphicsSets;
+				const bool compute = bindSets->BindPoint == VK_PIPELINE_BIND_POINT_COMPUTE;
+				const vkd::DescriptorSet** sets = compute ? state.computeSets : state.graphicsSets;
+				std::vector<vkd::DynamicOffsetEntry>& dynamicOffsets = compute ? state.computeDynamicOffsets : state.graphicsDynamicOffsets;
+				const uint32_t lastSet = bindSets->FirstSet + static_cast<uint32_t>(bindSets->DescriptorSets.size());
+				std::erase_if(dynamicOffsets, [&](const vkd::DynamicOffsetEntry& entry)
+							  { return entry.SetIndex >= bindSets->FirstSet && entry.SetIndex < lastSet; });
+				for (const vkd::DynamicOffsetEntry& entry : bindSets->DynamicOffsets)
+				{
+					vkd::DynamicOffsetEntry absolute = entry;
+					absolute.SetIndex += bindSets->FirstSet;
+					dynamicOffsets.push_back(absolute);
+				}
 				for (size_t i = 0; i < bindSets->DescriptorSets.size(); ++i)
 				{
 					const size_t set = bindSets->FirstSet + i;
