@@ -16,6 +16,7 @@ namespace vkd::amd
 	}
 
 	inline constexpr uint32_t kItNop = 0x10;
+	inline constexpr uint32_t kItIndirectBuffer = 0x3F;
 	inline constexpr uint32_t kItClearState = 0x12;
 	inline constexpr uint32_t kItContextControl = 0x28;
 	inline constexpr uint32_t kItDrawIndexAuto = 0x2D;
@@ -84,6 +85,14 @@ namespace vkd::amd
 		uint32_t capacity = 0;
 		uint32_t count = 0;
 		uint64_t gpuVa = 0; // GPU VA of dw[0], for data embedded in the IB (0 = unknown)
+		// INDIRECT_BUFFER sizes are 20 bits: a longer IB runs as a chain of segments, each ending with
+		// an INDIRECT_BUFFER (chain) to the next dwords, whose size is patched once that segment ends.
+		// The margin below the limit covers the HasRoom estimates of the packets that follow.
+		static constexpr uint32_t kMaxSegmentDw = 0xF0000;
+		uint32_t segmentStart = 0;
+		uint32_t chainSizeDw = 0;
+		uint32_t firstSegmentDw = 0;
+		bool mec = false;
 
 		bool Emit(uint32_t value)
 		{
@@ -97,9 +106,49 @@ namespace vkd::amd
 		{
 			return count * 4u;
 		}
-		[[nodiscard]] bool HasRoom(uint32_t dwords) const
+		[[nodiscard]] bool HasRoom(uint32_t dwords)
 		{
+			constexpr uint32_t kChainDw = 16;
+			if (dw && gpuVa != 0 && count + dwords + kChainDw - segmentStart > kMaxSegmentDw && count + kChainDw <= capacity)
+				Chain();
 			return dw && count + dwords <= capacity;
+		}
+
+		// Dwords of the first segment: what the submit points to.
+		uint32_t FinishSegments()
+		{
+			if (chainSizeDw == 0)
+				return count;
+			CloseSegment();
+			return firstSegmentDw;
+		}
+
+		void Chain()
+		{
+			uint32_t rem = (8 - ((count + 4) & 7u)) & 7u;
+			if (rem == 1)
+				rem += 8;
+			if (rem != 0)
+				NopBlock(rem);
+			const uint64_t next = gpuVa + uint64_t{count + 4} * 4;
+			Emit(PkT3(kItIndirectBuffer, 2));
+			Emit(static_cast<uint32_t>(next));
+			Emit(static_cast<uint32_t>(next >> 32));
+			Emit(0);
+			CloseSegment();
+			chainSizeDw = count - 1;
+			segmentStart = count;
+		}
+
+		void CloseSegment()
+		{
+			constexpr uint32_t kChain = 1u << 20;
+			constexpr uint32_t kValid = 1u << 23;
+			const uint32_t size = count - segmentStart;
+			if (chainSizeDw == 0)
+				firstSegmentDw = size;
+			else
+				dw[chainSizeDw] = size | kChain | (mec ? kValid : 0u);
 		}
 
 		void Nop()

@@ -2421,6 +2421,7 @@ namespace vkd::amd
 		stream.capacity = static_cast<uint32_t>(std::min<size_t>(mappedBytes, m_ib.GetSize()) / sizeof(uint32_t));
 		stream.count = 0;
 		stream.gpuVa = m_ib.GetGpuVa();
+		stream.mec = IsComputeEngine();
 
 		// Descriptor tables for dispatches and draws, written while encoding. Allocated on first use:
 		// most command buffers never dispatch nor draw.
@@ -2489,7 +2490,7 @@ namespace vkd::amd
 			return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 		stream.Nop();
 		stream.PadTo8Dw();
-		m_commandLength = stream.Bytes();
+		m_commandLength = stream.FinishSegments() * 4;
 		return VK_SUCCESS;
 	}
 
