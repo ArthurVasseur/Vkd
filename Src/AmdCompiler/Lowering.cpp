@@ -2158,7 +2158,8 @@ namespace amdcomp
 				}
 			}
 
-			llvm::Value* ComputeBuiltIn(uint32_t builtIn, llvm::Value* const (&localId)[3], llvm::Value* const (&groupId)[3], const std::array<uint32_t, 3>& size)
+			llvm::Value* ComputeBuiltIn(uint32_t builtIn, llvm::Value* const (&localId)[3], llvm::Value* const (&groupId)[3], const std::array<uint32_t, 3>& size,
+										llvm::Value* numWorkgroups)
 			{
 				auto vector3 = [&](llvm::Value* x, llvm::Value* y, llvm::Value* z)
 				{
@@ -2180,6 +2181,8 @@ namespace amdcomp
 							global[i] = m_builder.CreateAdd(m_builder.CreateMul(groupId[i], m_builder.getInt32(size[i])), localId[i]);
 						return vector3(global[0], global[1], global[2]);
 					}
+					case SpvBuiltInNumWorkgroups:
+						return numWorkgroups;
 					case SpvBuiltInLocalInvocationIndex:
 					{
 						llvm::Value* index = m_builder.CreateAdd(m_builder.CreateMul(localId[2], m_builder.getInt32(size[1])), localId[1]);
@@ -2203,6 +2206,17 @@ namespace amdcomp
 					layout.pushConstantDwords = std::max(layout.pushConstantDwords, static_cast<uint32_t>((block->size + 3) / 4));
 				}
 				layout.userSgprs = kPushConstantUserData + layout.pushConstantDwords + static_cast<uint32_t>(m_usedSets.size());
+				const bool needsNumWorkgroups = std::any_of(m_invocationVariables.begin(), m_invocationVariables.end(),
+															[&](const InvocationVariable& variable)
+															{
+																return variable.storageClass == SpvStorageClassInput &&
+																	   Decoration(variable.id, SpvDecorationBuiltIn) == SpvBuiltInNumWorkgroups;
+															});
+				if (needsNumWorkgroups)
+				{
+					layout.numWorkgroupsUserData = layout.userSgprs;
+					layout.userSgprs += 2;
+				}
 				if (layout.userSgprs > kMaxComputeUserSgprs)
 					return Fail(std::format("{} push constant dwords and {} descriptor sets don't fit in the user SGPRs", layout.pushConstantDwords,
 											m_usedSets.size()));
@@ -2229,6 +2243,19 @@ namespace amdcomp
 				};
 				llvm::Value* const groupId[3] = {entry->getArg(layout.userSgprs), entry->getArg(layout.userSgprs + 1), entry->getArg(layout.userSgprs + 2)};
 
+				llvm::Value* numWorkgroups = nullptr;
+				if (layout.numWorkgroupsUserData != 0)
+				{
+					llvm::Value* low = m_builder.CreateZExt(entry->getArg(layout.numWorkgroupsUserData), m_builder.getInt64Ty());
+					llvm::Value* high = m_builder.CreateZExt(entry->getArg(layout.numWorkgroupsUserData + 1), m_builder.getInt64Ty());
+					llvm::Value* address = m_builder.CreateOr(m_builder.CreateShl(high, 32), low);
+					llvm::LoadInst* load = m_builder.CreateAlignedLoad(llvm::FixedVectorType::get(m_builder.getInt32Ty(), 3),
+																	   m_builder.CreateIntToPtr(address, llvm::PointerType::get(m_context, kConstantAddressSpace)),
+																	   llvm::Align(4));
+					load->setMetadata(llvm::LLVMContext::MD_invariant_load, llvm::MDNode::get(m_context, {}));
+					numWorkgroups = load;
+				}
+
 				std::vector<llvm::Value*> storage;
 				for (const InvocationVariable& variable : m_invocationVariables)
 				{
@@ -2248,7 +2275,7 @@ namespace amdcomp
 							const std::optional<uint32_t> builtIn = Decoration(variable.id, SpvDecorationBuiltIn);
 							if (!builtIn)
 								return Fail("compute shader input without a BuiltIn decoration");
-							llvm::Value* value = ComputeBuiltIn(*builtIn, localId, groupId, layout.localSize);
+							llvm::Value* value = ComputeBuiltIn(*builtIn, localId, groupId, layout.localSize, numWorkgroups);
 							if (!value || !StoreMemory(alloca, variable.pointee, value, {}))
 								return false;
 							break;

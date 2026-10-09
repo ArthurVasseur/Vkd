@@ -42,6 +42,7 @@ namespace vkd::amd
 		// is PAL's global table).
 		uint32_t setTableUserData[kMaxPrecompiledSets] = {};
 		std::span<const PrecompiledDescriptor> descriptors = {};
+		uint32_t numWorkgroupsUserData = 0;
 	};
 
 	inline uint64_t HashSpirv(std::span<const uint32_t> words)

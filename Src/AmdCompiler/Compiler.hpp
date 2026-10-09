@@ -47,6 +47,7 @@ namespace amdcomp
 		uint32_t pushConstantDwords = 0;
 		uint32_t setTableUserData[kMaxDescriptorSets] = {};
 		std::vector<Descriptor> descriptors;
+		uint32_t numWorkgroupsUserData = 0;
 	};
 
 	struct CompileOptions

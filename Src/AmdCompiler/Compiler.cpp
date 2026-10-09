@@ -69,6 +69,7 @@ namespace amdcomp
 		for (uint32_t set = 0; set < kMaxDescriptorSets; ++set)
 			shader.setTableUserData[set] = layout.setTableUserData[set];
 		shader.descriptors = std::move(layout.descriptors);
+		shader.numWorkgroupsUserData = layout.numWorkgroupsUserData;
 		return shader;
 	}
 } // namespace amdcomp

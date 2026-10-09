@@ -32,6 +32,7 @@ namespace amdcomp
 		uint32_t userSgprs = 1;
 		std::array<uint32_t, kMaxDescriptorSets> setTableUserData = {};
 		std::vector<Descriptor> descriptors;
+		uint32_t numWorkgroupsUserData = 0;
 	};
 
 	std::unique_ptr<llvm::Module> LowerComputeShader(const see::spirv::Module& spirv, const CompileOptions& options, llvm::LLVMContext& context,

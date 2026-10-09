@@ -121,6 +121,7 @@ namespace vkd::amd
 			.pushConstantUserData = compiled->pushConstantUserData,
 			.pushConstantDwords = compiled->pushConstantDwords,
 			.descriptors = m_compiledDescriptors,
+			.numWorkgroupsUserData = compiled->numWorkgroupsUserData,
 		};
 		for (uint32_t set = 0; set < kMaxPrecompiledSets && set < amdcomp::kMaxDescriptorSets; ++set)
 			m_compiledShader.setTableUserData[set] = compiled->setTableUserData[set];

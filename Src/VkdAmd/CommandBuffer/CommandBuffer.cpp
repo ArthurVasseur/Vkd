@@ -1785,6 +1785,17 @@ namespace vkd::amd
 				if (shader->setTableUserData[set] != 0)
 					stream.SetComputeShReg(kComputeUserData0 + shader->setTableUserData[set], tablePointers[set]);
 			}
+			if (shader->numWorkgroupsUserData != 0)
+			{
+				uint8_t* groups = nullptr;
+				const uint64_t groupsVa = state.descriptors ? state.descriptors->Allocate(16, groups) : 0;
+				if (groupsVa == 0)
+					return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+				const uint32_t counts[4] = {op.GroupCountX, op.GroupCountY, op.GroupCountZ, 0};
+				std::memcpy(groups, counts, sizeof(counts));
+				const uint32_t address[2] = {static_cast<uint32_t>(groupsVa), static_cast<uint32_t>(groupsVa >> 32)};
+				stream.SetComputeShRegs(kComputeUserData0 + shader->numWorkgroupsUserData, address, 2);
+			}
 			stream.DispatchDirect(op.GroupCountX, op.GroupCountY, op.GroupCountZ, shader->dispatchInitiator);
 			stream.EventWrite(kEventCsPartialFlush);
 			return VK_SUCCESS;
@@ -2178,8 +2189,9 @@ namespace vkd::amd
 		uint64_t count = 0;
 		for (const vkd::CommandBuffer::Op& op : ops)
 		{
-			if (std::holds_alternative<vkd::OpDispatch>(op) || std::holds_alternative<vkd::OpDraw>(op) ||
-				std::holds_alternative<vkd::OpDrawIndexed>(op))
+			if (std::holds_alternative<vkd::OpDispatch>(op))
+				count += kMaxPrecompiledSets + 1;
+			else if (std::holds_alternative<vkd::OpDraw>(op) || std::holds_alternative<vkd::OpDrawIndexed>(op))
 				count += kMaxPrecompiledSets;
 			else if (const uint64_t tiled = TiledRpmDispatchCount(op))
 				count += tiled;
