@@ -81,10 +81,10 @@ namespace vkd::amd
 
 	private:
 		VkResult UploadCode(vkd::Device& owner, std::span<const uint32_t> first, std::span<const uint32_t> second = {});
-		const PrecompiledComputeShader* CompileComputeShader(const VkPipelineShaderStageCreateInfo& stage, std::span<const uint32_t> spirv);
+		const PrecompiledComputeShader* CompileComputeShader(const VkPipelineShaderStageCreateInfo& stage, std::span<const uint32_t> spirv, std::string& error);
 		const PrecompiledGraphicsPipeline* CompileGraphicsPipeline(const VkGraphicsPipelineCreateInfo& info, const VkPipelineShaderStageCreateInfo& vertexStage,
 																   std::span<const uint32_t> vertexSpirv, const VkPipelineShaderStageCreateInfo& fragmentStage,
-																   std::span<const uint32_t> fragmentSpirv);
+																   std::span<const uint32_t> fragmentSpirv, std::string& error);
 
 		const PrecompiledComputeShader* m_computeShader = nullptr;
 		std::vector<uint32_t> m_compiledCode;

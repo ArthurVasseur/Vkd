@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <format>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -148,12 +149,19 @@ namespace vkd::amd
 			return VK_SUCCESS;
 		const auto& spirv = module->GetCode();
 		const std::span<const uint32_t> code(spirv.data(), spirv.size());
-		if (!EnvironmentFlag("VKD_AMD_COMPILE_ALL"))
-			m_computeShader = FindPrecompiledComputeShader(code);
-		if (!m_computeShader)
-			m_computeShader = CompileComputeShader(info.stage, code);
+		const PrecompiledComputeShader* precompiled = FindPrecompiledComputeShader(code);
+		std::string error;
+		if (!precompiled || !EnvironmentFlag("VKD_AMD_PREFER_PRECOMPILED"))
+			m_computeShader = CompileComputeShader(info.stage, code, error);
+		if (!m_computeShader && precompiled)
+		{
+			if (!error.empty())
+				cct::Logger::Info("AmdPipeline: can't compile compute shader 0x{:016X}, using AMDVLK's code: {}", HashSpirv(code), error);
+			m_computeShader = precompiled;
+		}
 		if (!m_computeShader)
 		{
+			cct::Logger::Warning("AmdPipeline: can't compile compute shader 0x{:016X}, its dispatches are skipped: {}", HashSpirv(code), error);
 			DumpUnknownSpirv(code, HashSpirv(code));
 			return VK_SUCCESS;
 		}
@@ -161,7 +169,8 @@ namespace vkd::amd
 		return UploadCode(owner, m_computeShader->code);
 	}
 
-	const PrecompiledComputeShader* Pipeline::CompileComputeShader(const VkPipelineShaderStageCreateInfo& stage, std::span<const uint32_t> spirv)
+	const PrecompiledComputeShader* Pipeline::CompileComputeShader(const VkPipelineShaderStageCreateInfo& stage, std::span<const uint32_t> spirv,
+																   std::string& error)
 	{
 		const std::vector<amdcomp::SpecializationConstant> specialization = Specialization(stage.pSpecializationInfo);
 
@@ -169,8 +178,7 @@ namespace vkd::amd
 		const std::optional<amdcomp::ComputeShader>& compiled = cached->shader;
 		if (!compiled)
 		{
-			cct::Logger::Warning("AmdPipeline: can't compile compute shader (SPIR-V hash 0x{:016X}), its dispatches are skipped: {}", HashSpirv(spirv),
-								 cached->error);
+			error = cached->error;
 			return nullptr;
 		}
 		if (EnvironmentFlag("VKD_AMD_DUMP_ISA"))
@@ -287,16 +295,24 @@ namespace vkd::amd
 				stages[1] = &info.pStages[i];
 			}
 		}
-		if (!EnvironmentFlag("VKD_AMD_COMPILE_ALL"))
+		const PrecompiledGraphicsPipeline* precompiled = nullptr;
+		for (const PrecompiledGraphicsPipeline& pipeline : kPrecompiledGraphicsPipelines)
 		{
-			for (const PrecompiledGraphicsPipeline& pipeline : kPrecompiledGraphicsPipelines)
-			{
-				if (pipeline.vertexSpirvHash == vertexHash && pipeline.fragmentSpirvHash == fragmentHash)
-					m_graphics = &pipeline;
-			}
+			if (pipeline.vertexSpirvHash == vertexHash && pipeline.fragmentSpirvHash == fragmentHash)
+				precompiled = &pipeline;
 		}
-		if (!m_graphics && stages[0] && stages[1])
-			m_graphics = CompileGraphicsPipeline(info, *stages[0], stageCode[0], *stages[1], stageCode[1]);
+		std::string error = "the pipeline needs a vertex and a fragment shader";
+		if (stages[0] && stages[1] && (!precompiled || !EnvironmentFlag("VKD_AMD_PREFER_PRECOMPILED")))
+		{
+			error.clear();
+			m_graphics = CompileGraphicsPipeline(info, *stages[0], stageCode[0], *stages[1], stageCode[1], error);
+		}
+		if (!m_graphics && precompiled)
+		{
+			if (!error.empty())
+				cct::Logger::Info("AmdPipeline: can't compile the VS/FS pair 0x{:016X} / 0x{:016X}, using AMDVLK's code: {}", vertexHash, fragmentHash, error);
+			m_graphics = precompiled;
+		}
 		if (m_graphics)
 		{
 			// CB_SHADER_MASK is the PS's: the captured one.
@@ -308,6 +324,7 @@ namespace vkd::amd
 		}
 		if (!m_graphics)
 		{
+			cct::Logger::Warning("AmdPipeline: can't compile the VS/FS pair 0x{:016X} / 0x{:016X}, its draws are skipped: {}", vertexHash, fragmentHash, error);
 			DumpUnknownSpirv(stageCode[0], vertexHash);
 			DumpUnknownSpirv(stageCode[1], fragmentHash);
 			return VK_SUCCESS;
@@ -317,7 +334,7 @@ namespace vkd::amd
 
 	const PrecompiledGraphicsPipeline* Pipeline::CompileGraphicsPipeline(const VkGraphicsPipelineCreateInfo& info, const VkPipelineShaderStageCreateInfo& vertexStage,
 																		 std::span<const uint32_t> vertexSpirv, const VkPipelineShaderStageCreateInfo& fragmentStage,
-																		 std::span<const uint32_t> fragmentSpirv)
+																		 std::span<const uint32_t> fragmentSpirv, std::string& error)
 	{
 		const uint64_t vertexHash = HashSpirv(vertexSpirv);
 		const uint64_t fragmentHash = HashSpirv(fragmentSpirv);
@@ -337,9 +354,7 @@ namespace vkd::amd
 		}
 		if (!base || colorFormat != base->colorFormat)
 		{
-			cct::Logger::Warning("AmdPipeline: can't compile the VS/FS pair (SPIR-V hashes 0x{:016X} / 0x{:016X}), its draws are skipped: compiled pipelines only "
-								 "render into one R8G8B8A8_UNORM color attachment yet",
-								 vertexHash, fragmentHash);
+			error = "compiled pipelines only render into one R8G8B8A8_UNORM color attachment yet";
 			return nullptr;
 		}
 
@@ -351,14 +366,9 @@ namespace vkd::amd
 			.fragment = {.entryPoint = fragmentStage.pName, .specialization = fragmentSpecialization},
 			.colorExports = colorExports,
 		};
-		std::string error;
 		std::optional<amdcomp::GraphicsShaders> compiled = amdcomp::CompileGraphicsShaders(vertexSpirv, fragmentSpirv, options, error);
 		if (!compiled)
-		{
-			cct::Logger::Warning("AmdPipeline: can't compile the VS/FS pair (SPIR-V hashes 0x{:016X} / 0x{:016X}), its draws are skipped: {}", vertexHash,
-								 fragmentHash, error);
 			return nullptr;
-		}
 		if (EnvironmentFlag("VKD_AMD_DUMP_ISA"))
 		{
 			cct::Logger::Info("AmdPipeline: vertex shader 0x{:016X}:\n{}", vertexHash, amdcomp::Disassemble(compiled->vertex.code, true));
@@ -421,7 +431,7 @@ namespace vkd::amd
 				continue;
 			if (set >= std::size(kSetTablePatches))
 			{
-				cct::Logger::Warning("AmdPipeline: the fragment shader reads descriptor set {}, draws only bind sets 0-3 yet", set);
+				error = std::format("the fragment shader reads descriptor set {}, draws only bind sets 0-3 yet", set);
 				return nullptr;
 			}
 			m_compiledDrawState.push_back({RegKind::Sh, kSetTablePatches[set], kSpiShaderUserDataPs0 + compiled->fragmentSetTableUserData[set], 0});
