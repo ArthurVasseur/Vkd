@@ -9,7 +9,7 @@
 
 namespace amdcomp
 {
-	inline constexpr uint32_t kMaxDescriptorSets = 4;
+	inline constexpr uint32_t kMaxDescriptorSets = 8;
 
 	struct SpecializationConstant
 	{

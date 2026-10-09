@@ -2180,7 +2180,7 @@ namespace vkd::amd
 		{
 			if (std::holds_alternative<vkd::OpDispatch>(op) || std::holds_alternative<vkd::OpDraw>(op) ||
 				std::holds_alternative<vkd::OpDrawIndexed>(op))
-				count += 4;
+				count += kMaxPrecompiledSets;
 			else if (const uint64_t tiled = TiledRpmDispatchCount(op))
 				count += tiled;
 			else if (const auto* blit = std::get_if<vkd::Image::OpBlit>(&op))

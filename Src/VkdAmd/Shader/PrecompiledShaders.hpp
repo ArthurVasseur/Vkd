@@ -23,7 +23,7 @@ namespace vkd::amd
 		uint32_t count = 1;
 	};
 
-	inline constexpr uint32_t kMaxPrecompiledSets = 4;
+	inline constexpr uint32_t kMaxPrecompiledSets = 8;
 
 	struct PrecompiledComputeShader
 	{
