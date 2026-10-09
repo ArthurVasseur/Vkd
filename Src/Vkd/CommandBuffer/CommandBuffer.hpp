@@ -119,6 +119,8 @@ namespace vkd
 		inline void PushBindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, UInt32 firstSet, std::span<const VkDescriptorSet> pDescriptorSets, std::span<const UInt32> pDynamicOffsets);
 		inline void PushDraw(UInt32 vertexCount, UInt32 instanceCount, UInt32 firstVertex, UInt32 firstInstance);
 		inline void PushDrawIndexed(UInt32 indexCount, UInt32 instanceCount, UInt32 firstIndex, cct::Int32 vertexOffset, UInt32 firstInstance);
+		inline void PushDrawIndirect(VkBuffer buffer, VkDeviceSize offset, UInt32 drawCount, UInt32 stride);
+		inline void PushDrawIndexedIndirect(VkBuffer buffer, VkDeviceSize offset, UInt32 drawCount, UInt32 stride);
 		inline void PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport);
 		inline void PushSetScissor(std::span<const VkRect2D> pScissors, UInt32 firstScissor);
 		inline void PushSetBlendConstants(const float constants[4]);
@@ -141,6 +143,7 @@ namespace vkd
 		inline void PushExecuteCommands(UInt32 commandBufferCount, const VkCommandBuffer* pCommandBuffers);
 		inline void PushPushConstants(VkShaderStageFlags stageFlags, UInt32 offset, UInt32 size, const void* pValues);
 		inline void PushDispatch(UInt32 groupCountX, UInt32 groupCountY, UInt32 groupCountZ);
+		inline void PushDispatchIndirect(VkBuffer buffer, VkDeviceSize offset);
 
 		inline VkResult MarkSubmitted();
 		inline VkResult MarkComplete();

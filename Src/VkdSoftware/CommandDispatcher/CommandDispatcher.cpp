@@ -248,4 +248,9 @@ namespace vkd::software
 		}
 		return VK_SUCCESS;
 	}
+
+	VkResult CommandDispatcher::operator()(vkd::OpDispatchIndirect)
+	{
+		return operator()(vkd::OpDispatch{});
+	}
 } // namespace vkd::software

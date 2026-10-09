@@ -172,13 +172,17 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdDrawIndirect: not implemented, ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushDrawIndirect(buffer, offset, drawCount, stride);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdDrawIndexedIndirect: not implemented, ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushDrawIndexedIndirect(buffer, offset, drawCount, stride);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdDispatch(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
@@ -192,7 +196,9 @@ namespace vkd
 	void VKAPI_CALL CommandBuffer::CmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset)
 	{
 		VKD_AUTO_PROFILER_SCOPE();
-		cct::Logger::Warning("CmdDispatchIndirect: not implemented, compute dispatch is ignored");
+
+		VKD_FROM_HANDLE(CommandBuffer, commandBufferObj, commandBuffer);
+		commandBufferObj->PushDispatchIndirect(buffer, offset);
 	}
 
 	void VKAPI_CALL CommandBuffer::CmdSetViewport(VkCommandBuffer commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports)

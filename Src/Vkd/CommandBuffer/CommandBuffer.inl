@@ -304,6 +304,18 @@ namespace vkd
 		});
 	}
 
+	inline void CommandBuffer::PushDrawIndirect(VkBuffer buffer, VkDeviceSize offset, UInt32 drawCount, UInt32 stride)
+	{
+		VKD_FROM_HANDLE(Buffer, bufferObject, buffer);
+		Record(OpDrawIndirect{.BufferHandle = bufferObject, .Offset = offset, .DrawCount = drawCount, .Stride = stride});
+	}
+
+	inline void CommandBuffer::PushDrawIndexedIndirect(VkBuffer buffer, VkDeviceSize offset, UInt32 drawCount, UInt32 stride)
+	{
+		VKD_FROM_HANDLE(Buffer, bufferObject, buffer);
+		Record(OpDrawIndexedIndirect{.BufferHandle = bufferObject, .Offset = offset, .DrawCount = drawCount, .Stride = stride});
+	}
+
 	inline void CommandBuffer::PushSetViewport(std::span<const VkViewport> pViewports, UInt32 firstViewport)
 	{
 		Record(OpSetViewport{
@@ -458,6 +470,12 @@ namespace vkd
 			.GroupCountY = groupCountY,
 			.GroupCountZ = groupCountZ,
 		});
+	}
+
+	inline void CommandBuffer::PushDispatchIndirect(VkBuffer buffer, VkDeviceSize offset)
+	{
+		VKD_FROM_HANDLE(Buffer, bufferObject, buffer);
+		Record(OpDispatchIndirect{.BufferHandle = bufferObject, .Offset = offset});
 	}
 
 	inline void CommandBuffer::PushResetQueryPool(VkQueryPool queryPool, UInt32 firstQuery, UInt32 queryCount)

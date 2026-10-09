@@ -206,6 +206,12 @@ namespace vkd
 		UInt32 GroupCountZ;
 	};
 
+	struct OpDispatchIndirect
+	{
+		Buffer* BufferHandle;
+		VkDeviceSize Offset;
+	};
+
 	// vkCmdClearAttachments: attachments of the current subpass, inside a render pass.
 	struct OpClearAttachments
 	{
@@ -258,5 +264,6 @@ namespace vkd
 		OpWaitEvents,
 		OpExecuteCommands,
 		OpPushConstants,
-		OpDispatch>;
+		OpDispatch,
+		OpDispatchIndirect>;
 } // namespace vkd

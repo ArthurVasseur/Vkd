@@ -62,6 +62,7 @@ namespace vkd::software
 		VkResult operator()(vkd::OpExecuteCommands op);
 		VkResult operator()(vkd::OpPushConstants op);
 		VkResult operator()(vkd::OpDispatch op);
+		VkResult operator()(vkd::OpDispatchIndirect op);
 
 		CpuContext* m_context;
 	};
