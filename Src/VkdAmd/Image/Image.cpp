@@ -37,8 +37,9 @@ namespace vkd::amd
 			return result;
 
 		uint32_t depthBytes = 0, stencilBytes = 0;
-		m_tiled = info.tiling == VK_IMAGE_TILING_OPTIMAL && info.imageType == VK_IMAGE_TYPE_2D && info.samples == VK_SAMPLE_COUNT_1_BIT &&
-				  GetDepthStencilPlanes(info.format, depthBytes, stencilBytes);
+		// 1D images are laid out as 2D W x 1 ones (what AMDVLK does, byte for byte: Amd's [depth][re][raw]).
+		m_tiled = info.tiling == VK_IMAGE_TILING_OPTIMAL && (info.imageType == VK_IMAGE_TYPE_2D || info.imageType == VK_IMAGE_TYPE_1D) &&
+				  info.samples == VK_SAMPLE_COUNT_1_BIT && GetDepthStencilPlanes(info.format, depthBytes, stencilBytes);
 		if (!m_tiled)
 			return VK_SUCCESS;
 

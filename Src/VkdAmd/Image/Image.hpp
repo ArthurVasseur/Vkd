@@ -6,7 +6,7 @@
 
 namespace vkd::amd
 {
-	// Images keep the shared linear layout, except 2D OPTIMAL depth/stencil images: the DB only reads
+	// Images keep the shared linear layout, except 1D/2D OPTIMAL depth/stencil images: the DB only reads
 	// and writes swizzled surfaces, so those are tiled (SW_64KB_Z_X, AMDVLK's mode) -- a depth plane,
 	// then a stencil plane at the next 64KB boundary, without HTILE. Their copies and clears run RPM
 	// shaders through T#s, which also splits combined formats into their aspects.

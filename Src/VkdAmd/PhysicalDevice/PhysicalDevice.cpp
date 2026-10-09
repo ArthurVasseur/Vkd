@@ -253,8 +253,9 @@ namespace vkd::amd
 
 		properties = {};
 		constexpr VkImageUsageFlags kTransferUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		// Depth/stencil attachments are tiled 2D images (and combined formats exist only as those).
-		const bool tiledDepthStencil = IsDepthStencilAttachmentFormat(format) && tiling == VK_IMAGE_TILING_OPTIMAL && type == VK_IMAGE_TYPE_2D;
+		// Depth/stencil attachments are tiled 1D/2D images (and combined formats exist only as those).
+		const bool tiledDepthStencil =
+			IsDepthStencilAttachmentFormat(format) && tiling == VK_IMAGE_TILING_OPTIMAL && (type == VK_IMAGE_TYPE_2D || type == VK_IMAGE_TYPE_1D);
 		if (vkuFormatIsDepthAndStencil(format) && !tiledDepthStencil)
 			return VK_ERROR_FORMAT_NOT_SUPPORTED;
 		if (tiledDepthStencil)

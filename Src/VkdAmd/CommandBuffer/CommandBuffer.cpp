@@ -1170,23 +1170,21 @@ namespace vkd::amd
 			}
 			if (vkuFormatElementSize(image.GetFormat()) != vkuFormatElementSize(rawFormat))
 				return false; // one aspect of a linear combined depth/stencil texel
-			if (image.GetImageType() == VK_IMAGE_TYPE_3D)
-			{
-				// layer = a z slice of the mip, as a 2D linear image (same rows, 256-byte aligned).
-				const vkd::SubresourceFootprint fp = vkd::GetSubresourceFootprint(image, mipLevel, 0);
-				if (layer >= fp.extent.depth)
-					return false;
-				gfx11::ImageView view{};
-				view.address = AmdMemory(image.GetMemory())->GetGpuVa() + fp.offset + VkDeviceSize{layer} * fp.depthPitch;
-				view.format = rawFormat;
-				view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-				view.width = fp.extent.width;
-				view.height = fp.extent.height;
-				view.depth = 1;
-				view.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
-				return gfx11::WriteImageDescriptor(out, view);
-			}
-			return WriteSubresourceDescriptor(out, image, vkd::GetSubresourceFootprint(image, mipLevel, layer), rawFormat, mipLevel, layer);
+			// A linear subresource as a 2D image at its address (same rows, 256-byte aligned), as CopyImage2d
+			// reads and writes it: a 1D/2D layer, or a z slice of a 3D mip (layer = z).
+			const bool is3d = image.GetImageType() == VK_IMAGE_TYPE_3D;
+			const vkd::SubresourceFootprint fp = vkd::GetSubresourceFootprint(image, mipLevel, is3d ? 0 : layer);
+			if (is3d && layer >= fp.extent.depth)
+				return false;
+			gfx11::ImageView view{};
+			view.address = AmdMemory(image.GetMemory())->GetGpuVa() + fp.offset + (is3d ? VkDeviceSize{layer} * fp.depthPitch : 0);
+			view.format = rawFormat;
+			view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			view.width = fp.extent.width;
+			view.height = fp.extent.height;
+			view.depth = 1;
+			view.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+			return gfx11::WriteImageDescriptor(out, view);
 		}
 
 		// vkCmdCopyImage with a tiled side, through PAL's CopyImage2d as RsrcProcMgr::CopyImageCompute
@@ -1195,13 +1193,8 @@ namespace vkd::amd
 		// sides are viewed with the raw format of the aspect's element, one dispatch per layer.
 		VkResult EncodeTiledImageCopy(Pm4Stream& stream, const vkd::Image::OpCopy& op, EncodeState& state)
 		{
-			// Tiled images are 2D; the other side may be a linear 3D image (2D <-> 3D copies: its z
-			// slices pair with the 2D side's layers).
-			if (op.src->GetImageType() == VK_IMAGE_TYPE_1D || op.dst->GetImageType() == VK_IMAGE_TYPE_1D)
-			{
-				cct::Logger::Warning("AmdCommandBuffer: copy between a tiled image and a 1D image, skipped");
-				return VK_SUCCESS;
-			}
+			// Tiled images are 1D or 2D (1D ones laid out as 2D W x 1); the other side may be a linear 3D
+			// image (2D <-> 3D copies: its z slices pair with the 2D side's layers).
 			const bool src3d = op.src->GetImageType() == VK_IMAGE_TYPE_3D;
 			const bool dst3d = op.dst->GetImageType() == VK_IMAGE_TYPE_3D;
 			AmdDevice::RpmProgram program;
