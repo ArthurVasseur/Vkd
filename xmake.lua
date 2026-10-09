@@ -93,9 +93,18 @@ drivers = {
             "Shader",
         },
         Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
-        Deps = { "see" },
+        Deps = { "see", "amd-addr" },
     }
 }
+
+-- Layout of AMD tiled surfaces (sizes, mip placement): pure computation, no Vulkan, AddrLib's rules.
+target("amd-addr")
+    set_languages("c++20")
+    set_kind("static")
+    add_includedirs("Src", { public = true })
+    add_files("Src/AmdAddr/*.cpp")
+    add_headerfiles("Src/AmdAddr/*.hpp")
+target_end()
 
 target("see")
     set_languages("c++20")
@@ -304,6 +313,15 @@ if has_config("tests") then
         add_defines("VK_NO_PROTOTYPES")
         add_files("Src/Tests/**.cpp")
         add_deps("vkd-Utils", "see", "vkd")
+    target_end()
+
+    -- amd-addr against reference layouts generated from AddrLib (Amd's wddm-dump [addrlib][gen-amd-addr-ref]).
+    target("amd-addr-tests")
+        set_languages("c++20")
+        set_kind("binary")
+        add_packages("catch2")
+        add_files("Src/AmdAddr/Tests/*.cpp")
+        add_deps("amd-addr")
     target_end()
 
     target("vkd-test-app")

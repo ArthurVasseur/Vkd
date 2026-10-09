@@ -256,7 +256,7 @@ namespace vkd::amd::gfx11
 		uint32_t height;
 		uint32_t depth; // 3D: depth of the base mip; arrays/cubes: layer count
 		VkComponentMapping components;
-		// Tiled surfaces (Gfx11Tiling.hpp): the address is the surface's, width/height are mip 0's,
+		// Tiled surfaces (AmdAddr/Gfx11Tiling.hpp): the address is the surface's, width/height are mip 0's,
 		// and the hardware finds the view's mip and layers itself.
 		uint32_t swizzleMode = 0;
 		uint32_t mipLevels = 1; // of the surface

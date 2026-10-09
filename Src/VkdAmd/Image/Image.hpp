@@ -2,7 +2,7 @@
 
 #include "Vkd/Image/Image.hpp"
 
-#include "VkdAmd/Image/Gfx11Tiling.hpp"
+#include "AmdAddr/Gfx11Tiling.hpp"
 
 namespace vkd::amd
 {
@@ -23,11 +23,11 @@ namespace vkd::amd
 			return m_tiled;
 		}
 		// Tiled images only; a plane the format doesn't have has bytesPerElement == 0.
-		[[nodiscard]] const gfx11::SurfaceLayout& DepthPlane() const
+		[[nodiscard]] const amdaddr::gfx11::SurfaceLayout& DepthPlane() const
 		{
 			return m_depthPlane;
 		}
-		[[nodiscard]] const gfx11::SurfaceLayout& StencilPlane() const
+		[[nodiscard]] const amdaddr::gfx11::SurfaceLayout& StencilPlane() const
 		{
 			return m_stencilPlane;
 		}
@@ -42,8 +42,8 @@ namespace vkd::amd
 
 	private:
 		bool m_tiled = false;
-		gfx11::SurfaceLayout m_depthPlane;
-		gfx11::SurfaceLayout m_stencilPlane;
+		amdaddr::gfx11::SurfaceLayout m_depthPlane;
+		amdaddr::gfx11::SurfaceLayout m_stencilPlane;
 		VkDeviceSize m_stencilPlaneOffset = 0;
 	};
 } // namespace vkd::amd

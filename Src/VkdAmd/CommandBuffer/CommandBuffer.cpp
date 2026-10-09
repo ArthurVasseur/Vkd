@@ -880,7 +880,7 @@ namespace vkd::amd
 		}
 
 		// T# of one subresource (one mip, one layer -- or the whole depth of a 3D mip).
-		bool WriteTiledPlaneDescriptor(uint8_t* out, const amd::Image& image, uint64_t planeVa, const gfx11::SurfaceLayout& plane, VkFormat format,
+		bool WriteTiledPlaneDescriptor(uint8_t* out, const amd::Image& image, uint64_t planeVa, const amdaddr::gfx11::SurfaceLayout& plane, VkFormat format,
 									   uint32_t mipLevel, uint32_t layer);
 		uint64_t TiledImageVa(const amd::Image& image);
 
@@ -1030,7 +1030,7 @@ namespace vkd::amd
 
 		// The plane an aspect of a tiled image lives in, viewed as the raw unsigned format of its
 		// element size; false if the image has no such plane.
-		bool GetTiledPlane(const amd::Image& image, VkImageAspectFlags aspect, const gfx11::SurfaceLayout*& plane, VkDeviceSize& planeOffset,
+		bool GetTiledPlane(const amd::Image& image, VkImageAspectFlags aspect, const amdaddr::gfx11::SurfaceLayout*& plane, VkDeviceSize& planeOffset,
 						   VkFormat& rawFormat)
 		{
 			const bool stencil = aspect == VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -1054,7 +1054,7 @@ namespace vkd::amd
 
 		// T# of one mip and layer of a tiled plane: the surface's address and mip 0 extent, the
 		// hardware finds the subresource.
-		bool WriteTiledPlaneDescriptor(uint8_t* out, const amd::Image& image, uint64_t planeVa, const gfx11::SurfaceLayout& plane, VkFormat format,
+		bool WriteTiledPlaneDescriptor(uint8_t* out, const amd::Image& image, uint64_t planeVa, const amdaddr::gfx11::SurfaceLayout& plane, VkFormat format,
 									   uint32_t mipLevel, uint32_t layer)
 		{
 			gfx11::ImageView view{};
@@ -1083,7 +1083,7 @@ namespace vkd::amd
 			image.GetMemoryRequirements(requirements);
 			VkDeviceSize imageBytes = 0;
 			const uint64_t imageVa = AmdMemory(image.GetMemory())->GetGpuVaAt(image.GetMemoryOffset(), imageBytes);
-			if (imageVa == 0 || imageBytes < requirements.size || (imageVa & (gfx11::kBlock64Kb - 1)) != 0)
+			if (imageVa == 0 || imageBytes < requirements.size || (imageVa & (amdaddr::gfx11::kBlock64Kb - 1)) != 0)
 			{
 				cct::Logger::Error("AmdCommandBuffer: tiled image memory not 64KB aligned or too small, skipped");
 				return 0;
@@ -1103,7 +1103,7 @@ namespace vkd::amd
 
 			for (const VkBufferImageCopy& r : regions)
 			{
-				const gfx11::SurfaceLayout* plane = nullptr;
+				const amdaddr::gfx11::SurfaceLayout* plane = nullptr;
 				VkDeviceSize planeOffset = 0;
 				VkFormat rawFormat = VK_FORMAT_UNDEFINED;
 				if (!GetTiledPlane(image, r.imageSubresource.aspectMask, plane, planeOffset, rawFormat) || r.imageExtent.width == 0 ||
@@ -1161,7 +1161,7 @@ namespace vkd::amd
 		{
 			if (const auto* tiled = static_cast<const amd::Image*>(&image); tiled->IsTiled())
 			{
-				const gfx11::SurfaceLayout* plane = nullptr;
+				const amdaddr::gfx11::SurfaceLayout* plane = nullptr;
 				VkDeviceSize planeOffset = 0;
 				VkFormat planeFormat = VK_FORMAT_UNDEFINED;
 				const uint64_t imageVa = TiledImageVa(*tiled);
@@ -1217,7 +1217,7 @@ namespace vkd::amd
 				const uint32_t dstFirst = dst3d ? static_cast<uint32_t>(r.dstOffset.z) : r.dstSubresource.baseArrayLayer;
 				const VkResult res = ForEachTiledAspect(tiled, r.srcSubresource.aspectMask, [&](VkImageAspectFlagBits aspect) -> VkResult
 														{
-					const gfx11::SurfaceLayout* plane = nullptr;
+					const amdaddr::gfx11::SurfaceLayout* plane = nullptr;
 					VkDeviceSize planeOffset = 0;
 					VkFormat rawFormat = VK_FORMAT_UNDEFINED;
 					if (!GetTiledPlane(tiled, aspect, plane, planeOffset, rawFormat))
@@ -1269,7 +1269,7 @@ namespace vkd::amd
 		VkResult EncodeTiledClear(Pm4Stream& stream, const amd::Image& image, VkImageAspectFlagBits aspect, const VkClearDepthStencilValue& value,
 								  uint32_t mipLevel, uint32_t baseLayer, uint32_t layerCount, const VkRect2D& rect, EncodeState& state)
 		{
-			const gfx11::SurfaceLayout* plane = nullptr;
+			const amdaddr::gfx11::SurfaceLayout* plane = nullptr;
 			VkDeviceSize planeOffset = 0;
 			VkFormat rawFormat = VK_FORMAT_UNDEFINED;
 			if (!GetTiledPlane(image, aspect, plane, planeOffset, rawFormat) || mipLevel >= image.GetMipLevels())
@@ -1369,8 +1369,8 @@ namespace vkd::amd
 				}
 				return;
 			}
-			const gfx11::SurfaceLayout& depth = tiled->DepthPlane();
-			const gfx11::SurfaceLayout& stencil = tiled->StencilPlane();
+			const amdaddr::gfx11::SurfaceLayout& depth = tiled->DepthPlane();
+			const amdaddr::gfx11::SurfaceLayout& stencil = tiled->StencilPlane();
 			const uint64_t zVa = depth.bytesPerElement ? imageVa : 0;
 			const uint64_t sVa = stencil.bytesPerElement ? imageVa + tiled->StencilPlaneOffset() : 0;
 			const VkImageSubresourceRange& range = view->GetSubresourceRange();
@@ -1379,9 +1379,9 @@ namespace vkd::amd
 
 			// Z_16 / Z_32_FLOAT, SW_MODE, MAXMIP, ITERATE_256; no TILE_SURFACE_ENABLE (HTILE).
 			const uint32_t zFormat = depth.bytesPerElement == 4 ? 3u : (depth.bytesPerElement == 2 ? 1u : 0u);
-			const uint32_t zInfo = zFormat | (gfx11::kSwMode64KbZX << 4) | ((image->GetMipLevels() - 1) << 16) | (1u << 20);
+			const uint32_t zInfo = zFormat | (amdaddr::gfx11::kSwMode64KbZX << 4) | ((image->GetMipLevels() - 1) << 16) | (1u << 20);
 			// STENCIL_8, SW_MODE, ITERATE_256, TILE_STENCIL_DISABLE.
-			const uint32_t stencilInfo = (stencil.bytesPerElement ? 1u : 0u) | (gfx11::kSwMode64KbZX << 4) | (1u << 20) | (1u << 29);
+			const uint32_t stencilInfo = (stencil.bytesPerElement ? 1u : 0u) | (amdaddr::gfx11::kSwMode64KbZX << 4) | (1u << 20) | (1u << 29);
 			// SLICE_START(_HI), SLICE_MAX(_HI), MIPID.
 			const uint32_t depthView = (firstLayer & 0x7FFu) | (((firstLayer >> 11) & 3u) << 11) | ((lastLayer & 0x7FFu) << 13) |
 									   ((range.baseMipLevel & 0xFu) << 26) | (((lastLayer >> 11) & 3u) << 30);

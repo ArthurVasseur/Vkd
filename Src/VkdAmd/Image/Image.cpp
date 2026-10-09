@@ -45,13 +45,13 @@ namespace vkd::amd
 		VkDeviceSize planeEnd = 0;
 		if (depthBytes)
 		{
-			m_depthPlane = gfx11::Compute64KbZLayout(depthBytes, info.extent.width, info.extent.height, info.mipLevels, info.arrayLayers);
+			m_depthPlane = amdaddr::gfx11::Compute64KbZLayout(depthBytes, info.extent.width, info.extent.height, info.mipLevels, info.arrayLayers);
 			planeEnd = m_depthPlane.size;
 		}
 		if (stencilBytes)
 		{
-			m_stencilPlane = gfx11::Compute64KbZLayout(stencilBytes, info.extent.width, info.extent.height, info.mipLevels, info.arrayLayers);
-			m_stencilPlaneOffset = (planeEnd + gfx11::kBlock64Kb - 1) & ~(gfx11::kBlock64Kb - 1);
+			m_stencilPlane = amdaddr::gfx11::Compute64KbZLayout(stencilBytes, info.extent.width, info.extent.height, info.mipLevels, info.arrayLayers);
+			m_stencilPlaneOffset = (planeEnd + amdaddr::gfx11::kBlock64Kb - 1) & ~(amdaddr::gfx11::kBlock64Kb - 1);
 		}
 		return VK_SUCCESS;
 	}
@@ -62,6 +62,6 @@ namespace vkd::amd
 		if (!m_tiled)
 			return;
 		memoryRequirements.size = m_stencilPlane.bytesPerElement ? m_stencilPlaneOffset + m_stencilPlane.size : m_depthPlane.size;
-		memoryRequirements.alignment = gfx11::kBlock64Kb; // swizzles XOR address bits up to the block size
+		memoryRequirements.alignment = amdaddr::gfx11::kBlock64Kb; // swizzles XOR address bits up to the block size
 	}
 } // namespace vkd::amd
