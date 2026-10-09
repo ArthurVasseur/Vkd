@@ -198,6 +198,10 @@ namespace amdcomp
 		shaders.vertexBufferTableUserData = vertexLayout.vertexBufferTableUserData;
 		shaders.baseVertexUserData = vertexLayout.baseVertexUserData;
 		shaders.baseInstanceUserData = vertexLayout.baseInstanceUserData;
+		for (uint32_t set = 0; set < kMaxDescriptorSets; ++set)
+			shaders.vertexSetTableUserData[set] = vertexLayout.setTableUserData[set];
+		shaders.vertexPushConstantUserData = vertexLayout.pushConstantUserData;
+		shaders.vertexPushConstantDwords = vertexLayout.pushConstantDwords;
 		shaders.fragment.code = std::move(fragment->code);
 		shaders.fragment.pgmRsrc1 = fragment->registers[backend::kPsPgmRsrc1];
 		shaders.fragment.pgmRsrc2 = (fragment->registers[backend::kPsPgmRsrc2] & ~kRsrc2UserSgprMask) | (fragmentLayout.userSgprs << kRsrc2UserSgprShift);

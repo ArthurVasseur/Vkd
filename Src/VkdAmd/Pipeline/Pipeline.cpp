@@ -473,24 +473,37 @@ namespace vkd::amd
 		m_compiledDrawState.push_back({RegKind::Sh, RegPatch::BaseInstance, kSpiShaderUserDataGs0 + compiled->baseInstanceUserData, 0});
 		for (size_t i = 0; i < compiled->psInputCntl.size(); ++i)
 			m_compiledDrawState.push_back({RegKind::Context, RegPatch::None, kSpiPsInputCntl0 + static_cast<uint32_t>(i), compiled->psInputCntl[i]});
-		for (uint32_t set = 0; set < amdcomp::kMaxDescriptorSets; ++set)
-		{
-			if (compiled->fragmentSetTableUserData[set] == 0)
-				continue;
-			if (set >= std::size(kSetTablePatches))
-			{
-				error = std::format("the fragment shader reads descriptor set {}, draws only bind sets 0-3 yet", set);
-				return nullptr;
-			}
-			m_compiledDrawState.push_back({RegKind::Sh, kSetTablePatches[set], kSpiShaderUserDataPs0 + compiled->fragmentSetTableUserData[set], 0});
-		}
 		m_compiledPushConstants.clear();
-		if (compiled->fragmentPushConstantDwords > 0)
+		const struct
 		{
-			const uint32_t firstReg = kSpiShaderUserDataPs0 + compiled->fragmentPushConstantUserData;
-			m_compiledPushConstants.push_back({firstReg, compiled->fragmentPushConstantDwords, 0});
-			for (uint32_t d = 0; d < compiled->fragmentPushConstantDwords; ++d)
-				m_compiledDrawState.push_back({RegKind::Sh, RegPatch::PushConstant, firstReg + d, 0});
+			uint32_t userData0;
+			const uint32_t* setTableUserData;
+			uint32_t pushConstantUserData;
+			uint32_t pushConstantDwords;
+		} stages[] = {
+			{kSpiShaderUserDataGs0, compiled->vertexSetTableUserData, compiled->vertexPushConstantUserData, compiled->vertexPushConstantDwords},
+			{kSpiShaderUserDataPs0, compiled->fragmentSetTableUserData, compiled->fragmentPushConstantUserData, compiled->fragmentPushConstantDwords},
+		};
+		for (const auto& stage : stages)
+		{
+			for (uint32_t set = 0; set < amdcomp::kMaxDescriptorSets; ++set)
+			{
+				if (stage.setTableUserData[set] == 0)
+					continue;
+				if (set >= std::size(kSetTablePatches))
+				{
+					error = std::format("the pipeline reads descriptor set {}, draws only bind sets 0-3 yet", set);
+					return nullptr;
+				}
+				m_compiledDrawState.push_back({RegKind::Sh, kSetTablePatches[set], stage.userData0 + stage.setTableUserData[set], 0});
+			}
+			if (stage.pushConstantDwords > 0)
+			{
+				const uint32_t firstReg = stage.userData0 + stage.pushConstantUserData;
+				m_compiledPushConstants.push_back({firstReg, stage.pushConstantDwords, 0});
+				for (uint32_t d = 0; d < stage.pushConstantDwords; ++d)
+					m_compiledDrawState.push_back({RegKind::Sh, RegPatch::PushConstant, firstReg + d, 0});
+			}
 		}
 
 		m_compiledDescriptors.clear();

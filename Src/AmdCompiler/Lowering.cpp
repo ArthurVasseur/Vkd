@@ -2812,10 +2812,26 @@ namespace amdcomp
 				return result;
 			}
 
+			std::optional<uint32_t> PushConstantDwords()
+			{
+				uint32_t dwords = 0;
+				for (const InvocationVariable& variable : m_invocationVariables)
+				{
+					if (variable.storageClass != SpvStorageClassPushConstant)
+						continue;
+					const std::optional<Layout> block = LayoutOf(variable.pointee);
+					if (!block)
+						return std::nullopt;
+					dwords = std::max(dwords, static_cast<uint32_t>((block->size + 3) / 4));
+				}
+				return dwords;
+			}
+
 			bool CreateVertexEntry(std::span<const VertexAttribute> attributes, VertexLayout& layout)
 			{
-				if (!m_usedSets.empty())
-					return Fail("descriptors in vertex shaders aren't supported yet");
+				const std::optional<uint32_t> pushConstantDwords = PushConstantDwords();
+				if (!pushConstantDwords)
+					return false;
 				const bool vertexBuffers = std::any_of(m_invocationVariables.begin(), m_invocationVariables.end(),
 													   [&](const InvocationVariable& variable)
 													   { return IsVertexAttribute(variable); });
@@ -2826,6 +2842,16 @@ namespace amdcomp
 					layout.baseVertexUserData = 2;
 					layout.baseInstanceUserData = 3;
 				}
+				for (const uint32_t set : m_usedSets)
+					layout.setTableUserData[set] = layout.userSgprs++;
+				if (*pushConstantDwords > 0)
+				{
+					layout.pushConstantUserData = layout.userSgprs;
+					layout.pushConstantDwords = *pushConstantDwords;
+					layout.userSgprs += *pushConstantDwords;
+				}
+				if (layout.userSgprs > 32)
+					return Fail("the vertex shader's descriptor sets and push constants don't fit in the user SGPRs");
 				constexpr unsigned kSystemSgprs = 8;
 				constexpr unsigned kVgprs = 9;
 				const unsigned sgprs = kSystemSgprs + layout.userSgprs;
@@ -2860,7 +2886,12 @@ namespace amdcomp
 					llvm::AllocaInst* alloca = CreateAlloca(*variableLayout);
 					storage.push_back(alloca);
 					if (variable.storageClass == SpvStorageClassPushConstant)
-						return Fail("push constants in vertex shaders aren't supported yet");
+					{
+						for (uint32_t d = 0; d < (variableLayout->size + 3) / 4; ++d)
+							m_builder.CreateAlignedStore(entry->getArg(kSystemSgprs + layout.pushConstantUserData + d), OffsetPointer(alloca, 4 * d),
+														 llvm::Align(4));
+						continue;
+					}
 					if (IsVertexAttribute(variable))
 					{
 						const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
@@ -2903,6 +2934,8 @@ namespace amdcomp
 							return false;
 					}
 				}
+				for (const uint32_t set : m_usedSets)
+					storage.push_back(TablePointer(entry->getArg(kSystemSgprs + layout.setTableUserData[set])));
 				m_builder.CreateCall(m_functions.at(m_entryFunctionId), storage);
 
 				llvm::Value* position = nullptr;
@@ -2995,24 +3028,17 @@ namespace amdcomp
 
 			bool CreateFragmentEntry(std::span<const ColorExportFormat> colorExports, FragmentLayout& layout)
 			{
-				uint32_t pushConstantDwords = 0;
-				for (const InvocationVariable& variable : m_invocationVariables)
-				{
-					if (variable.storageClass != SpvStorageClassPushConstant)
-						continue;
-					const std::optional<Layout> block = LayoutOf(variable.pointee);
-					if (!block)
-						return false;
-					pushConstantDwords = std::max(pushConstantDwords, static_cast<uint32_t>((block->size + 3) / 4));
-				}
+				const std::optional<uint32_t> pushConstantDwords = PushConstantDwords();
+				if (!pushConstantDwords)
+					return false;
 				layout.userSgprs = 1;
 				for (const uint32_t set : m_usedSets)
 					layout.setTableUserData[set] = layout.userSgprs++;
-				if (pushConstantDwords > 0)
+				if (*pushConstantDwords > 0)
 				{
 					layout.pushConstantUserData = layout.userSgprs;
-					layout.pushConstantDwords = pushConstantDwords;
-					layout.userSgprs += pushConstantDwords;
+					layout.pushConstantDwords = *pushConstantDwords;
+					layout.userSgprs += *pushConstantDwords;
 				}
 				if (layout.userSgprs > 32)
 					return Fail("the fragment shader's descriptor sets and push constants don't fit in the user SGPRs");

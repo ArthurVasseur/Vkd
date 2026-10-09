@@ -44,6 +44,9 @@ namespace amdcomp
 		uint32_t vertexBufferTableUserData = 0;
 		uint32_t baseVertexUserData = 1;
 		uint32_t baseInstanceUserData = 2;
+		std::array<uint32_t, kMaxDescriptorSets> setTableUserData = {};
+		uint32_t pushConstantUserData = 0;
+		uint32_t pushConstantDwords = 0;
 		bool instanceIndex = false;
 		std::vector<uint32_t> outputLocations;
 		std::vector<Descriptor> descriptors;

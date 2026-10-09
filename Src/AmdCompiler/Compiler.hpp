@@ -99,6 +99,9 @@ namespace amdcomp
 		uint32_t vertexBufferTableUserData = 0;
 		uint32_t baseVertexUserData = 0;
 		uint32_t baseInstanceUserData = 0;
+		uint32_t vertexSetTableUserData[kMaxDescriptorSets] = {};
+		uint32_t vertexPushConstantUserData = 0;
+		uint32_t vertexPushConstantDwords = 0;
 		uint32_t vsOutConfig = 0;
 		uint32_t numInterpolants = 0;
 		std::vector<uint32_t> psInputCntl;
