@@ -1298,6 +1298,20 @@ namespace amdcomp
 				return scalar;
 			}
 
+			llvm::Value* ReduceBool(llvm::Value* vector, bool all)
+			{
+				auto* vectorType = llvm::dyn_cast<llvm::FixedVectorType>(vector->getType());
+				if (!vectorType)
+					return vector;
+				llvm::Value* result = m_builder.CreateExtractElement(vector, uint64_t{0});
+				for (unsigned i = 1; i < vectorType->getNumElements(); ++i)
+				{
+					llvm::Value* component = m_builder.CreateExtractElement(vector, i);
+					result = all ? m_builder.CreateAnd(result, component) : m_builder.CreateOr(result, component);
+				}
+				return result;
+			}
+
 			llvm::Value* Dot(llvm::Value* a, llvm::Value* b)
 			{
 				auto* vectorType = llvm::dyn_cast<llvm::FixedVectorType>(a->getType());
@@ -1641,10 +1655,10 @@ namespace amdcomp
 									 { return m_builder.CreateNot(a); });
 					case SpvOpAny:
 						return unary([&](llvm::Value* a)
-									 { return a->getType()->isVectorTy() ? m_builder.CreateOrReduce(a) : a; });
+									 { return ReduceBool(a, false); });
 					case SpvOpAll:
 						return unary([&](llvm::Value* a)
-									 { return a->getType()->isVectorTy() ? m_builder.CreateAndReduce(a) : a; });
+									 { return ReduceBool(a, true); });
 					case SpvOpSelect:
 					{
 						llvm::Value* condition = operand(0);
