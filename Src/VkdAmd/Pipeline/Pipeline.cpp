@@ -12,6 +12,7 @@
 
 #include <Concerto/Core/Logger/Logger.hpp>
 
+#include "Vkd/RenderPass/RenderPass.hpp"
 #include "Vkd/ShaderModule/ShaderModule.hpp"
 
 #include "AmdCompiler/Compiler.hpp"
@@ -65,6 +66,41 @@ namespace vkd::amd
 					return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			}
 		}
+
+		std::vector<amdcomp::SpecializationConstant> Specialization(const VkSpecializationInfo* info)
+		{
+			std::vector<amdcomp::SpecializationConstant> specialization;
+			if (!info)
+				return specialization;
+			for (uint32_t i = 0; i < info->mapEntryCount; ++i)
+			{
+				const VkSpecializationMapEntry& entry = info->pMapEntries[i];
+				uint64_t value = 0;
+				const size_t size = std::min<size_t>(entry.size, sizeof(value));
+				if (entry.offset + size <= info->dataSize)
+					std::memcpy(&value, static_cast<const uint8_t*>(info->pData) + entry.offset, size);
+				specialization.push_back({.id = entry.constantID, .value = value, .size = static_cast<uint32_t>(size)});
+			}
+			return specialization;
+		}
+
+		constexpr uint32_t kSpiShaderPgmChksumPs = 0x2C06;
+		constexpr uint32_t kSpiShaderPgmRsrc1Ps = 0x2C0A;
+		constexpr uint32_t kSpiShaderPgmRsrc2Ps = 0x2C0B;
+		constexpr uint32_t kSpiShaderUserDataPs0 = 0x2C0C;
+		constexpr uint32_t kSpiShaderUserDataPsLast = 0x2C2B;
+		constexpr uint32_t kSpiShaderPgmChksumGs = 0x2C80;
+		constexpr uint32_t kSpiShaderPgmRsrc1Gs = 0x2C8A;
+		constexpr uint32_t kSpiShaderPgmRsrc2Gs = 0x2C8B;
+		constexpr uint32_t kSpiPsInputCntl0 = 0xA191;
+		constexpr uint32_t kSpiPsInputCntl31 = 0xA1B0;
+		constexpr uint32_t kSpiVsOutConfig = 0xA1B1;
+		constexpr uint32_t kSpiPsInputEna = 0xA1B3;
+		constexpr uint32_t kSpiPsInputAddr = 0xA1B4;
+		constexpr uint32_t kSpiPsInControl = 0xA1B6;
+		constexpr uint32_t kSpiShaderColFormat = 0xA1C5;
+		constexpr uint32_t kSpiPsInControlNumInterpMask = 0x3F;
+		constexpr RegPatch kSetTablePatches[] = {RegPatch::SetTable0, RegPatch::SetTable1, RegPatch::SetTable2, RegPatch::SetTable3};
 
 		struct CompiledComputeShader
 		{
@@ -127,19 +163,7 @@ namespace vkd::amd
 
 	const PrecompiledComputeShader* Pipeline::CompileComputeShader(const VkPipelineShaderStageCreateInfo& stage, std::span<const uint32_t> spirv)
 	{
-		std::vector<amdcomp::SpecializationConstant> specialization;
-		if (const VkSpecializationInfo* info = stage.pSpecializationInfo)
-		{
-			for (uint32_t i = 0; i < info->mapEntryCount; ++i)
-			{
-				const VkSpecializationMapEntry& entry = info->pMapEntries[i];
-				uint64_t value = 0;
-				const size_t size = std::min<size_t>(entry.size, sizeof(value));
-				if (entry.offset + size <= info->dataSize)
-					std::memcpy(&value, static_cast<const uint8_t*>(info->pData) + entry.offset, size);
-				specialization.push_back({.id = entry.constantID, .value = value, .size = static_cast<uint32_t>(size)});
-			}
-		}
+		const std::vector<amdcomp::SpecializationConstant> specialization = Specialization(stage.pSpecializationInfo);
 
 		const std::shared_ptr<const CompiledComputeShader> cached = CompileCached(spirv, stage.pName, specialization);
 		const std::optional<amdcomp::ComputeShader>& compiled = cached->shader;
@@ -242,6 +266,7 @@ namespace vkd::amd
 		uint64_t vertexHash = 0;
 		uint64_t fragmentHash = 0;
 		std::span<const uint32_t> stageCode[2];
+		const VkPipelineShaderStageCreateInfo* stages[2] = {};
 		for (uint32_t i = 0; i < info.stageCount; ++i)
 		{
 			VKD_FROM_HANDLE(vkd::ShaderModule, module, info.pStages[i].module);
@@ -253,18 +278,25 @@ namespace vkd::amd
 			{
 				vertexHash = HashSpirv(code);
 				stageCode[0] = code;
+				stages[0] = &info.pStages[i];
 			}
 			else if (info.pStages[i].stage == VK_SHADER_STAGE_FRAGMENT_BIT)
 			{
 				fragmentHash = HashSpirv(code);
 				stageCode[1] = code;
+				stages[1] = &info.pStages[i];
 			}
 		}
-		for (const PrecompiledGraphicsPipeline& pipeline : kPrecompiledGraphicsPipelines)
+		if (!EnvironmentFlag("VKD_AMD_COMPILE_ALL"))
 		{
-			if (pipeline.vertexSpirvHash == vertexHash && pipeline.fragmentSpirvHash == fragmentHash)
-				m_graphics = &pipeline;
+			for (const PrecompiledGraphicsPipeline& pipeline : kPrecompiledGraphicsPipelines)
+			{
+				if (pipeline.vertexSpirvHash == vertexHash && pipeline.fragmentSpirvHash == fragmentHash)
+					m_graphics = &pipeline;
+			}
 		}
+		if (!m_graphics && stages[0] && stages[1])
+			m_graphics = CompileGraphicsPipeline(info, *stages[0], stageCode[0], *stages[1], stageCode[1]);
 		if (m_graphics)
 		{
 			// CB_SHADER_MASK is the PS's: the captured one.
@@ -276,13 +308,150 @@ namespace vkd::amd
 		}
 		if (!m_graphics)
 		{
-			cct::Logger::Warning("AmdPipeline: no GFX11 code for this VS/FS pair (SPIR-V hashes 0x{:016X} / 0x{:016X}), its draws are skipped",
-								 vertexHash, fragmentHash);
 			DumpUnknownSpirv(stageCode[0], vertexHash);
 			DumpUnknownSpirv(stageCode[1], fragmentHash);
 			return VK_SUCCESS;
 		}
 		return UploadCode(owner, m_graphics->esCode, m_graphics->psCode);
+	}
+
+	const PrecompiledGraphicsPipeline* Pipeline::CompileGraphicsPipeline(const VkGraphicsPipelineCreateInfo& info, const VkPipelineShaderStageCreateInfo& vertexStage,
+																		 std::span<const uint32_t> vertexSpirv, const VkPipelineShaderStageCreateInfo& fragmentStage,
+																		 std::span<const uint32_t> fragmentSpirv)
+	{
+		const uint64_t vertexHash = HashSpirv(vertexSpirv);
+		const uint64_t fragmentHash = HashSpirv(fragmentSpirv);
+		VkFormat colorFormat = VK_FORMAT_UNDEFINED;
+		VKD_FROM_HANDLE(vkd::RenderPass, renderPass, info.renderPass);
+		if (renderPass && info.subpass < renderPass->GetSubpasses().size())
+		{
+			const VkSubpassDescription& subpass = renderPass->GetSubpasses()[info.subpass];
+			if (subpass.colorAttachmentCount > 0 && subpass.pColorAttachments[0].attachment < renderPass->GetAttachments().size())
+				colorFormat = renderPass->GetAttachments()[subpass.pColorAttachments[0].attachment].format;
+		}
+		const PrecompiledGraphicsPipeline* base = nullptr;
+		for (const PrecompiledGraphicsPipeline& pipeline : kPrecompiledGraphicsPipelines)
+		{
+			if (pipeline.drawState.data() == kTestAppDrawState)
+				base = &pipeline;
+		}
+		if (!base || colorFormat != base->colorFormat)
+		{
+			cct::Logger::Warning("AmdPipeline: can't compile the VS/FS pair (SPIR-V hashes 0x{:016X} / 0x{:016X}), its draws are skipped: compiled pipelines only "
+								 "render into one R8G8B8A8_UNORM color attachment yet",
+								 vertexHash, fragmentHash);
+			return nullptr;
+		}
+
+		const std::vector<amdcomp::SpecializationConstant> vertexSpecialization = Specialization(vertexStage.pSpecializationInfo);
+		const std::vector<amdcomp::SpecializationConstant> fragmentSpecialization = Specialization(fragmentStage.pSpecializationInfo);
+		const amdcomp::ColorExportFormat colorExports[] = {amdcomp::ColorExportFormat::Float16};
+		amdcomp::GraphicsOptions options{
+			.vertex = {.entryPoint = vertexStage.pName, .specialization = vertexSpecialization},
+			.fragment = {.entryPoint = fragmentStage.pName, .specialization = fragmentSpecialization},
+			.colorExports = colorExports,
+		};
+		std::string error;
+		std::optional<amdcomp::GraphicsShaders> compiled = amdcomp::CompileGraphicsShaders(vertexSpirv, fragmentSpirv, options, error);
+		if (!compiled)
+		{
+			cct::Logger::Warning("AmdPipeline: can't compile the VS/FS pair (SPIR-V hashes 0x{:016X} / 0x{:016X}), its draws are skipped: {}", vertexHash,
+								 fragmentHash, error);
+			return nullptr;
+		}
+		if (EnvironmentFlag("VKD_AMD_DUMP_ISA"))
+		{
+			cct::Logger::Info("AmdPipeline: vertex shader 0x{:016X}:\n{}", vertexHash, amdcomp::Disassemble(compiled->vertex.code, true));
+			cct::Logger::Info("AmdPipeline: fragment shader 0x{:016X}:\n{}", fragmentHash, amdcomp::Disassemble(compiled->fragment.code, true));
+		}
+
+		m_compiledDrawState.clear();
+		for (const RegWrite& write : base->drawState)
+		{
+			RegWrite w = write;
+			switch (w.reg)
+			{
+				case kSpiShaderPgmRsrc1Gs:
+					w.value = compiled->vertex.pgmRsrc1;
+					break;
+				case kSpiShaderPgmRsrc2Gs:
+					w.value = compiled->vertex.pgmRsrc2;
+					break;
+				case kSpiShaderPgmRsrc1Ps:
+					w.value = compiled->fragment.pgmRsrc1;
+					break;
+				case kSpiShaderPgmRsrc2Ps:
+					w.value = compiled->fragment.pgmRsrc2;
+					break;
+				case kSpiShaderPgmChksumGs:
+				case kSpiShaderPgmChksumPs:
+					w.value = 0;
+					break;
+				case kSpiVsOutConfig:
+					w.value = compiled->vsOutConfig;
+					break;
+				case kSpiPsInputEna:
+					w.value = compiled->psInputEna;
+					break;
+				case kSpiPsInputAddr:
+					w.value = compiled->psInputAddr;
+					break;
+				case kSpiPsInControl:
+					w.value = (w.value & ~kSpiPsInControlNumInterpMask) | compiled->numInterpolants;
+					break;
+				case kSpiShaderColFormat:
+					w.value = compiled->colorFormat;
+					break;
+				case kCbShaderMask:
+					w.value = compiled->shaderMask;
+					break;
+				default:
+					break;
+			}
+			const bool psInputCntl = w.kind == RegKind::Context && w.reg >= kSpiPsInputCntl0 && w.reg <= kSpiPsInputCntl31;
+			const bool psUserData = w.kind == RegKind::Sh && w.reg > kSpiShaderUserDataPs0 && w.reg <= kSpiShaderUserDataPsLast;
+			if (!psInputCntl && !psUserData)
+				m_compiledDrawState.push_back(w);
+		}
+		for (size_t i = 0; i < compiled->psInputCntl.size(); ++i)
+			m_compiledDrawState.push_back({RegKind::Context, RegPatch::None, kSpiPsInputCntl0 + static_cast<uint32_t>(i), compiled->psInputCntl[i]});
+		for (uint32_t set = 0; set < amdcomp::kMaxDescriptorSets; ++set)
+		{
+			if (compiled->fragmentSetTableUserData[set] == 0)
+				continue;
+			if (set >= std::size(kSetTablePatches))
+			{
+				cct::Logger::Warning("AmdPipeline: the fragment shader reads descriptor set {}, draws only bind sets 0-3 yet", set);
+				return nullptr;
+			}
+			m_compiledDrawState.push_back({RegKind::Sh, kSetTablePatches[set], kSpiShaderUserDataPs0 + compiled->fragmentSetTableUserData[set], 0});
+		}
+		m_compiledPushConstants.clear();
+		if (compiled->fragmentPushConstantDwords > 0)
+		{
+			const uint32_t firstReg = kSpiShaderUserDataPs0 + compiled->fragmentPushConstantUserData;
+			m_compiledPushConstants.push_back({firstReg, compiled->fragmentPushConstantDwords, 0});
+			for (uint32_t d = 0; d < compiled->fragmentPushConstantDwords; ++d)
+				m_compiledDrawState.push_back({RegKind::Sh, RegPatch::PushConstant, firstReg + d, 0});
+		}
+
+		m_compiledDescriptors.clear();
+		for (const amdcomp::Descriptor& descriptor : compiled->descriptors)
+			m_compiledDescriptors.push_back({descriptor.set, descriptor.binding, ToVkDescriptorType(descriptor.kind), descriptor.offset, descriptor.count});
+		m_compiledEsCode = std::move(compiled->vertex.code);
+		m_compiledPsCode = std::move(compiled->fragment.code);
+		m_compiledGraphics = PrecompiledGraphicsPipeline{
+			.vertexSpirvHash = vertexHash,
+			.fragmentSpirvHash = fragmentHash,
+			.colorFormat = base->colorFormat,
+			.esCode = m_compiledEsCode,
+			.psCode = m_compiledPsCode,
+			.drawState = m_compiledDrawState,
+			.drawInitiator = base->drawInitiator,
+			.descriptors = m_compiledDescriptors,
+			.pushConstants = m_compiledPushConstants,
+		};
+		return &m_compiledGraphics;
 	}
 
 	// Shader code is read by the GPU only, uploaded once through the CPU mapping (AMDVLK puts its code
