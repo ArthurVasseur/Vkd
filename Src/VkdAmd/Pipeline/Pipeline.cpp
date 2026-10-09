@@ -4,7 +4,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <mutex>
 #include <span>
+#include <string>
+#include <unordered_map>
 
 #include <Concerto/Core/Logger/Logger.hpp>
 
@@ -41,6 +45,39 @@ namespace vkd::amd
 			char value[8] = {};
 			size_t length = 0;
 			return getenv_s(&length, value, sizeof(value), name) == 0 && length > 1 && value[0] == '1';
+		}
+
+		struct CompiledComputeShader
+		{
+			std::optional<amdcomp::ComputeShader> shader;
+			std::string error;
+		};
+
+		std::shared_ptr<const CompiledComputeShader> CompileCached(std::span<const uint32_t> spirv, const char* entryPoint,
+																   std::span<const amdcomp::SpecializationConstant> specialization)
+		{
+			std::string key(reinterpret_cast<const char*>(spirv.data()), spirv.size_bytes());
+			key.append(entryPoint ? entryPoint : "main");
+			key.push_back('\0');
+			for (const amdcomp::SpecializationConstant& constant : specialization)
+			{
+				key.append(reinterpret_cast<const char*>(&constant.id), sizeof(constant.id));
+				key.append(reinterpret_cast<const char*>(&constant.value), sizeof(constant.value));
+			}
+
+			static std::mutex mutex;
+			static std::unordered_map<std::string, std::shared_ptr<const CompiledComputeShader>> cache;
+			{
+				std::scoped_lock lock(mutex);
+				if (auto found = cache.find(key); found != cache.end())
+					return found->second;
+			}
+
+			auto compiled = std::make_shared<CompiledComputeShader>();
+			compiled->shader = amdcomp::CompileComputeShader(
+				spirv, amdcomp::CompileOptions{.entryPoint = entryPoint ? entryPoint : "main", .specialization = specialization}, compiled->error);
+			std::scoped_lock lock(mutex);
+			return cache.emplace(std::move(key), std::move(compiled)).first->second;
 		}
 	} // namespace
 
@@ -85,13 +122,12 @@ namespace vkd::amd
 			}
 		}
 
-		std::string error;
-		std::optional<amdcomp::ComputeShader> compiled =
-			amdcomp::CompileComputeShader(spirv, amdcomp::CompileOptions{.entryPoint = stage.pName, .specialization = specialization}, error);
+		const std::shared_ptr<const CompiledComputeShader> cached = CompileCached(spirv, stage.pName, specialization);
+		const std::optional<amdcomp::ComputeShader>& compiled = cached->shader;
 		if (!compiled)
 		{
 			cct::Logger::Warning("AmdPipeline: can't compile compute shader (SPIR-V hash 0x{:016X}), its dispatches are skipped: {}", HashSpirv(spirv),
-								 error);
+								 cached->error);
 			return nullptr;
 		}
 		if (EnvironmentFlag("VKD_AMD_DUMP_ISA"))
@@ -100,7 +136,7 @@ namespace vkd::amd
 							  amdcomp::Disassemble(compiled->code, (compiled->dispatchInitiator & 0x8000u) == 0));
 		}
 
-		m_compiledCode = std::move(compiled->code);
+		m_compiledCode = compiled->code;
 		m_compiledDescriptors.clear();
 		for (const amdcomp::Descriptor& descriptor : compiled->descriptors)
 		{
