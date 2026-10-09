@@ -1,6 +1,7 @@
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo")
 
+includes("deps/ConcertoFramework/libllvm/xmake.lua")
 includes("deps/ConcertoFramework/xmake.lua")
 
 for _, require in ipairs({"vulkan-headers", "vulkan-utility-libraries"}) do
@@ -10,6 +11,7 @@ end
 add_requires("mimalloc", "nazarautils", "catch2", "volk")
 add_requires("catch2", "nzsl")
 add_requires("spirv-headers", "spirv-tools")
+add_requires("libllvm", {configs = {clang = true}})
 
 if has_config("debug-checks") then
     add_requires("cpptrace")
@@ -93,7 +95,7 @@ drivers = {
             "Shader",
         },
         Packages = { {"concerto-core", public = false}, {"vulkan-headers", public = true}},
-        Deps = { "see", "amd-addr" },
+        Deps = { "see", "amd-addr", "amd-compiler" },
     }
 }
 
@@ -104,6 +106,16 @@ target("amd-addr")
     add_includedirs("Src", { public = true })
     add_files("Src/AmdAddr/*.cpp")
     add_headerfiles("Src/AmdAddr/*.hpp")
+target_end()
+
+target("amd-compiler")
+    set_languages("c++20")
+    set_kind("static")
+    add_includedirs("Src", { public = true })
+    add_files("Src/AmdCompiler/*.cpp")
+    add_headerfiles("Src/AmdCompiler/*.hpp")
+    add_deps("see")
+    add_packages("libllvm", { public = true })
 target_end()
 
 target("see")
@@ -322,6 +334,14 @@ if has_config("tests") then
         add_packages("catch2")
         add_files("Src/AmdAddr/Tests/*.cpp")
         add_deps("amd-addr")
+    target_end()
+
+    target("amd-compiler-tests")
+        set_languages("c++20")
+        set_kind("binary")
+        add_packages("catch2")
+        add_files("Src/AmdCompiler/Tests/*.cpp")
+        add_deps("amd-compiler")
     target_end()
 
     target("vkd-test-app")
