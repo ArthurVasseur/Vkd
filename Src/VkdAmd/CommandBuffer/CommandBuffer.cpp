@@ -2104,6 +2104,9 @@ namespace vkd::amd
 			if (std::holds_alternative<vkd::OpEndRenderPass>(op))
 			{
 				state.renderPass = nullptr;
+				if (!stream.HasRoom(16))
+					return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+				stream.PostDrawBarrier(kEventCacheFlushAndInvTs);
 				return VK_SUCCESS;
 			}
 			if (const auto* clearAttachments = std::get_if<vkd::OpClearAttachments>(&op))

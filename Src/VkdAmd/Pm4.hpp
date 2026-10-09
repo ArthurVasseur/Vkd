@@ -63,6 +63,8 @@ namespace vkd::amd
 	inline constexpr uint32_t kEventCsPartialFlush = 0x407;
 	inline constexpr uint32_t kEventVsPartialFlush = 0x40F;
 	inline constexpr uint32_t kEventVgtFlush = 0x24;
+	inline constexpr uint32_t kEventCacheFlushAndInvTs = 0x14;
+	inline constexpr uint32_t kEventBottomOfPipeTs = 0x28;
 
 	// Graphics-queue state shadowing (PAL UniversalQueueContext with mid-command-buffer preemption,
 	// LOAD packets in the preamble). With CONTEXT_CONTROL's shadow enables set, the CP mirrors every
@@ -360,10 +362,10 @@ namespace vkd::amd
 		// AMDVLK's barrier after a render pass (wddm-dump [draw][re][minimal]): end-of-pipe cache
 		// action, then the matching ACQUIRE_MEM, so later CP DMA reads see the color target. Also
 		// the PWS end-of-pipe stall of the per-submit preamble (PAL BuildWaitEopPws).
-		void PostDrawBarrier()
+		void PostDrawBarrier(uint32_t eventType = kEventBottomOfPipeTs)
 		{
 			Emit(PkT3(kItReleaseMem, 6));
-			Emit(0x80000528u);
+			Emit(0x80000500u | eventType);
 			Emit(0x00010000u);
 			for (int i = 0; i < 5; ++i)
 				Emit(0);
