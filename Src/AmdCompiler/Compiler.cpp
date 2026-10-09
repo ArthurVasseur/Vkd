@@ -66,6 +66,9 @@ namespace amdcomp
 		shader.dispatchInitiator = kDispatchInitiator | output->registers[backend::kComputeDispatchInitiator];
 		shader.pushConstantUserData = layout.pushConstantDwords > 0 ? kPushConstantUserData : 0;
 		shader.pushConstantDwords = layout.pushConstantDwords;
+		for (uint32_t set = 0; set < kMaxDescriptorSets; ++set)
+			shader.setTableUserData[set] = layout.setTableUserData[set];
+		shader.descriptors = std::move(layout.descriptors);
 		return shader;
 	}
 } // namespace amdcomp

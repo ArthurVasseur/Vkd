@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "AmdCompiler/Compiler.hpp"
 
@@ -29,6 +30,8 @@ namespace amdcomp
 		std::array<uint32_t, 3> localSize = {1, 1, 1};
 		uint32_t pushConstantDwords = 0;
 		uint32_t userSgprs = 1;
+		std::array<uint32_t, kMaxDescriptorSets> setTableUserData = {};
+		std::vector<Descriptor> descriptors;
 	};
 
 	std::unique_ptr<llvm::Module> LowerComputeShader(const see::spirv::Module& spirv, const CompileOptions& options, llvm::LLVMContext& context,

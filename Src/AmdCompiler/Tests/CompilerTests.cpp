@@ -29,19 +29,39 @@ TEST_CASE("buffer-address fill shader compiles", "[amd-compiler][compute]")
 	CHECK(assembly.find("s_endpgm") != std::string::npos);
 }
 
-TEST_CASE("descriptor-backed storage is reported as unsupported", "[amd-compiler][compute]")
+TEST_CASE("storage buffer fill shader compiles", "[amd-compiler][compute]")
 {
 	std::string error;
-	const std::optional<ComputeShader> shader = CompileComputeShader(tests::kFillDescriptorSpirv, CompileOptions{}, error);
-	CHECK_FALSE(shader.has_value());
-	CHECK(error.find("StorageBuffer") != std::string::npos);
+	std::string ir;
+	const std::optional<ComputeShader> shader = CompileComputeShader(tests::kFillDescriptorSpirv, CompileOptions{.llvmIr = &ir}, error);
+	INFO(error);
+	INFO(ir);
+	REQUIRE(shader.has_value());
+	const std::string assembly = Disassemble(shader->code, true);
+	INFO(assembly);
+
+	CHECK(shader->pushConstantDwords == 2);
+	CHECK(shader->setTableUserData[0] == 3);
+	CHECK(((shader->pgmRsrc2 >> 1) & 0x1F) == 4);
+	REQUIRE(shader->descriptors.size() == 1);
+	CHECK(shader->descriptors[0].set == 0);
+	CHECK(shader->descriptors[0].binding == 0);
+	CHECK(shader->descriptors[0].kind == DescriptorKind::StorageBuffer);
+	CHECK(shader->descriptors[0].offset == 0);
+	CHECK(shader->descriptors[0].count == 1);
+	CHECK(assembly.find("s_getpc_b64") != std::string::npos);
+	CHECK(assembly.find("buffer_store_b32") != std::string::npos);
 }
 
-TEST_CASE("print the fill shader's registers", "[.][amd-compiler][dump]")
+TEST_CASE("print the compiled test shaders", "[.][amd-compiler][dump]")
 {
-	std::string error;
-	const std::optional<ComputeShader> shader = CompileComputeShader(tests::kFillBufferAddressSpirv, CompileOptions{}, error);
-	REQUIRE(shader.has_value());
-	WARN("RSRC1 " << std::hex << shader->pgmRsrc1 << " RSRC2 " << shader->pgmRsrc2 << " RSRC3 " << shader->pgmRsrc3 << " initiator " << shader->dispatchInitiator);
-	WARN(Disassemble(shader->code, true));
+	for (const std::span<const uint32_t> spirv : {std::span<const uint32_t>(tests::kFillBufferAddressSpirv), std::span<const uint32_t>(tests::kFillDescriptorSpirv)})
+	{
+		std::string error;
+		const std::optional<ComputeShader> shader = CompileComputeShader(spirv, CompileOptions{}, error);
+		REQUIRE(shader.has_value());
+		WARN("RSRC1 " << std::hex << shader->pgmRsrc1 << " RSRC2 " << shader->pgmRsrc2 << " RSRC3 " << shader->pgmRsrc3 << " initiator " << shader->dispatchInitiator);
+		WARN(Disassemble(shader->code, true));
+	}
 }
+

@@ -30,7 +30,11 @@ namespace amdcomp
 
 		constexpr unsigned kGlobalAddressSpace = 1;
 		constexpr unsigned kLdsAddressSpace = 3;
+		constexpr unsigned kConstantAddressSpace = 4;
 		constexpr unsigned kPrivateAddressSpace = 5;
+		constexpr unsigned kBufferFatPointerAddressSpace = 7;
+		constexpr unsigned kBufferResourceAddressSpace = 8;
+		constexpr uint32_t kBufferDescriptorBytes = 16;
 
 		struct Type
 		{
@@ -77,6 +81,17 @@ namespace amdcomp
 			uint32_t pointee;
 			uint32_t storageClass;
 			uint32_t initializer;
+		};
+
+		struct DescriptorVariable
+		{
+			uint32_t set;
+			uint32_t binding;
+			DescriptorKind kind;
+			uint32_t block;
+			uint32_t count;
+			bool isArray;
+			uint32_t offset = 0;
 		};
 
 		struct PendingPhi
@@ -161,7 +176,7 @@ namespace amdcomp
 					return Fail(std::format("no GLCompute entry point named {}", m_options.entryPoint));
 				m_entryFunctionId = entryPoint->m_functionId;
 
-				if (!LowerGlobals() || !ReadLocalSize(*entryPoint, layout.localSize) || !DeclareFunctions())
+				if (!LowerGlobals() || !ReadLocalSize(*entryPoint, layout.localSize) || !AssignDescriptorOffsets(layout) || !DeclareFunctions())
 					return false;
 				for (const spirv::Function& function : m_spirv.m_functions)
 				{
@@ -223,6 +238,9 @@ namespace amdcomp
 					case SpvStorageClassPhysicalStorageBuffer:
 					case SpvStorageClassCrossWorkgroup:
 						return kGlobalAddressSpace;
+					case SpvStorageClassUniform:
+					case SpvStorageClassStorageBuffer:
+						return kBufferFatPointerAddressSpace;
 					default:
 						Fail(std::format("storage class {} not supported yet", SpvStorageClassToString(static_cast<SpvStorageClass>(storageClass))));
 						return std::nullopt;
@@ -431,6 +449,21 @@ namespace amdcomp
 					return local->second;
 				if (auto global = m_globalValues.find(id); global != m_globalValues.end())
 					return global->second;
+				if (auto descriptor = m_descriptorVariables.find(id); descriptor != m_descriptorVariables.end())
+				{
+					if (descriptor->second.isArray)
+					{
+						Fail("arrays of descriptors are only supported through access chains");
+						return nullptr;
+					}
+					llvm::BasicBlock& entry = m_currentFunction->getEntryBlock();
+					llvm::IRBuilder<> builder(&entry, entry.getFirstInsertionPt());
+					llvm::Value* records = nullptr;
+					llvm::Value* pointer = BufferPointer(builder, descriptor->second, nullptr, records);
+					m_values[id] = pointer;
+					m_bufferRecords[id] = records;
+					return pointer;
+				}
 				if (auto unsupported = m_unsupportedVariables.find(id); unsupported != m_unsupportedVariables.end())
 				{
 					Fail(std::format("variables in storage class {} aren't supported yet",
@@ -684,10 +717,71 @@ namespace amdcomp
 						m_globalValues[id] = global;
 						return true;
 					}
+					case SpvStorageClassUniform:
+					case SpvStorageClassStorageBuffer:
+						return AddDescriptorVariable(id, storageClass, pointerType->element);
 					default:
 						m_unsupportedVariables[id] = storageClass;
 						return true;
 				}
+			}
+
+			bool AddDescriptorVariable(uint32_t id, uint32_t storageClass, uint32_t pointee)
+			{
+				const Type* type = TypeOf(pointee);
+				if (!type)
+					return false;
+				if (type->kind == Type::Kind::RuntimeArray)
+					return Fail("runtime arrays of descriptors aren't supported");
+				const bool isArray = type->kind == Type::Kind::Array;
+				const uint32_t block = isArray ? type->element : pointee;
+				const bool storage = storageClass == SpvStorageClassStorageBuffer || Decoration(block, SpvDecorationBufferBlock).has_value();
+				m_descriptorVariables[id] = DescriptorVariable{
+					.set = Decoration(id, SpvDecorationDescriptorSet).value_or(0),
+					.binding = Decoration(id, SpvDecorationBinding).value_or(0),
+					.kind = storage ? DescriptorKind::StorageBuffer : DescriptorKind::UniformBuffer,
+					.block = block,
+					.count = isArray ? type->count : 1,
+					.isArray = isArray,
+				};
+				return true;
+			}
+
+			bool AssignDescriptorOffsets(ComputeLayout& layout)
+			{
+				std::vector<DescriptorVariable*> variables;
+				for (auto& [id, variable] : m_descriptorVariables)
+					variables.push_back(&variable);
+				std::sort(variables.begin(), variables.end(),
+						  [](const DescriptorVariable* a, const DescriptorVariable* b)
+						  { return a->set != b->set ? a->set < b->set : a->binding < b->binding; });
+				std::array<uint32_t, kMaxDescriptorSets> tableBytes = {};
+				for (DescriptorVariable* variable : variables)
+				{
+					if (variable->set >= kMaxDescriptorSets)
+						return Fail(std::format("descriptor set {} is beyond the {} sets Vkd supports", variable->set, kMaxDescriptorSets));
+					variable->offset = tableBytes[variable->set];
+					tableBytes[variable->set] += variable->count * kBufferDescriptorBytes;
+					layout.descriptors.push_back(Descriptor{variable->set, variable->binding, variable->kind, variable->offset, variable->count});
+					if (std::find(m_usedSets.begin(), m_usedSets.end(), variable->set) == m_usedSets.end())
+						m_usedSets.push_back(variable->set);
+				}
+				std::sort(m_usedSets.begin(), m_usedSets.end());
+				return true;
+			}
+
+			llvm::Value* BufferPointer(llvm::IRBuilder<>& builder, const DescriptorVariable& variable, llvm::Value* index, llvm::Value*& records)
+			{
+				llvm::Value* offset = builder.getInt32(variable.offset);
+				if (index)
+					offset = builder.CreateAdd(offset, builder.CreateMul(builder.CreateZExtOrTrunc(index, builder.getInt32Ty()), builder.getInt32(kBufferDescriptorBytes)));
+				llvm::Value* address = builder.CreateGEP(builder.getInt8Ty(), m_setTables.at(variable.set), offset);
+				llvm::LoadInst* descriptor = builder.CreateAlignedLoad(llvm::FixedVectorType::get(builder.getInt32Ty(), 4), address, llvm::Align(16));
+				descriptor->setMetadata(llvm::LLVMContext::MD_invariant_load, llvm::MDNode::get(m_context, {}));
+				records = builder.CreateExtractElement(descriptor, uint64_t{2});
+				llvm::Value* resource =
+					builder.CreateIntToPtr(builder.CreateBitCast(descriptor, builder.getInt128Ty()), llvm::PointerType::get(m_context, kBufferResourceAddressSpace));
+				return builder.CreateAddrSpaceCast(resource, llvm::PointerType::get(m_context, kBufferFatPointerAddressSpace));
 			}
 
 			bool ReadLocalSize(const spirv::EntryPoint& entryPoint, std::array<uint32_t, 3>& size)
@@ -751,6 +845,7 @@ namespace amdcomp
 						parameters.push_back(type);
 					}
 					parameters.insert(parameters.end(), m_invocationVariables.size(), llvm::PointerType::get(m_context, kPrivateAddressSpace));
+					parameters.insert(parameters.end(), m_usedSets.size(), llvm::PointerType::get(m_context, kConstantAddressSpace));
 					auto* llvmFunction = llvm::Function::Create(llvm::FunctionType::get(returnType, parameters, false), llvm::GlobalValue::InternalLinkage,
 																std::format("spirv.{}", function.m_id), *m_module);
 					llvmFunction->addFnAttr(llvm::Attribute::AlwaysInline);
@@ -776,6 +871,10 @@ namespace amdcomp
 				}
 				for (size_t i = 0; i < m_invocationVariables.size(); ++i)
 					m_values[m_invocationVariables[i].id] = llvmFunction->getArg(static_cast<unsigned>(function.m_parameters.size() + i));
+				m_setTables.clear();
+				m_bufferRecords.clear();
+				for (size_t i = 0; i < m_usedSets.size(); ++i)
+					m_setTables[m_usedSets[i]] = llvmFunction->getArg(static_cast<unsigned>(function.m_parameters.size() + m_invocationVariables.size() + i));
 
 				for (const spirv::BasicBlock& block : function.m_blocks)
 					m_blocks[block.m_label] = llvm::BasicBlock::Create(m_context, "", llvmFunction);
@@ -1059,10 +1158,32 @@ namespace amdcomp
 
 			bool LowerAccessChain(uint32_t id, std::span<const uint32_t> args, bool hasElement)
 			{
-				llvm::Value* base = Value(args[0]);
-				uint32_t type = PointeeOf(args[0]);
+				llvm::Value* base = nullptr;
+				uint32_t type = 0;
+				llvm::Value* records = nullptr;
+				size_t first = 1;
+				if (auto descriptor = m_descriptorVariables.find(args[0]); descriptor != m_descriptorVariables.end() && descriptor->second.isArray)
+				{
+					if (hasElement || args.size() < 2)
+						return Fail("unsupported access chain into an array of descriptors");
+					llvm::Value* element = Value(args[1]);
+					if (!element)
+						return false;
+					base = BufferPointer(m_builder, descriptor->second, element, records);
+					type = descriptor->second.block;
+					first = 2;
+				}
+				else
+				{
+					base = Value(args[0]);
+					type = PointeeOf(args[0]);
+					if (auto known = m_bufferRecords.find(args[0]); known != m_bufferRecords.end())
+						records = known->second;
+				}
 				if (!base || type == 0)
 					return false;
+				if (records)
+					m_bufferRecords[id] = records;
 				PointerInfo info = InfoOf(args[0]);
 				auto* indexType = llvm::cast<llvm::IntegerType>(m_module->getDataLayout().getIndexType(base->getType()));
 				llvm::Value* offset = llvm::ConstantInt::get(indexType, 0);
@@ -1077,7 +1198,6 @@ namespace amdcomp
 					offset = m_builder.CreateAdd(offset, m_builder.CreateMul(value, llvm::ConstantInt::get(indexType, scale)));
 				};
 
-				size_t first = 1;
 				if (hasElement)
 				{
 					llvm::Value* element = index(args[1]);
@@ -1301,6 +1421,8 @@ namespace amdcomp
 						}
 						for (const InvocationVariable& variable : m_invocationVariables)
 							callArgs.push_back(m_values.at(variable.id));
+						for (const uint32_t set : m_usedSets)
+							callArgs.push_back(m_setTables.at(set));
 						llvm::CallInst* call = m_builder.CreateCall(function->second, callArgs);
 						return resultType->isVoidTy() ? true : Set(id, call);
 					}
@@ -1594,6 +1716,42 @@ namespace amdcomp
 					case SpvOpExtInst:
 						return LowerExtInst(id, resultType, args);
 
+					case SpvOpArrayLength:
+					{
+						if (!Value(args[0]))
+							return false;
+						auto records = m_bufferRecords.find(args[0]);
+						const uint32_t block = PointeeOf(args[0]);
+						if (records == m_bufferRecords.end() || block == 0)
+							return Fail("OpArrayLength of a pointer that isn't a buffer block");
+						const std::optional<uint64_t> offset = MemberOffset(block, args[1]);
+						const std::optional<uint64_t> stride = ArrayStride(m_types.at(block).members[args[1]]);
+						if (!offset || !stride)
+							return false;
+						llvm::Value* bytes = records->second;
+						llvm::Value* length = m_builder.CreateUDiv(m_builder.CreateSub(bytes, m_builder.getInt32(static_cast<uint32_t>(*offset))),
+																   m_builder.getInt32(static_cast<uint32_t>(*stride)));
+						return Set(id, m_builder.CreateSelect(m_builder.CreateICmpULT(bytes, m_builder.getInt32(static_cast<uint32_t>(*offset))),
+															  m_builder.getInt32(0), length));
+					}
+
+					case SpvOpAtomicLoad:
+					case SpvOpAtomicStore:
+					case SpvOpAtomicExchange:
+					case SpvOpAtomicCompareExchange:
+					case SpvOpAtomicIIncrement:
+					case SpvOpAtomicIDecrement:
+					case SpvOpAtomicIAdd:
+					case SpvOpAtomicISub:
+					case SpvOpAtomicSMin:
+					case SpvOpAtomicUMin:
+					case SpvOpAtomicSMax:
+					case SpvOpAtomicUMax:
+					case SpvOpAtomicAnd:
+					case SpvOpAtomicOr:
+					case SpvOpAtomicXor:
+						return LowerAtomic(instruction.m_opcode, id, resultType, args);
+
 					default:
 						return Unsupported(instruction);
 				}
@@ -1670,6 +1828,117 @@ namespace amdcomp
 				if (fence)
 					m_builder.CreateFence(llvm::AtomicOrdering::Acquire, SyncScope(static_cast<uint32_t>(*memoryScope)));
 				return true;
+			}
+
+			std::optional<llvm::AtomicOrdering> AtomicOrdering(uint32_t semanticsId)
+			{
+				const std::optional<uint64_t> semantics = ConstantValue(semanticsId);
+				if (!semantics)
+				{
+					Fail("atomic with non-constant semantics");
+					return std::nullopt;
+				}
+				const bool acquire = (*semantics & SpvMemorySemanticsAcquireMask) != 0;
+				const bool release = (*semantics & SpvMemorySemanticsReleaseMask) != 0;
+				if (*semantics & SpvMemorySemanticsSequentiallyConsistentMask)
+					return llvm::AtomicOrdering::SequentiallyConsistent;
+				if ((*semantics & SpvMemorySemanticsAcquireReleaseMask) || (acquire && release))
+					return llvm::AtomicOrdering::AcquireRelease;
+				if (acquire)
+					return llvm::AtomicOrdering::Acquire;
+				if (release)
+					return llvm::AtomicOrdering::Release;
+				return llvm::AtomicOrdering::Monotonic;
+			}
+
+			bool LowerAtomic(uint32_t opcode, uint32_t id, llvm::Type* resultType, std::span<const uint32_t> args)
+			{
+				llvm::Value* pointer = Value(args[0]);
+				const std::optional<uint64_t> scopeValue = ConstantValue(args[1]);
+				std::optional<llvm::AtomicOrdering> ordering = AtomicOrdering(args[2]);
+				if (!pointer || !ordering)
+					return false;
+				if (!scopeValue)
+					return Fail("atomic with a non-constant scope");
+				const llvm::SyncScope::ID scope = SyncScope(static_cast<uint32_t>(*scopeValue));
+
+				if (opcode == SpvOpAtomicLoad)
+				{
+					if (*ordering == llvm::AtomicOrdering::Release || *ordering == llvm::AtomicOrdering::AcquireRelease)
+						ordering = llvm::AtomicOrdering::Acquire;
+					llvm::LoadInst* load = m_builder.CreateAlignedLoad(resultType, pointer, llvm::Align(resultType->getScalarSizeInBits() / 8));
+					load->setAtomic(*ordering, scope);
+					return Set(id, load);
+				}
+				if (opcode == SpvOpAtomicStore)
+				{
+					llvm::Value* value = Value(args[3]);
+					if (!value)
+						return false;
+					if (*ordering == llvm::AtomicOrdering::Acquire || *ordering == llvm::AtomicOrdering::AcquireRelease)
+						ordering = llvm::AtomicOrdering::Release;
+					llvm::StoreInst* store = m_builder.CreateAlignedStore(value, pointer, llvm::Align(value->getType()->getScalarSizeInBits() / 8));
+					store->setAtomic(*ordering, scope);
+					return true;
+				}
+				if (opcode == SpvOpAtomicCompareExchange)
+				{
+					llvm::Value* value = Value(args[4]);
+					llvm::Value* comparator = Value(args[5]);
+					if (!value || !comparator)
+						return false;
+					llvm::AtomicCmpXchgInst* exchange =
+						m_builder.CreateAtomicCmpXchg(pointer, comparator, value, llvm::MaybeAlign(), *ordering,
+													  llvm::AtomicCmpXchgInst::getStrongestFailureOrdering(*ordering), scope);
+					return Set(id, m_builder.CreateExtractValue(exchange, {0}));
+				}
+
+				llvm::AtomicRMWInst::BinOp operation = llvm::AtomicRMWInst::Add;
+				llvm::Value* value = nullptr;
+				switch (opcode)
+				{
+					case SpvOpAtomicIIncrement:
+						value = llvm::ConstantInt::get(resultType, 1);
+						break;
+					case SpvOpAtomicIDecrement:
+						operation = llvm::AtomicRMWInst::Sub;
+						value = llvm::ConstantInt::get(resultType, 1);
+						break;
+					case SpvOpAtomicExchange:
+						operation = llvm::AtomicRMWInst::Xchg;
+						break;
+					case SpvOpAtomicISub:
+						operation = llvm::AtomicRMWInst::Sub;
+						break;
+					case SpvOpAtomicSMin:
+						operation = llvm::AtomicRMWInst::Min;
+						break;
+					case SpvOpAtomicUMin:
+						operation = llvm::AtomicRMWInst::UMin;
+						break;
+					case SpvOpAtomicSMax:
+						operation = llvm::AtomicRMWInst::Max;
+						break;
+					case SpvOpAtomicUMax:
+						operation = llvm::AtomicRMWInst::UMax;
+						break;
+					case SpvOpAtomicAnd:
+						operation = llvm::AtomicRMWInst::And;
+						break;
+					case SpvOpAtomicOr:
+						operation = llvm::AtomicRMWInst::Or;
+						break;
+					case SpvOpAtomicXor:
+						operation = llvm::AtomicRMWInst::Xor;
+						break;
+					default:
+						break;
+				}
+				if (!value)
+					value = Value(args[3]);
+				if (!value)
+					return false;
+				return Set(id, m_builder.CreateAtomicRMW(operation, pointer, value, llvm::MaybeAlign(), *ordering, scope));
 			}
 
 			bool LowerExtInst(uint32_t id, llvm::Type* resultType, std::span<const uint32_t> args)
@@ -1884,9 +2153,10 @@ namespace amdcomp
 						return false;
 					layout.pushConstantDwords = std::max(layout.pushConstantDwords, static_cast<uint32_t>((block->size + 3) / 4));
 				}
-				layout.userSgprs = kPushConstantUserData + layout.pushConstantDwords;
+				layout.userSgprs = kPushConstantUserData + layout.pushConstantDwords + static_cast<uint32_t>(m_usedSets.size());
 				if (layout.userSgprs > kMaxComputeUserSgprs)
-					return Fail(std::format("{} push constant dwords don't fit in the user SGPRs (spilling them isn't supported yet)", layout.pushConstantDwords));
+					return Fail(std::format("{} push constant dwords and {} descriptor sets don't fit in the user SGPRs", layout.pushConstantDwords,
+											m_usedSets.size()));
 
 				const unsigned sgprArguments = layout.userSgprs + 4;
 				std::vector<llvm::Type*> parameters(sgprArguments + 1, m_builder.getInt32Ty());
@@ -1944,6 +2214,18 @@ namespace amdcomp
 							break;
 					}
 				}
+				if (!m_usedSets.empty())
+				{
+					llvm::Value* pc = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_s_getpc, {}, {});
+					llvm::Value* high = m_builder.CreateAnd(pc, m_builder.getInt64(0xFFFFFFFF00000000ull));
+					for (size_t i = 0; i < m_usedSets.size(); ++i)
+					{
+						const uint32_t userData = kPushConstantUserData + layout.pushConstantDwords + static_cast<uint32_t>(i);
+						layout.setTableUserData[m_usedSets[i]] = userData;
+						llvm::Value* address = m_builder.CreateOr(high, m_builder.CreateZExt(entry->getArg(userData), m_builder.getInt64Ty()));
+						storage.push_back(m_builder.CreateIntToPtr(address, llvm::PointerType::get(m_context, kConstantAddressSpace)));
+					}
+				}
 				m_builder.CreateCall(m_functions.at(m_entryFunctionId), storage);
 				m_builder.CreateRetVoid();
 				return true;
@@ -1965,12 +2247,16 @@ namespace amdcomp
 			std::unordered_map<uint32_t, uint32_t> m_unsupportedVariables;
 			std::unordered_map<uint32_t, PointerInfo> m_pointerInfo;
 			std::vector<InvocationVariable> m_invocationVariables;
+			std::unordered_map<uint32_t, DescriptorVariable> m_descriptorVariables;
+			std::vector<uint32_t> m_usedSets;
 			std::unordered_map<uint32_t, llvm::Function*> m_functions;
 
 			llvm::Function* m_currentFunction = nullptr;
 			std::unordered_map<uint32_t, llvm::Value*> m_values;
 			std::unordered_map<uint32_t, llvm::BasicBlock*> m_blocks;
 			std::vector<PendingPhi> m_pendingPhis;
+			std::unordered_map<uint32_t, llvm::Value*> m_setTables;
+			std::unordered_map<uint32_t, llvm::Value*> m_bufferRecords;
 		};
 	} // namespace
 

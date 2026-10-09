@@ -18,6 +18,21 @@ namespace amdcomp
 		uint32_t size;
 	};
 
+	enum class DescriptorKind
+	{
+		UniformBuffer,
+		StorageBuffer
+	};
+
+	struct Descriptor
+	{
+		uint32_t set;
+		uint32_t binding;
+		DescriptorKind kind;
+		uint32_t offset;
+		uint32_t count;
+	};
+
 	struct ComputeShader
 	{
 		std::vector<uint32_t> code;
@@ -31,6 +46,7 @@ namespace amdcomp
 		uint32_t pushConstantUserData = 0;
 		uint32_t pushConstantDwords = 0;
 		uint32_t setTableUserData[kMaxDescriptorSets] = {};
+		std::vector<Descriptor> descriptors;
 	};
 
 	struct CompileOptions

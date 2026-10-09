@@ -85,6 +85,7 @@ namespace vkd::amd
 
 		const PrecompiledComputeShader* m_computeShader = nullptr;
 		std::vector<uint32_t> m_compiledCode;
+		std::vector<PrecompiledDescriptor> m_compiledDescriptors;
 		PrecompiledComputeShader m_compiledShader = {};
 		const PrecompiledGraphicsPipeline* m_graphics = nullptr;
 		GraphicsPipelineState m_graphicsState;

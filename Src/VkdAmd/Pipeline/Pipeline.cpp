@@ -101,6 +101,13 @@ namespace vkd::amd
 		}
 
 		m_compiledCode = std::move(compiled->code);
+		m_compiledDescriptors.clear();
+		for (const amdcomp::Descriptor& descriptor : compiled->descriptors)
+		{
+			const VkDescriptorType type =
+				descriptor.kind == amdcomp::DescriptorKind::StorageBuffer ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			m_compiledDescriptors.push_back({descriptor.set, descriptor.binding, type, descriptor.offset, descriptor.count});
+		}
 		m_compiledShader = PrecompiledComputeShader{
 			.spirvHash = HashSpirv(spirv),
 			.code = m_compiledCode,
@@ -113,6 +120,7 @@ namespace vkd::amd
 			.dispatchInitiator = compiled->dispatchInitiator,
 			.pushConstantUserData = compiled->pushConstantUserData,
 			.pushConstantDwords = compiled->pushConstantDwords,
+			.descriptors = m_compiledDescriptors,
 		};
 		for (uint32_t set = 0; set < kMaxPrecompiledSets && set < amdcomp::kMaxDescriptorSets; ++set)
 			m_compiledShader.setTableUserData[set] = compiled->setTableUserData[set];
