@@ -62,8 +62,15 @@ namespace see::spirv
 					// Selector, Default, (Literal, Label)*
 					block.m_terminatorOperand = instruction.words[instruction.operands[0].offset];
 					block.m_branchTargets.push_back(instruction.words[instruction.operands[1].offset]);
-					for (cct::UInt16 i = 3; i < instruction.num_operands; i += 2)
-						block.m_branchTargets.push_back(instruction.words[instruction.operands[i].offset]);
+					for (cct::UInt16 i = 2; i + 1 < instruction.num_operands; i += 2)
+					{
+						const spv_parsed_operand_t& literal = instruction.operands[i];
+						cct::UInt64 value = instruction.words[literal.offset];
+						if (literal.num_words > 1)
+							value |= static_cast<cct::UInt64>(instruction.words[literal.offset + 1]) << 32;
+						block.m_switchLiterals.push_back(value);
+						block.m_branchTargets.push_back(instruction.words[instruction.operands[i + 1].offset]);
+					}
 					break;
 				case SpvOpReturnValue:
 					block.m_terminatorOperand = instruction.words[instruction.operands[0].offset];
@@ -177,6 +184,7 @@ namespace see::spirv
 					return SPV_ERROR_INVALID_BINARY;
 
 				state.m_currentFunction->m_parameters.push_back(instruction->result_id);
+				state.m_currentFunction->m_parameterTypes.push_back(instruction->type_id);
 				return SPV_SUCCESS;
 			}
 

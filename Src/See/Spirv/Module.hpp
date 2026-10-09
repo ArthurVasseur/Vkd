@@ -45,6 +45,7 @@ namespace see::spirv
 		Terminator m_terminator = Terminator::None;
 		std::vector<cct::UInt32> m_branchTargets;
 		cct::UInt32 m_terminatorOperand = 0; // BranchConditional: condition id. Switch: selector id. ReturnValue: returned value id.
+		std::vector<cct::UInt64> m_switchLiterals;
 	};
 
 	struct Function
@@ -52,6 +53,7 @@ namespace see::spirv
 		cct::UInt32 m_id;
 		cct::UInt32 m_resultType;
 		std::vector<cct::UInt32> m_parameters;
+		std::vector<cct::UInt32> m_parameterTypes;
 		std::vector<BasicBlock> m_blocks;
 	};
 
