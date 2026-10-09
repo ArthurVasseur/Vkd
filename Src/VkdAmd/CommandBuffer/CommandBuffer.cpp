@@ -1360,7 +1360,25 @@ namespace vkd::amd
 			uint32_t firstInstance;
 			bool indexed;
 			uint32_t firstIndex;
+			uint64_t indirectVa = 0;
+			uint32_t drawCount = 1;
+			uint32_t indirectStride = 0;
 		};
+
+		struct DispatchParams
+		{
+			uint32_t x;
+			uint32_t y;
+			uint32_t z;
+			uint64_t indirectVa = 0;
+		};
+
+		uint64_t IndirectVa(const vkd::Buffer* buffer, VkDeviceSize offset)
+		{
+			if (!IsBound(buffer) || offset >= buffer->GetSize())
+				return 0;
+			return AmdMemory(buffer->GetMemory())->GetGpuVa() + buffer->GetMemoryOffset() + offset;
+		}
 
 		// The subpass's depth/stencil attachment as PAL's DepthStencilView programs an image without
 		// HTILE (Gfx10DepthStencilView::InitRegisters), then the pipeline's tests (DepthStencil.hpp).
@@ -1465,7 +1483,7 @@ namespace vkd::amd
 				}
 				return VK_SUCCESS;
 			}
-			if (op.count == 0 || op.instanceCount == 0)
+			if (op.indirectVa == 0 ? (op.count == 0 || op.instanceCount == 0) : op.drawCount == 0)
 				return VK_SUCCESS;
 
 			// Indices: INDEX_BASE at the first index, MAX_SIZE = what's left in the buffer.
@@ -1556,7 +1574,7 @@ namespace vkd::amd
 			const VkRect2D& scissor = gs.dynamicScissor ? state.scissor : gs.scissor;
 			const ViewportRegs vp = ComputeViewportRegs(viewport);
 
-			if (!stream.HasRoom(130 + uint32_t(std::size(kGraphicsInitState) + graphics->drawState.size()) * 3))
+			if (!stream.HasRoom(150 + uint32_t(std::size(kGraphicsInitState) + graphics->drawState.size()) * 3))
 				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
 			if (!state.shaderCachesInvalidated)
 			{
@@ -1720,7 +1738,23 @@ namespace vkd::amd
 			const uint32_t constantBits[4] = {FloatBits(constants[0]), FloatBits(constants[1]), FloatBits(constants[2]), FloatBits(constants[3])};
 			stream.SetContextRegs(kCbBlendRed, constantBits, 4);
 			EmitDepthStencilTarget(stream, subpass, views, gs, state);
-			if (op.indexed)
+			if (op.indirectVa != 0)
+			{
+				uint32_t baseVertexReg = 0;
+				uint32_t baseInstanceReg = 0;
+				for (const RegWrite& w : graphics->drawState)
+				{
+					if (w.patch == RegPatch::BaseVertex)
+						baseVertexReg = w.reg;
+					else if (w.patch == RegPatch::BaseInstance)
+						baseInstanceReg = w.reg;
+				}
+				if (op.indexed)
+					stream.IndexBuffer(indexVa, maxIndices);
+				stream.SetIndirectBase(op.indirectVa, false);
+				stream.DrawIndirect(baseVertexReg, baseInstanceReg, op.indexed, op.drawCount, op.indirectStride);
+			}
+			else if (op.indexed)
 				stream.DrawIndex2(op.instanceCount, maxIndices, indexVa, op.count);
 			else
 				stream.DrawIndexAuto(op.instanceCount, op.count, graphics->drawInitiator);
@@ -1731,7 +1765,7 @@ namespace vkd::amd
 		// vkCmdDispatch: the shader registers AMDVLK programs for the same pipeline, push constants in
 		// COMPUTE_USER_DATA_n, DISPATCH_DIRECT, then CS_PARTIAL_FLUSH so the next packets (CP DMA,
 		// the EOP postamble) see the results.
-		VkResult EncodeDispatch(Pm4Stream& stream, const vkd::OpDispatch& op, EncodeState& state)
+		VkResult EncodeDispatch(Pm4Stream& stream, const DispatchParams& op, EncodeState& state)
 		{
 			const amd::Pipeline* pipeline = state.computePipeline;
 			const PrecompiledComputeShader* shader = pipeline ? pipeline->GetComputeShader() : nullptr;
@@ -1745,7 +1779,7 @@ namespace vkd::amd
 				}
 				return VK_SUCCESS;
 			}
-			if (op.GroupCountX == 0 || op.GroupCountY == 0 || op.GroupCountZ == 0)
+			if (op.indirectVa == 0 && (op.x == 0 || op.y == 0 || op.z == 0))
 				return VK_SUCCESS;
 			if (!stream.HasRoom(96 + shader->pushConstantDwords))
 				return VK_ERROR_OUT_OF_DEVICE_MEMORY;
@@ -1794,16 +1828,28 @@ namespace vkd::amd
 			}
 			if (shader->numWorkgroupsUserData != 0)
 			{
-				uint8_t* groups = nullptr;
-				const uint64_t groupsVa = state.descriptors ? state.descriptors->Allocate(16, groups) : 0;
+				uint64_t groupsVa = op.indirectVa;
 				if (groupsVa == 0)
-					return VK_ERROR_OUT_OF_DEVICE_MEMORY;
-				const uint32_t counts[4] = {op.GroupCountX, op.GroupCountY, op.GroupCountZ, 0};
-				std::memcpy(groups, counts, sizeof(counts));
+				{
+					uint8_t* groups = nullptr;
+					groupsVa = state.descriptors ? state.descriptors->Allocate(16, groups) : 0;
+					if (groupsVa == 0)
+						return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+					const uint32_t counts[4] = {op.x, op.y, op.z, 0};
+					std::memcpy(groups, counts, sizeof(counts));
+				}
 				const uint32_t address[2] = {static_cast<uint32_t>(groupsVa), static_cast<uint32_t>(groupsVa >> 32)};
 				stream.SetComputeShRegs(kComputeUserData0 + shader->numWorkgroupsUserData, address, 2);
 			}
-			stream.DispatchDirect(op.GroupCountX, op.GroupCountY, op.GroupCountZ, shader->dispatchInitiator);
+			if (op.indirectVa == 0)
+				stream.DispatchDirect(op.x, op.y, op.z, shader->dispatchInitiator);
+			else if (state.computeEngine)
+				stream.DispatchIndirectMec(op.indirectVa, shader->dispatchInitiator);
+			else
+			{
+				stream.SetIndirectBase(op.indirectVa, true);
+				stream.DispatchIndirect(0, shader->dispatchInitiator);
+			}
 			stream.EventWrite(kEventCsPartialFlush);
 			return VK_SUCCESS;
 		}
@@ -1974,6 +2020,16 @@ namespace vkd::amd
 								  DrawParams{drawIndexed->IndexCount, drawIndexed->InstanceCount, drawIndexed->VertexOffset, drawIndexed->FirstInstance, true,
 											 drawIndexed->FirstIndex},
 								  state);
+			if (const auto* draw = std::get_if<vkd::OpDrawIndirect>(&op))
+			{
+				const uint64_t va = IndirectVa(draw->BufferHandle, draw->Offset);
+				return va == 0 ? VK_SUCCESS : EncodeDraw(stream, DrawParams{0, 0, 0, 0, false, 0, va, draw->DrawCount, draw->Stride}, state);
+			}
+			if (const auto* draw = std::get_if<vkd::OpDrawIndexedIndirect>(&op))
+			{
+				const uint64_t va = IndirectVa(draw->BufferHandle, draw->Offset);
+				return va == 0 ? VK_SUCCESS : EncodeDraw(stream, DrawParams{0, 0, 0, 0, true, 0, va, draw->DrawCount, draw->Stride}, state);
+			}
 			if (const auto* bindVertex = std::get_if<vkd::OpBindVertexBuffer>(&op))
 			{
 				for (size_t i = 0; i < bindVertex->Buffers.size() && i < bindVertex->Offsets.size(); ++i)
@@ -2062,7 +2118,12 @@ namespace vkd::amd
 				return VK_SUCCESS;
 			}
 			if (const auto* dispatch = std::get_if<vkd::OpDispatch>(&op))
-				return EncodeDispatch(stream, *dispatch, state);
+				return EncodeDispatch(stream, DispatchParams{dispatch->GroupCountX, dispatch->GroupCountY, dispatch->GroupCountZ}, state);
+			if (const auto* dispatch = std::get_if<vkd::OpDispatchIndirect>(&op))
+			{
+				const uint64_t va = IndirectVa(dispatch->BufferHandle, dispatch->Offset);
+				return va == 0 ? VK_SUCCESS : EncodeDispatch(stream, DispatchParams{0, 0, 0, va}, state);
+			}
 			if (const auto* begin = std::get_if<vkd::OpBeginQuery>(&op))
 			{
 				if (!begin->QueryPoolObject || begin->QueryPoolObject->GetQueryType() != VK_QUERY_TYPE_OCCLUSION || state.computeEngine)
@@ -2146,13 +2207,27 @@ namespace vkd::amd
 		}
 	} // namespace
 
+	namespace
+	{
+		bool IsDraw(const vkd::CommandBuffer::Op& op)
+		{
+			return std::holds_alternative<vkd::OpDraw>(op) || std::holds_alternative<vkd::OpDrawIndexed>(op) || std::holds_alternative<vkd::OpDrawIndirect>(op) ||
+				   std::holds_alternative<vkd::OpDrawIndexedIndirect>(op);
+		}
+
+		bool IsDispatch(const vkd::CommandBuffer::Op& op)
+		{
+			return std::holds_alternative<vkd::OpDispatch>(op) || std::holds_alternative<vkd::OpDispatchIndirect>(op);
+		}
+	} // namespace
+
 	bool NeedsAttributeRing(std::span<const vkd::CommandBuffer::Op> ops, uint32_t depth)
 	{
 		if (depth > 4)
 			return false;
 		for (const vkd::CommandBuffer::Op& op : ops)
 		{
-			if (std::holds_alternative<vkd::OpDraw>(op) || std::holds_alternative<vkd::OpDrawIndexed>(op))
+			if (IsDraw(op))
 				return true;
 			if (const auto* execute = std::get_if<vkd::OpExecuteCommands>(&op))
 			{
@@ -2199,9 +2274,9 @@ namespace vkd::amd
 		uint64_t count = 0;
 		for (const vkd::CommandBuffer::Op& op : ops)
 		{
-			if (std::holds_alternative<vkd::OpDispatch>(op))
+			if (IsDispatch(op))
 				count += kMaxPrecompiledSets + 1;
-			else if (std::holds_alternative<vkd::OpDraw>(op) || std::holds_alternative<vkd::OpDrawIndexed>(op))
+			else if (IsDraw(op))
 				count += kMaxPrecompiledSets;
 			else if (const uint64_t tiled = TiledRpmDispatchCount(op))
 				count += tiled;
@@ -2225,8 +2300,7 @@ namespace vkd::amd
 			return false;
 		for (const vkd::CommandBuffer::Op& op : ops)
 		{
-			if (std::holds_alternative<vkd::OpDispatch>(op) || std::holds_alternative<vkd::OpDraw>(op) ||
-				std::holds_alternative<vkd::OpDrawIndexed>(op) || std::holds_alternative<vkd::Image::OpBlit>(op))
+			if (IsDispatch(op) || IsDraw(op) || std::holds_alternative<vkd::Image::OpBlit>(op))
 				return true;
 			// Tiled images are copied and cleared by RPM shaders.
 			if (TiledRpmDispatchCount(op) != 0)

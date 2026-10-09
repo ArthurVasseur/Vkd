@@ -16,6 +16,14 @@ namespace vkd::amd
 	}
 
 	inline constexpr uint32_t kItNop = 0x10;
+	inline constexpr uint32_t kItSetBase = 0x11;
+	inline constexpr uint32_t kItIndexBufferSize = 0x13;
+	inline constexpr uint32_t kItDispatchIndirect = 0x16;
+	inline constexpr uint32_t kItDrawIndirect = 0x24;
+	inline constexpr uint32_t kItDrawIndexIndirect = 0x25;
+	inline constexpr uint32_t kItIndexBase = 0x26;
+	inline constexpr uint32_t kItDrawIndirectMulti = 0x2C;
+	inline constexpr uint32_t kItDrawIndexIndirectMulti = 0x38;
 	inline constexpr uint32_t kItIndirectBuffer = 0x3F;
 	inline constexpr uint32_t kItClearState = 0x12;
 	inline constexpr uint32_t kItContextControl = 0x28;
@@ -426,6 +434,67 @@ namespace vkd::amd
 			Emit(0);
 			Emit(0x80000000u);
 			Emit(0);
+		}
+
+		// Indirect arguments as PAL reads them (UniversalCmdBuffer::CmdDraw*IndirectMulti): SET_BASE
+		// patch_table_base, then each DRAW_*INDIRECT / DISPATCH_INDIRECT takes an offset from it. The
+		// CP writes the draw's first vertex / vertex offset and first instance into the given SH
+		// registers.
+		void SetIndirectBase(uint64_t gpuVa, bool compute)
+		{
+			Emit(PkT3(kItSetBase, 2) | (compute ? kPkt3ShaderTypeCompute : 0));
+			Emit(1);
+			Emit(static_cast<uint32_t>(gpuVa));
+			Emit(static_cast<uint32_t>(gpuVa >> 32));
+		}
+
+		void IndexBuffer(uint64_t indexVa, uint32_t maxIndices)
+		{
+			Emit(PkT3(kItIndexBase, 1));
+			Emit(static_cast<uint32_t>(indexVa));
+			Emit(static_cast<uint32_t>(indexVa >> 32));
+			Emit(PkT3(kItIndexBufferSize, 0));
+			Emit(maxIndices);
+		}
+
+		void DrawIndirect(uint32_t baseVertexReg, uint32_t baseInstanceReg, bool indexed, uint32_t count, uint32_t stride)
+		{
+			constexpr uint32_t kShRegBase = 0x2C00;
+			const uint32_t initiator = indexed ? 0u : 2u;
+			if (count == 1)
+			{
+				Emit(PkT3(indexed ? kItDrawIndexIndirect : kItDrawIndirect, 3));
+				Emit(0);
+				Emit(baseVertexReg - kShRegBase);
+				Emit(baseInstanceReg - kShRegBase);
+				Emit(initiator);
+				return;
+			}
+			Emit(PkT3(indexed ? kItDrawIndexIndirectMulti : kItDrawIndirectMulti, 8));
+			Emit(0);
+			Emit(baseVertexReg - kShRegBase);
+			Emit(baseInstanceReg - kShRegBase);
+			Emit(0);
+			Emit(count);
+			Emit(0);
+			Emit(0);
+			Emit(stride);
+			Emit(initiator);
+		}
+
+		void DispatchIndirect(uint32_t dataOffset, uint32_t initiator)
+		{
+			Emit(PkT3(kItDispatchIndirect, 1) | kPkt3ShaderTypeCompute);
+			Emit(dataOffset);
+			Emit(initiator);
+		}
+
+		void DispatchIndirectMec(uint64_t gpuVa, uint32_t initiator)
+		{
+			Emit(PkT3(kItDispatchIndirect, 2) | kPkt3ShaderTypeCompute);
+			Emit(static_cast<uint32_t>(gpuVa));
+			Emit(static_cast<uint32_t>(gpuVa >> 32));
+			Emit(initiator);
 		}
 
 		void DispatchDirect(uint32_t x, uint32_t y, uint32_t z, uint32_t initiator)

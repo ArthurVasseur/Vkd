@@ -306,6 +306,9 @@ namespace vkd::amd
 		// ([draw][vkd][depth]: depth bounds static/dynamic, depth bias with a clamp).
 		features.depthBounds = VK_TRUE;
 		features.depthBiasClamp = VK_TRUE;
+		// DRAW_INDIRECT_MULTI, with the first instance written to the VS's base instance user data.
+		features.multiDrawIndirect = VK_TRUE;
+		features.drawIndirectFirstInstance = VK_TRUE;
 	}
 
 	DispatchableObjectResult<vkd::Device> PhysicalDevice::CreateDevice()
