@@ -90,3 +90,59 @@ TEST_CASE("compile the SPIR-V file in AMDCOMP_SPIRV", "[.][amd-compiler][file]")
 	if (shader)
 		WARN(Disassemble(shader->code, true));
 }
+
+TEST_CASE("disassemble the code file in AMDCOMP_CODE", "[.][amd-compiler][disassemble]")
+{
+	char path[512] = {};
+	size_t length = 0;
+	REQUIRE((getenv_s(&length, path, sizeof(path), "AMDCOMP_CODE") == 0 && length > 1));
+	std::ifstream file(path, std::ios::binary);
+	REQUIRE(file);
+	const std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	std::vector<uint32_t> code(bytes.size() / 4);
+	std::memcpy(code.data(), bytes.data(), code.size() * 4);
+	WARN(Disassemble(code, true));
+}
+
+TEST_CASE("vkd-test-app's pipeline compiles", "[amd-compiler][graphics]")
+{
+	std::string error;
+	const std::optional<GraphicsShaders> shaders = CompileGraphicsShaders(tests::kTestAppVertSpirv, tests::kTestAppFragSpirv, GraphicsOptions{}, error);
+	INFO(error);
+	REQUIRE(shaders.has_value());
+	CHECK(shaders->vsOutConfig == 2);
+	CHECK(shaders->numInterpolants == 2);
+	REQUIRE(shaders->psInputCntl.size() == 2);
+	CHECK(shaders->psInputCntl[0] == 0);
+	CHECK(shaders->psInputCntl[1] == 1);
+	CHECK(shaders->colorFormat == 4);
+	CHECK(shaders->shaderMask == 0xF);
+	CHECK(shaders->fragmentSetTableUserData[0] == 1);
+	REQUIRE(shaders->descriptors.size() == 2);
+	CHECK(shaders->descriptors[0].kind == DescriptorKind::UniformBuffer);
+	CHECK(shaders->descriptors[0].offset == 0);
+	CHECK(shaders->descriptors[1].kind == DescriptorKind::CombinedImageSampler);
+	CHECK(shaders->descriptors[1].offset == 16);
+	CHECK(Disassemble(shaders->vertex.code, true).find("exp pos0") != std::string::npos);
+	CHECK(Disassemble(shaders->fragment.code, true).find("image_sample") != std::string::npos);
+}
+
+TEST_CASE("print the compiled graphics test shaders", "[.][amd-compiler][dump-graphics]")
+{
+	const std::pair<std::span<const uint32_t>, std::span<const uint32_t>> pipelines[] = {
+		{tests::kTestAppVertSpirv, tests::kTestAppFragSpirv},
+		{tests::kVaryingsVertSpirv, tests::kVaryingsFragSpirv},
+	};
+	for (const auto& [vertex, fragment] : pipelines)
+	{
+		std::string error;
+		const std::optional<GraphicsShaders> shaders = CompileGraphicsShaders(vertex, fragment, GraphicsOptions{}, error);
+		INFO(error);
+		REQUIRE(shaders.has_value());
+		WARN("GS RSRC1 " << std::hex << shaders->vertex.pgmRsrc1 << " RSRC2 " << shaders->vertex.pgmRsrc2 << " PS RSRC1 " << shaders->fragment.pgmRsrc1
+						 << " RSRC2 " << shaders->fragment.pgmRsrc2 << " ENA " << shaders->psInputEna << " ADDR " << shaders->psInputAddr << " VS_OUT "
+						 << shaders->vsOutConfig);
+		WARN(Disassemble(shaders->vertex.code, true));
+		WARN(Disassemble(shaders->fragment.code, true));
+	}
+}

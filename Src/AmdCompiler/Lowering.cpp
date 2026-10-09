@@ -160,6 +160,40 @@ namespace amdcomp
 				return std::move(m_module);
 			}
 
+			std::unique_ptr<llvm::Module> LowerVertex(std::span<const Descriptor> descriptorLayout, VertexLayout& layout, std::string& error)
+			{
+				if (!Prepare(SpvExecutionModelVertex, descriptorLayout, layout.descriptors) || !CreateVertexEntry(layout))
+				{
+					error = m_error.empty() ? "SPIR-V lowering failed" : m_error;
+					return nullptr;
+				}
+				return std::move(m_module);
+			}
+
+			std::unique_ptr<llvm::Module> LowerFragment(std::span<const Descriptor> descriptorLayout, std::span<const ColorExportFormat> colorExports,
+														FragmentLayout& layout, std::string& error)
+			{
+				m_fragmentStage = true;
+				if (!Prepare(SpvExecutionModelFragment, descriptorLayout, layout.descriptors) || !CreateFragmentEntry(colorExports, layout))
+				{
+					error = m_error.empty() ? "SPIR-V lowering failed" : m_error;
+					return nullptr;
+				}
+				return std::move(m_module);
+			}
+
+			bool ScanDescriptors(std::vector<Descriptor>& descriptors, std::string& error)
+			{
+				if (!LowerGlobals())
+				{
+					error = m_error;
+					return false;
+				}
+				for (const auto& [id, variable] : m_descriptorVariables)
+					descriptors.push_back(Descriptor{variable.set, variable.binding, variable.kind, 0, variable.count});
+				return true;
+			}
+
 		private:
 			bool Fail(std::string message)
 			{
@@ -173,20 +207,20 @@ namespace amdcomp
 				return Fail(std::format("unsupported SPIR-V instruction {}", SpvOpToString(static_cast<SpvOp>(instruction.m_opcode))));
 			}
 
-			bool RunCompute(ComputeLayout& layout)
+			bool Prepare(uint32_t executionModel, std::span<const Descriptor> descriptorLayout, std::vector<Descriptor>& descriptors)
 			{
-				const spirv::EntryPoint* entryPoint = nullptr;
 				for (const spirv::EntryPoint& candidate : m_spirv.m_entryPoints)
 				{
-					if (candidate.m_name == m_options.entryPoint && candidate.m_executionModel == SpvExecutionModelGLCompute)
-						entryPoint = &candidate;
+					if (candidate.m_name == m_options.entryPoint && candidate.m_executionModel == executionModel)
+						m_entryPoint = &candidate;
 				}
-				if (!entryPoint)
-					return Fail(std::format("no GLCompute entry point named {}", m_options.entryPoint));
-				m_entryFunctionId = entryPoint->m_functionId;
-				m_entryInterface = entryPoint->m_interfaceIds;
+				if (!m_entryPoint)
+					return Fail(std::format("no {} entry point named {}", SpvExecutionModelToString(static_cast<SpvExecutionModel>(executionModel)),
+											m_options.entryPoint));
+				m_entryFunctionId = m_entryPoint->m_functionId;
+				m_entryInterface = m_entryPoint->m_interfaceIds;
 
-				if (!LowerGlobals() || !ReadLocalSize(*entryPoint, layout.localSize) || !AssignDescriptorOffsets(layout) || !DeclareFunctions())
+				if (!LowerGlobals() || !AssignDescriptorOffsets(descriptorLayout, descriptors) || !DeclareFunctions())
 					return false;
 				if (m_constantFolder)
 				{
@@ -198,7 +232,18 @@ namespace amdcomp
 					if (!LowerFunction(function))
 						return false;
 				}
-				return CreateComputeEntry(layout);
+				return true;
+			}
+
+			bool RunCompute(ComputeLayout& layout)
+			{
+				return Prepare(SpvExecutionModelGLCompute, {}, layout.descriptors) && ReadLocalSize(*m_entryPoint, layout.localSize) &&
+					   CreateComputeEntry(layout);
+			}
+
+			bool InEntryInterface(uint32_t id) const
+			{
+				return std::find(m_entryInterface.begin(), m_entryInterface.end(), id) != m_entryInterface.end();
 			}
 
 			std::optional<uint32_t> Decoration(uint32_t id, uint32_t kind) const
@@ -884,7 +929,7 @@ namespace amdcomp
 				return m_builder.CreateInsertValue(result, load(4, 32), {1});
 			}
 
-			bool AssignDescriptorOffsets(ComputeLayout& layout)
+			bool AssignDescriptorOffsets(std::span<const Descriptor> descriptorLayout, std::vector<Descriptor>& descriptors)
 			{
 				std::vector<DescriptorVariable*> variables;
 				for (auto& [id, variable] : m_descriptorVariables)
@@ -897,9 +942,21 @@ namespace amdcomp
 				{
 					if (variable->set >= kMaxDescriptorSets)
 						return Fail(std::format("descriptor set {} is beyond the {} sets Vkd supports", variable->set, kMaxDescriptorSets));
-					variable->offset = tableBytes[variable->set];
-					tableBytes[variable->set] += variable->count * DescriptorBytes(variable->kind);
-					layout.descriptors.push_back(Descriptor{variable->set, variable->binding, variable->kind, variable->offset, variable->count});
+					if (descriptorLayout.empty())
+					{
+						variable->offset = tableBytes[variable->set];
+						tableBytes[variable->set] += variable->count * DescriptorBytes(variable->kind);
+					}
+					else
+					{
+						auto shared = std::find_if(descriptorLayout.begin(), descriptorLayout.end(),
+												   [&](const Descriptor& d)
+												   { return d.set == variable->set && d.binding == variable->binding; });
+						if (shared == descriptorLayout.end() || shared->kind != variable->kind)
+							return Fail(std::format("set {} binding {} doesn't match the pipeline's descriptor layout", variable->set, variable->binding));
+						variable->offset = shared->offset;
+					}
+					descriptors.push_back(Descriptor{variable->set, variable->binding, variable->kind, variable->offset, variable->count});
 					if (std::find(m_usedSets.begin(), m_usedSets.end(), variable->set) == m_usedSets.end())
 						m_usedSets.push_back(variable->set);
 				}
@@ -1113,7 +1170,11 @@ namespace amdcomp
 						m_builder.CreateUnreachable();
 						return true;
 					case spirv::Terminator::Kill:
-						return Fail("OpKill outside a fragment shader");
+						if (!m_fragmentStage)
+							return Fail("OpKill outside a fragment shader");
+						m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_kill, {}, {m_builder.getFalse()});
+						m_builder.CreateUnreachable();
+						return true;
 					default:
 						return Fail("block without a terminator");
 				}
@@ -2669,6 +2730,404 @@ namespace amdcomp
 				}
 			}
 
+			llvm::Value* TablePointer(llvm::Value* low)
+			{
+				llvm::Value* pc = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_s_getpc, {}, {});
+				llvm::Value* high = m_builder.CreateAnd(pc, m_builder.getInt64(0xFFFFFFFF00000000ull));
+				llvm::Value* address = m_builder.CreateOr(high, m_builder.CreateZExt(low, m_builder.getInt64Ty()));
+				return m_builder.CreateIntToPtr(address, llvm::PointerType::get(m_context, kConstantAddressSpace));
+			}
+
+			llvm::Value* Export(uint32_t target, uint32_t enable, llvm::ArrayRef<llvm::Value*> values, bool done, bool validMask)
+			{
+				llvm::Type* type = values[0]->getType();
+				std::vector<llvm::Value*> callArgs{m_builder.getInt32(target), m_builder.getInt32(enable)};
+				for (uint32_t i = 0; i < 4; ++i)
+					callArgs.push_back(i < values.size() ? values[i] : llvm::PoisonValue::get(type));
+				callArgs.push_back(m_builder.getInt1(done));
+				callArgs.push_back(m_builder.getInt1(validMask));
+				return m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_exp, {type}, callArgs);
+			}
+
+			llvm::Value* AsVec4Float(llvm::Value* value, float fill)
+			{
+				llvm::Type* floatType = m_builder.getFloatTy();
+				std::vector<llvm::Value*> components = Components(value, 4, floatType);
+				const unsigned count = value->getType()->isVectorTy() ? llvm::cast<llvm::FixedVectorType>(value->getType())->getNumElements() : 1;
+				for (unsigned i = count; i < 4; ++i)
+					components[i] = llvm::ConstantFP::get(floatType, i == 3 ? fill : 0.0f);
+				llvm::Value* result = llvm::PoisonValue::get(llvm::FixedVectorType::get(floatType, 4));
+				for (unsigned i = 0; i < 4; ++i)
+					result = m_builder.CreateInsertElement(result, components[i], uint64_t{i});
+				return result;
+			}
+
+			bool IsScalarOrVector(uint32_t typeId)
+			{
+				const Type* type = TypeOf(typeId);
+				if (!type)
+					return false;
+				if (type->kind == Type::Kind::Vector)
+					type = TypeOf(type->element);
+				return type && (type->kind == Type::Kind::Int || type->kind == Type::Kind::Float) && type->width == 32;
+			}
+
+			bool CreateVertexEntry(VertexLayout& layout)
+			{
+				if (!m_usedSets.empty())
+					return Fail("descriptors in vertex shaders aren't supported yet");
+				constexpr unsigned kSystemSgprs = 8;
+				constexpr unsigned kVgprs = 9;
+				const unsigned sgprs = kSystemSgprs + kVertexUserSgprs;
+				std::vector<llvm::Type*> parameters(sgprs + kVgprs, m_builder.getInt32Ty());
+				auto* entry = llvm::Function::Create(llvm::FunctionType::get(m_builder.getVoidTy(), parameters, false), llvm::GlobalValue::ExternalLinkage,
+													 "_amdgpu_gs_main", *m_module);
+				entry->setCallingConv(llvm::CallingConv::AMDGPU_GS);
+				for (unsigned i = 0; i < sgprs; ++i)
+					entry->addParamAttr(i, llvm::Attribute::InReg);
+
+				m_currentFunction = entry;
+				m_values.clear();
+				m_builder.SetInsertPoint(llvm::BasicBlock::Create(m_context, "", entry));
+				m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_init_exec, {}, {m_builder.getInt64(~uint64_t{0})});
+
+				llvm::Value* lane = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_mbcnt_lo, {}, {m_builder.getInt32(~0u), m_builder.getInt32(0)});
+				lane = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder.getInt32(~0u), lane});
+				llvm::Value* wave = m_builder.CreateAnd(m_builder.CreateLShr(entry->getArg(3), 24), 0xF);
+				llvm::Value* thread = m_builder.CreateAdd(m_builder.CreateMul(wave, m_builder.getInt32(64)), lane);
+				llvm::Value* vertexCount = m_builder.CreateAnd(m_builder.CreateLShr(entry->getArg(2), 12), 0x1FF);
+				llvm::Value* primitiveCount = m_builder.CreateAnd(m_builder.CreateLShr(entry->getArg(2), 22), 0x1FF);
+				llvm::Value* vertexIndex = m_builder.CreateAdd(entry->getArg(sgprs + 5), entry->getArg(kSystemSgprs + 1));
+				llvm::Value* instanceIndex = m_builder.CreateAdd(entry->getArg(sgprs + 8), entry->getArg(kSystemSgprs + 2));
+
+				std::vector<llvm::Value*> storage;
+				for (const InvocationVariable& variable : m_invocationVariables)
+				{
+					const std::optional<Layout> variableLayout = LayoutOf(variable.pointee);
+					if (!variableLayout)
+						return false;
+					llvm::AllocaInst* alloca = CreateAlloca(*variableLayout);
+					storage.push_back(alloca);
+					if (variable.storageClass == SpvStorageClassPushConstant)
+						return Fail("push constants in vertex shaders aren't supported yet");
+					if (variable.storageClass == SpvStorageClassInput && InEntryInterface(variable.id))
+					{
+						const std::optional<uint32_t> builtIn = Decoration(variable.id, SpvDecorationBuiltIn);
+						if (!builtIn)
+							return Fail("vertex inputs aren't supported yet");
+						llvm::Value* value = nullptr;
+						if (*builtIn == SpvBuiltInVertexIndex)
+							value = vertexIndex;
+						else if (*builtIn == SpvBuiltInInstanceIndex)
+						{
+							value = instanceIndex;
+							layout.instanceIndex = true;
+						}
+						else
+							return Fail(std::format("vertex built-in {} not supported yet", SpvBuiltInToString(static_cast<SpvBuiltIn>(*builtIn))));
+						if (!StoreMemory(alloca, variable.pointee, value, {}))
+							return false;
+					}
+					else if (variable.initializer != 0)
+					{
+						llvm::Value* initializer = Value(variable.initializer);
+						if (!initializer || !StoreMemory(alloca, variable.pointee, initializer, {}))
+							return false;
+					}
+				}
+				m_builder.CreateCall(m_functions.at(m_entryFunctionId), storage);
+
+				llvm::Value* position = nullptr;
+				std::vector<std::pair<uint32_t, llvm::Value*>> outputs;
+				for (size_t i = 0; i < m_invocationVariables.size(); ++i)
+				{
+					const InvocationVariable& variable = m_invocationVariables[i];
+					if (variable.storageClass != SpvStorageClassOutput || !InEntryInterface(variable.id))
+						continue;
+					if (const std::optional<uint32_t> builtIn = Decoration(variable.id, SpvDecorationBuiltIn))
+					{
+						if (*builtIn == SpvBuiltInPosition)
+							position = LoadMemory(storage[i], variable.pointee, {});
+						continue;
+					}
+					const Type* type = TypeOf(variable.pointee);
+					if (type && type->kind == Type::Kind::Struct && m_spirv.m_memberDecorations.contains(variable.pointee))
+					{
+						for (uint32_t member = 0; member < type->members.size(); ++member)
+						{
+							if (MemberDecoration(variable.pointee, member, SpvDecorationBuiltIn) != SpvBuiltInPosition)
+								continue;
+							const std::optional<uint64_t> offset = MemberOffset(variable.pointee, member);
+							if (!offset)
+								return false;
+							position = LoadMemory(OffsetPointer(storage[i], *offset), type->members[member], {});
+						}
+						continue;
+					}
+					const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
+					if (!location)
+						continue;
+					if (!IsScalarOrVector(variable.pointee) || Decoration(variable.id, SpvDecorationComponent))
+						return Fail("vertex outputs other than 32-bit scalars and vectors aren't supported yet");
+					llvm::Value* value = LoadMemory(storage[i], variable.pointee, {});
+					if (!value)
+						return false;
+					outputs.push_back({*location, AsVec4Float(value, 0.0f)});
+				}
+				std::sort(outputs.begin(), outputs.end(), [](const auto& a, const auto& b)
+						  { return a.first < b.first; });
+				for (const auto& output : outputs)
+					layout.outputLocations.push_back(output.first);
+				if (!position)
+					position = llvm::Constant::getNullValue(llvm::FixedVectorType::get(m_builder.getFloatTy(), 4));
+
+				llvm::BasicBlock* primitiveBlock = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* afterPrimitive = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* vertexBlock = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* end = llvm::BasicBlock::Create(m_context, "", entry);
+				m_builder.CreateCondBr(m_builder.CreateICmpULT(thread, primitiveCount), primitiveBlock, afterPrimitive);
+
+				m_builder.SetInsertPoint(primitiveBlock);
+				Export(20, 1, {entry->getArg(sgprs)}, true, false);
+				m_builder.CreateBr(afterPrimitive);
+
+				m_builder.SetInsertPoint(afterPrimitive);
+				m_builder.CreateCondBr(m_builder.CreateICmpULT(thread, vertexCount), vertexBlock, end);
+
+				m_builder.SetInsertPoint(vertexBlock);
+				if (!outputs.empty())
+				{
+					llvm::LoadInst* ring = m_builder.CreateAlignedLoad(llvm::FixedVectorType::get(m_builder.getInt32Ty(), 4),
+																	   OffsetPointer(TablePointer(entry->getArg(kSystemSgprs)), 0xB0), llvm::Align(16));
+					ring->setMetadata(llvm::LLVMContext::MD_invariant_load, llvm::MDNode::get(m_context, {}));
+					llvm::Value* descriptor = ring;
+					if (outputs.size() > 1)
+					{
+						llvm::Value* word = m_builder.CreateExtractElement(descriptor, uint64_t{1});
+						word = m_builder.CreateOr(m_builder.CreateAnd(word, 0xC000FFFFu), static_cast<uint64_t>(16 * outputs.size()) << 16);
+						descriptor = m_builder.CreateInsertElement(descriptor, word, uint64_t{1});
+					}
+					llvm::Value* waveOffset = m_builder.CreateAnd(m_builder.CreateShl(entry->getArg(5), 9), 0xFFFE00u);
+					for (size_t parameter = 0; parameter < outputs.size(); ++parameter)
+					{
+						m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_struct_buffer_store, {outputs[parameter].second->getType()},
+												  {outputs[parameter].second, descriptor, thread, m_builder.getInt32(static_cast<uint32_t>(16 * parameter)), waveOffset,
+												   m_builder.getInt32(1)});
+					}
+					m_builder.CreateFence(llvm::AtomicOrdering::Release, m_context.getOrInsertSyncScopeID("agent"));
+				}
+				std::vector<llvm::Value*> coordinates = Components(position, 4, m_builder.getFloatTy());
+				Export(12, 0xF, coordinates, true, false);
+				m_builder.CreateBr(end);
+
+				m_builder.SetInsertPoint(end);
+				m_builder.CreateRetVoid();
+				return true;
+			}
+
+			bool CreateFragmentEntry(std::span<const ColorExportFormat> colorExports, FragmentLayout& layout)
+			{
+				uint32_t pushConstantDwords = 0;
+				for (const InvocationVariable& variable : m_invocationVariables)
+				{
+					if (variable.storageClass != SpvStorageClassPushConstant)
+						continue;
+					const std::optional<Layout> block = LayoutOf(variable.pointee);
+					if (!block)
+						return false;
+					pushConstantDwords = std::max(pushConstantDwords, static_cast<uint32_t>((block->size + 3) / 4));
+				}
+				layout.userSgprs = 1;
+				for (const uint32_t set : m_usedSets)
+					layout.setTableUserData[set] = layout.userSgprs++;
+				if (pushConstantDwords > 0)
+				{
+					layout.pushConstantUserData = layout.userSgprs;
+					layout.pushConstantDwords = pushConstantDwords;
+					layout.userSgprs += pushConstantDwords;
+				}
+				if (layout.userSgprs > 32)
+					return Fail("the fragment shader's descriptor sets and push constants don't fit in the user SGPRs");
+
+				llvm::Type* i32 = m_builder.getInt32Ty();
+				llvm::Type* f32 = m_builder.getFloatTy();
+				llvm::Type* v2f32 = llvm::FixedVectorType::get(f32, 2);
+				llvm::Type* v3f32 = llvm::FixedVectorType::get(f32, 3);
+				std::vector<llvm::Type*> parameters(layout.userSgprs + 1, i32);
+				const unsigned firstVgpr = static_cast<unsigned>(parameters.size());
+				const llvm::Type* inputs[] = {v2f32, v2f32, v2f32, v3f32, v2f32, v2f32, v2f32, f32, f32, f32, f32, f32, f32, i32, i32, i32};
+				for (const llvm::Type* type : inputs)
+					parameters.push_back(const_cast<llvm::Type*>(type));
+				auto* entry = llvm::Function::Create(llvm::FunctionType::get(m_builder.getVoidTy(), parameters, false), llvm::GlobalValue::ExternalLinkage,
+													 "_amdgpu_ps_main", *m_module);
+				entry->setCallingConv(llvm::CallingConv::AMDGPU_PS);
+				for (unsigned i = 0; i < firstVgpr; ++i)
+					entry->addParamAttr(i, llvm::Attribute::InReg);
+
+				m_currentFunction = entry;
+				m_values.clear();
+				m_builder.SetInsertPoint(llvm::BasicBlock::Create(m_context, "", entry));
+				llvm::Value* primitiveMask = entry->getArg(layout.userSgprs);
+				auto vgpr = [&](unsigned index)
+				{ return entry->getArg(firstVgpr + index); };
+				constexpr unsigned kPerspSample = 0, kPerspCenter = 1, kPerspCentroid = 2, kLinearSample = 4, kLinearCenter = 5, kLinearCentroid = 6;
+				constexpr unsigned kPosX = 8, kFrontFace = 12;
+
+				std::vector<std::pair<uint32_t, size_t>> inputVariables;
+				for (size_t i = 0; i < m_invocationVariables.size(); ++i)
+				{
+					const InvocationVariable& variable = m_invocationVariables[i];
+					if (variable.storageClass != SpvStorageClassInput || !InEntryInterface(variable.id) || Decoration(variable.id, SpvDecorationBuiltIn))
+						continue;
+					const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
+					if (!location)
+						return Fail("fragment input without a Location");
+					inputVariables.push_back({*location, i});
+				}
+				std::sort(inputVariables.begin(), inputVariables.end());
+				std::unordered_map<size_t, uint32_t> attributeOf;
+				for (size_t k = 0; k < inputVariables.size(); ++k)
+					attributeOf[inputVariables[k].second] = static_cast<uint32_t>(k);
+
+				std::vector<llvm::Value*> storage;
+				for (size_t i = 0; i < m_invocationVariables.size(); ++i)
+				{
+					const InvocationVariable& variable = m_invocationVariables[i];
+					const std::optional<Layout> variableLayout = LayoutOf(variable.pointee);
+					if (!variableLayout)
+						return false;
+					llvm::AllocaInst* alloca = CreateAlloca(*variableLayout);
+					storage.push_back(alloca);
+					if (variable.storageClass == SpvStorageClassPushConstant)
+					{
+						for (uint32_t d = 0; d < (variableLayout->size + 3) / 4; ++d)
+							m_builder.CreateAlignedStore(entry->getArg(layout.pushConstantUserData + d), OffsetPointer(alloca, 4 * d), llvm::Align(4));
+						continue;
+					}
+					if (variable.storageClass != SpvStorageClassInput || !InEntryInterface(variable.id))
+					{
+						if (variable.initializer != 0)
+						{
+							llvm::Value* initializer = Value(variable.initializer);
+							if (!initializer || !StoreMemory(alloca, variable.pointee, initializer, {}))
+								return false;
+						}
+						continue;
+					}
+					llvm::Value* value = nullptr;
+					if (const std::optional<uint32_t> builtIn = Decoration(variable.id, SpvDecorationBuiltIn))
+					{
+						if (*builtIn == SpvBuiltInFragCoord)
+						{
+							llvm::Value* w = m_builder.CreateFDiv(llvm::ConstantFP::get(f32, 1.0), vgpr(kPosX + 3));
+							llvm::Value* coordinate = llvm::PoisonValue::get(llvm::FixedVectorType::get(f32, 4));
+							for (unsigned c = 0; c < 4; ++c)
+								coordinate = m_builder.CreateInsertElement(coordinate, c == 3 ? w : vgpr(kPosX + c), uint64_t{c});
+							value = coordinate;
+						}
+						else if (*builtIn == SpvBuiltInFrontFacing)
+							value = m_builder.CreateICmpNE(m_builder.CreateBitCast(vgpr(kFrontFace), i32), m_builder.getInt32(0));
+						else
+							return Fail(std::format("fragment built-in {} not supported yet", SpvBuiltInToString(static_cast<SpvBuiltIn>(*builtIn))));
+					}
+					else
+					{
+						if (!IsScalarOrVector(variable.pointee) || Decoration(variable.id, SpvDecorationComponent))
+							return Fail("fragment inputs other than 32-bit scalars and vectors aren't supported yet");
+						const Type* type = TypeOf(variable.pointee);
+						const Type* scalar = type->kind == Type::Kind::Vector ? TypeOf(type->element) : type;
+						const unsigned count = type->kind == Type::Kind::Vector ? type->count : 1;
+						const bool flat = Decoration(variable.id, SpvDecorationFlat).has_value() || scalar->kind == Type::Kind::Int;
+						const bool linear = Decoration(variable.id, SpvDecorationNoPerspective).has_value();
+						unsigned barycentric = linear ? kLinearCenter : kPerspCenter;
+						if (Decoration(variable.id, SpvDecorationCentroid))
+							barycentric = linear ? kLinearCentroid : kPerspCentroid;
+						else if (Decoration(variable.id, SpvDecorationSample))
+							barycentric = linear ? kLinearSample : kPerspSample;
+						llvm::Value* baryI = m_builder.CreateExtractElement(vgpr(barycentric), uint64_t{0});
+						llvm::Value* baryJ = m_builder.CreateExtractElement(vgpr(barycentric), uint64_t{1});
+						const uint32_t attribute = attributeOf.at(i);
+						layout.inputs.push_back({inputVariables[attribute].first, flat});
+						std::vector<llvm::Value*> components;
+						for (unsigned c = 0; c < count; ++c)
+						{
+							llvm::Value* parameter =
+								m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_lds_param_load, {}, {m_builder.getInt32(c), m_builder.getInt32(attribute), primitiveMask});
+							llvm::Value* component =
+								flat ? m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p10, {}, {parameter, llvm::ConstantFP::get(f32, 0.0), parameter})
+									 : m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p2, {},
+																 {parameter, baryJ,
+																  m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p10, {}, {parameter, baryI, parameter})});
+							components.push_back(component);
+						}
+						llvm::Type* valueType = ValueType(variable.pointee);
+						if (count == 1)
+							value = components[0];
+						else
+						{
+							value = llvm::PoisonValue::get(llvm::FixedVectorType::get(f32, count));
+							for (unsigned c = 0; c < count; ++c)
+								value = m_builder.CreateInsertElement(value, components[c], uint64_t{c});
+						}
+						if (value->getType() != valueType)
+							value = m_builder.CreateBitCast(value, valueType);
+					}
+					if (!StoreMemory(alloca, variable.pointee, value, {}))
+						return false;
+				}
+				std::sort(layout.inputs.begin(), layout.inputs.end(), [](const FragmentInput& a, const FragmentInput& b)
+						  { return a.location < b.location; });
+
+				for (const uint32_t set : m_usedSets)
+					storage.push_back(TablePointer(entry->getArg(layout.setTableUserData[set])));
+				m_builder.CreateCall(m_functions.at(m_entryFunctionId), storage);
+
+				std::vector<std::pair<uint32_t, llvm::Value*>> outputs;
+				for (size_t i = 0; i < m_invocationVariables.size(); ++i)
+				{
+					const InvocationVariable& variable = m_invocationVariables[i];
+					if (variable.storageClass != SpvStorageClassOutput || !InEntryInterface(variable.id))
+						continue;
+					if (Decoration(variable.id, SpvDecorationBuiltIn))
+						return Fail("fragment output built-ins aren't supported yet");
+					const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
+					if (!location || *location >= 8 || !IsScalarOrVector(variable.pointee))
+						return Fail("fragment outputs other than 32-bit scalars and vectors at locations 0-7 aren't supported yet");
+					llvm::Value* value = LoadMemory(storage[i], variable.pointee, {});
+					if (!value)
+						return false;
+					outputs.push_back({*location, AsVec4Float(value, 1.0f)});
+				}
+				std::sort(outputs.begin(), outputs.end(), [](const auto& a, const auto& b)
+						  { return a.first < b.first; });
+				constexpr uint32_t kColFormatFp16Abgr = 4;
+				constexpr uint32_t kColFormat32Abgr = 9;
+				for (size_t k = 0; k < outputs.size(); ++k)
+				{
+					const uint32_t location = outputs[k].first;
+					const bool last = k + 1 == outputs.size();
+					const ColorExportFormat format = location < colorExports.size() ? colorExports[location] : ColorExportFormat::Float16;
+					std::vector<llvm::Value*> components = Components(outputs[k].second, 4, f32);
+					if (format == ColorExportFormat::Float16)
+					{
+						llvm::Value* low = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_cvt_pkrtz, {}, {components[0], components[1]});
+						llvm::Value* high = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_cvt_pkrtz, {}, {components[2], components[3]});
+						Export(location, 0x3, {m_builder.CreateBitCast(low, f32), m_builder.CreateBitCast(high, f32)}, last, true);
+						layout.colorFormat |= kColFormatFp16Abgr << (4 * location);
+					}
+					else
+					{
+						Export(location, 0xF, components, last, true);
+						layout.colorFormat |= kColFormat32Abgr << (4 * location);
+					}
+					layout.shaderMask |= 0xFu << (4 * location);
+				}
+				if (outputs.empty())
+					Export(9, 0, {llvm::PoisonValue::get(f32)}, true, true);
+				m_builder.CreateRetVoid();
+				return true;
+			}
+
 			bool CreateComputeEntry(ComputeLayout& layout)
 			{
 				for (const InvocationVariable& variable : m_invocationVariables)
@@ -2792,6 +3251,7 @@ namespace amdcomp
 			llvm::IRBuilder<> m_builder;
 			std::string m_error;
 
+			const spirv::EntryPoint* m_entryPoint = nullptr;
 			uint32_t m_entryFunctionId = 0;
 			std::vector<uint32_t> m_entryInterface;
 			std::unordered_map<uint32_t, Type> m_types;
@@ -2822,5 +3282,27 @@ namespace amdcomp
 	{
 		Lowering lowering(spirv, options, context, tm);
 		return lowering.LowerCompute(layout, error);
+	}
+
+	bool ScanDescriptors(const see::spirv::Module& spirv, const CompileOptions& options, llvm::LLVMContext& context, llvm::TargetMachine& tm,
+						 std::vector<Descriptor>& descriptors, std::string& error)
+	{
+		Lowering lowering(spirv, options, context, tm);
+		return lowering.ScanDescriptors(descriptors, error);
+	}
+
+	std::unique_ptr<llvm::Module> LowerVertexShader(const see::spirv::Module& spirv, const CompileOptions& options, std::span<const Descriptor> descriptorLayout,
+													llvm::LLVMContext& context, llvm::TargetMachine& tm, VertexLayout& layout, std::string& error)
+	{
+		Lowering lowering(spirv, options, context, tm);
+		return lowering.LowerVertex(descriptorLayout, layout, error);
+	}
+
+	std::unique_ptr<llvm::Module> LowerFragmentShader(const see::spirv::Module& spirv, const CompileOptions& options,
+													  std::span<const Descriptor> descriptorLayout, std::span<const ColorExportFormat> colorExports,
+													  llvm::LLVMContext& context, llvm::TargetMachine& tm, FragmentLayout& layout, std::string& error)
+	{
+		Lowering lowering(spirv, options, context, tm);
+		return lowering.LowerFragment(descriptorLayout, colorExports, layout, error);
 	}
 } // namespace amdcomp

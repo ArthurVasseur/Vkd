@@ -64,5 +64,46 @@ namespace amdcomp
 
 	std::optional<ComputeShader> CompileComputeShader(std::span<const uint32_t> spirv, const CompileOptions& options, std::string& error);
 
+	enum class ColorExportFormat
+	{
+		Float16,
+		Float32
+	};
+
+	struct GraphicsStageCode
+	{
+		std::vector<uint32_t> code;
+		uint32_t pgmRsrc1 = 0;
+		uint32_t pgmRsrc2 = 0;
+	};
+
+	struct GraphicsShaders
+	{
+		GraphicsStageCode vertex;
+		GraphicsStageCode fragment;
+		bool instanceIndex = false;
+		uint32_t vsOutConfig = 0;
+		uint32_t numInterpolants = 0;
+		std::vector<uint32_t> psInputCntl;
+		uint32_t psInputEna = 0;
+		uint32_t psInputAddr = 0;
+		uint32_t colorFormat = 0;
+		uint32_t shaderMask = 0;
+		uint32_t fragmentSetTableUserData[kMaxDescriptorSets] = {};
+		uint32_t fragmentPushConstantUserData = 0;
+		uint32_t fragmentPushConstantDwords = 0;
+		std::vector<Descriptor> descriptors;
+	};
+
+	struct GraphicsOptions
+	{
+		CompileOptions vertex;
+		CompileOptions fragment;
+		std::span<const ColorExportFormat> colorExports = {};
+	};
+
+	std::optional<GraphicsShaders> CompileGraphicsShaders(std::span<const uint32_t> vertexSpirv, std::span<const uint32_t> fragmentSpirv,
+														  const GraphicsOptions& options, std::string& error);
+
 	std::string Disassemble(std::span<const uint32_t> code, bool wave64);
 } // namespace amdcomp
