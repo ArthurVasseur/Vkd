@@ -1567,6 +1567,79 @@ namespace amdcomp
 				return result;
 			}
 
+			std::vector<llvm::Value*> Columns(llvm::Value* matrix)
+			{
+				std::vector<llvm::Value*> columns;
+				for (unsigned c = 0; c < matrix->getType()->getArrayNumElements(); ++c)
+					columns.push_back(m_builder.CreateExtractValue(matrix, {c}));
+				return columns;
+			}
+
+			llvm::Value* MakeMatrix(llvm::Type* type, const std::vector<llvm::Value*>& columns)
+			{
+				llvm::Value* matrix = llvm::PoisonValue::get(type);
+				for (unsigned c = 0; c < columns.size(); ++c)
+					matrix = m_builder.CreateInsertValue(matrix, columns[c], {c});
+				return matrix;
+			}
+
+			llvm::Value* MatrixTimesVector(llvm::Value* matrix, llvm::Value* vector)
+			{
+				llvm::Value* sum = nullptr;
+				const std::vector<llvm::Value*> columns = Columns(matrix);
+				for (unsigned c = 0; c < columns.size(); ++c)
+				{
+					llvm::Value* term = m_builder.CreateFMul(columns[c], Splat(m_builder.CreateExtractElement(vector, c), columns[c]->getType()));
+					sum = sum ? m_builder.CreateFAdd(sum, term) : term;
+				}
+				return sum;
+			}
+
+			bool LowerMatrixOp(uint32_t opcode, uint32_t id, llvm::Type* resultType, llvm::Value* a, llvm::Value* b)
+			{
+				std::vector<llvm::Value*> columns;
+				switch (opcode)
+				{
+					case SpvOpMatrixTimesScalar:
+						for (llvm::Value* column : Columns(a))
+							columns.push_back(m_builder.CreateFMul(column, Splat(b, column->getType())));
+						return Set(id, MakeMatrix(resultType, columns));
+					case SpvOpMatrixTimesVector:
+						return Set(id, MatrixTimesVector(a, b));
+					case SpvOpVectorTimesMatrix:
+					{
+						llvm::Value* result = llvm::PoisonValue::get(resultType);
+						const std::vector<llvm::Value*> bColumns = Columns(b);
+						for (unsigned c = 0; c < bColumns.size(); ++c)
+							result = m_builder.CreateInsertElement(result, Dot(a, bColumns[c]), uint64_t{c});
+						return Set(id, result);
+					}
+					case SpvOpMatrixTimesMatrix:
+						for (llvm::Value* column : Columns(b))
+							columns.push_back(MatrixTimesVector(a, column));
+						return Set(id, MakeMatrix(resultType, columns));
+					case SpvOpOuterProduct:
+						for (unsigned c = 0; c < resultType->getArrayNumElements(); ++c)
+							columns.push_back(m_builder.CreateFMul(a, Splat(m_builder.CreateExtractElement(b, c), a->getType())));
+						return Set(id, MakeMatrix(resultType, columns));
+					case SpvOpTranspose:
+					{
+						const std::vector<llvm::Value*> aColumns = Columns(a);
+						llvm::Type* columnType = resultType->getArrayElementType();
+						for (unsigned r = 0; r < resultType->getArrayNumElements(); ++r)
+						{
+							llvm::Value* column = llvm::PoisonValue::get(columnType);
+							for (unsigned c = 0; c < aColumns.size(); ++c)
+								column = m_builder.CreateInsertElement(column, m_builder.CreateExtractElement(aColumns[c], r), uint64_t{c});
+							columns.push_back(column);
+						}
+						return Set(id, MakeMatrix(resultType, columns));
+					}
+					default:
+						return false;
+				}
+			}
+
 			llvm::Value* Dot(llvm::Value* a, llvm::Value* b)
 			{
 				auto* vectorType = llvm::dyn_cast<llvm::FixedVectorType>(a->getType());
@@ -1758,6 +1831,19 @@ namespace amdcomp
 					case SpvOpVectorTimesScalar:
 						return binary([&](llvm::Value* v, llvm::Value* s)
 									  { return m_builder.CreateFMul(v, Splat(s, v->getType())); });
+					case SpvOpMatrixTimesScalar:
+					case SpvOpMatrixTimesVector:
+					case SpvOpVectorTimesMatrix:
+					case SpvOpMatrixTimesMatrix:
+					case SpvOpOuterProduct:
+					case SpvOpTranspose:
+					{
+						llvm::Value* a = operand(0);
+						llvm::Value* b = instruction.m_opcode == SpvOpTranspose ? a : operand(1);
+						if (!a || !b)
+							return false;
+						return LowerMatrixOp(instruction.m_opcode, id, resultType, a, b);
+					}
 					case SpvOpDot:
 						return binary([&](llvm::Value* a, llvm::Value* b)
 									  { return Dot(a, b); });

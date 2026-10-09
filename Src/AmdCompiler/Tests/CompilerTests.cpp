@@ -149,6 +149,32 @@ TEST_CASE("vertex buffers compile", "[amd-compiler][graphics]")
 	CHECK(code.find("format:[BUF_FMT_32_32_FLOAT] idxen") != std::string::npos);
 }
 
+TEST_CASE("vertex shader descriptors, push constants and matrices compile", "[amd-compiler][graphics]")
+{
+	const VertexAttribute attributes[] = {
+		{.location = 0, .binding = 0, .offset = 0, .format = 0x32, .channels = 2, .swizzle = {0, 1, kVertexSwizzleZero, kVertexSwizzleOne}},
+		{.location = 1, .binding = 0, .offset = 8, .format = 0x32, .channels = 2, .swizzle = {0, 1, kVertexSwizzleZero, kVertexSwizzleOne}},
+		{.location = 2, .binding = 0, .offset = 16, .format = 0x32, .channels = 2, .swizzle = {0, 1, kVertexSwizzleZero, kVertexSwizzleOne}},
+	};
+	std::string error;
+	const std::optional<GraphicsShaders> shaders =
+		CompileGraphicsShaders(tests::kMatrixVertSpirv, tests::kMatrixFragSpirv, GraphicsOptions{.vertexAttributes = attributes}, error);
+	INFO(error);
+	REQUIRE(shaders.has_value());
+	CHECK(shaders->vertexBufferTableUserData == 1);
+	CHECK(shaders->vertexSetTableUserData[0] == 4);
+	CHECK(shaders->vertexPushConstantUserData == 5);
+	CHECK(shaders->vertexPushConstantDwords == 1);
+	CHECK(((shaders->vertex.pgmRsrc2 >> 1) & 0x1F) == 6);
+	CHECK(shaders->vsOutConfig == 2);
+	CHECK(shaders->numInterpolants == 2);
+	REQUIRE(shaders->psInputCntl.size() == 2);
+	CHECK(shaders->psInputCntl[0] == 0);
+	CHECK(shaders->psInputCntl[1] == 1);
+	REQUIRE(shaders->descriptors.size() == 1);
+	CHECK(shaders->descriptors[0].kind == DescriptorKind::UniformBuffer);
+}
+
 TEST_CASE("print the compiled graphics test shaders", "[.][amd-compiler][dump-graphics]")
 {
 	const std::pair<std::span<const uint32_t>, std::span<const uint32_t>> pipelines[] = {
