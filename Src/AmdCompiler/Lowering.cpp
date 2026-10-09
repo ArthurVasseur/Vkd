@@ -176,6 +176,7 @@ namespace amdcomp
 				if (!entryPoint)
 					return Fail(std::format("no GLCompute entry point named {}", m_options.entryPoint));
 				m_entryFunctionId = entryPoint->m_functionId;
+				m_entryInterface = entryPoint->m_interfaceIds;
 
 				if (!LowerGlobals() || !ReadLocalSize(*entryPoint, layout.localSize) || !AssignDescriptorOffsets(layout) || !DeclareFunctions())
 					return false;
@@ -2210,7 +2211,8 @@ namespace amdcomp
 															[&](const InvocationVariable& variable)
 															{
 																return variable.storageClass == SpvStorageClassInput &&
-																	   Decoration(variable.id, SpvDecorationBuiltIn) == SpvBuiltInNumWorkgroups;
+																	   Decoration(variable.id, SpvDecorationBuiltIn) == SpvBuiltInNumWorkgroups &&
+																	   std::find(m_entryInterface.begin(), m_entryInterface.end(), variable.id) != m_entryInterface.end();
 															});
 				if (needsNumWorkgroups)
 				{
@@ -2272,6 +2274,8 @@ namespace amdcomp
 							break;
 						case SpvStorageClassInput:
 						{
+							if (std::find(m_entryInterface.begin(), m_entryInterface.end(), variable.id) == m_entryInterface.end())
+								break;
 							const std::optional<uint32_t> builtIn = Decoration(variable.id, SpvDecorationBuiltIn);
 							if (!builtIn)
 								return Fail("compute shader input without a BuiltIn decoration");
@@ -2315,6 +2319,7 @@ namespace amdcomp
 			std::string m_error;
 
 			uint32_t m_entryFunctionId = 0;
+			std::vector<uint32_t> m_entryInterface;
 			std::unordered_map<uint32_t, Type> m_types;
 			std::unordered_map<uint32_t, llvm::Type*> m_llvmTypes;
 			std::unordered_map<uint32_t, std::string> m_extInstSets;
