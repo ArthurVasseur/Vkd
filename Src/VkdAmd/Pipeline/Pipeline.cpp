@@ -47,6 +47,25 @@ namespace vkd::amd
 			return getenv_s(&length, value, sizeof(value), name) == 0 && length > 1 && value[0] == '1';
 		}
 
+		VkDescriptorType ToVkDescriptorType(amdcomp::DescriptorKind kind)
+		{
+			switch (kind)
+			{
+				case amdcomp::DescriptorKind::StorageBuffer:
+					return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				case amdcomp::DescriptorKind::SampledImage:
+					return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+				case amdcomp::DescriptorKind::StorageImage:
+					return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				case amdcomp::DescriptorKind::Sampler:
+					return VK_DESCRIPTOR_TYPE_SAMPLER;
+				case amdcomp::DescriptorKind::CombinedImageSampler:
+					return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				default:
+					return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			}
+		}
+
 		struct CompiledComputeShader
 		{
 			std::optional<amdcomp::ComputeShader> shader;
@@ -140,9 +159,7 @@ namespace vkd::amd
 		m_compiledDescriptors.clear();
 		for (const amdcomp::Descriptor& descriptor : compiled->descriptors)
 		{
-			const VkDescriptorType type =
-				descriptor.kind == amdcomp::DescriptorKind::StorageBuffer ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			m_compiledDescriptors.push_back({descriptor.set, descriptor.binding, type, descriptor.offset, descriptor.count});
+			m_compiledDescriptors.push_back({descriptor.set, descriptor.binding, ToVkDescriptorType(descriptor.kind), descriptor.offset, descriptor.count});
 		}
 		m_compiledShader = PrecompiledComputeShader{
 			.spirvHash = HashSpirv(spirv),

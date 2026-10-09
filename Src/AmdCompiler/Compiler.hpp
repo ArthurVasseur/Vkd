@@ -21,7 +21,11 @@ namespace amdcomp
 	enum class DescriptorKind
 	{
 		UniformBuffer,
-		StorageBuffer
+		StorageBuffer,
+		SampledImage,
+		StorageImage,
+		Sampler,
+		CombinedImageSampler
 	};
 
 	struct Descriptor

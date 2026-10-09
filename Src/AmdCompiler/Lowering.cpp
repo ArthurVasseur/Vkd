@@ -51,6 +51,9 @@ namespace amdcomp
 				Struct,
 				Pointer,
 				Function,
+				Image,
+				Sampler,
+				SampledImage,
 				Opaque
 			};
 
@@ -61,6 +64,11 @@ namespace amdcomp
 			uint32_t count = 0;
 			uint32_t storageClass = 0;
 			std::vector<uint32_t> members;
+			uint32_t dim = 0;
+			bool arrayed = false;
+			bool multisampled = false;
+			uint32_t sampled = 0;
+			bool depth = false;
 		};
 
 		struct Layout
@@ -248,6 +256,8 @@ namespace amdcomp
 					case SpvStorageClassUniform:
 					case SpvStorageClassStorageBuffer:
 						return kBufferFatPointerAddressSpace;
+					case SpvStorageClassUniformConstant:
+						return kConstantAddressSpace;
 					default:
 						Fail(std::format("storage class {} not supported yet", SpvStorageClassToString(static_cast<SpvStorageClass>(storageClass))));
 						return std::nullopt;
@@ -308,6 +318,16 @@ namespace amdcomp
 						result = llvm::StructType::get(m_context, members);
 						break;
 					}
+					case Type::Kind::Image:
+						result = llvm::FixedVectorType::get(m_builder.getInt32Ty(), 8);
+						break;
+					case Type::Kind::Sampler:
+						result = llvm::FixedVectorType::get(m_builder.getInt32Ty(), 4);
+						break;
+					case Type::Kind::SampledImage:
+						result = llvm::StructType::get(m_context,
+													   {llvm::FixedVectorType::get(m_builder.getInt32Ty(), 8), llvm::FixedVectorType::get(m_builder.getInt32Ty(), 4)});
+						break;
 					case Type::Kind::Pointer:
 					{
 						const std::optional<unsigned> addressSpace = AddressSpace(type->storageClass);
@@ -338,6 +358,12 @@ namespace amdcomp
 						return Layout{type->width / 8, type->width / 8};
 					case Type::Kind::Pointer:
 						return Layout{8, 8};
+					case Type::Kind::Image:
+						return Layout{32, 16};
+					case Type::Kind::Sampler:
+						return Layout{16, 16};
+					case Type::Kind::SampledImage:
+						return Layout{48, 16};
 					case Type::Kind::Vector:
 					{
 						const std::optional<Layout> element = LayoutOf(type->element);
@@ -453,6 +479,14 @@ namespace amdcomp
 					return global->second;
 				if (auto descriptor = m_descriptorVariables.find(id); descriptor != m_descriptorVariables.end())
 				{
+					if (!IsBuffer(descriptor->second.kind))
+					{
+						llvm::BasicBlock& entry = m_currentFunction->getEntryBlock();
+						llvm::IRBuilder<> builder(&entry, entry.getFirstInsertionPt());
+						llvm::Value* pointer = builder.CreateGEP(builder.getInt8Ty(), m_setTables.at(descriptor->second.set), builder.getInt32(descriptor->second.offset));
+						m_values[id] = pointer;
+						return pointer;
+					}
 					if (descriptor->second.isArray)
 					{
 						Fail("arrays of descriptors are only supported through access chains");
@@ -559,9 +593,19 @@ namespace amdcomp
 							m_types[id] = Type{.kind = Type::Kind::Function, .members = std::vector<uint32_t>(args.begin(), args.end())};
 							break;
 						case SpvOpTypeImage:
+							m_types[id] = Type{.kind = Type::Kind::Image,
+											   .element = args[0],
+											   .dim = args[1],
+											   .arrayed = args[3] != 0,
+											   .multisampled = args[4] != 0,
+											   .sampled = args[5],
+											   .depth = args[2] == 1};
+							break;
 						case SpvOpTypeSampler:
+							m_types[id] = Type{.kind = Type::Kind::Sampler};
+							break;
 						case SpvOpTypeSampledImage:
-							m_types[id] = Type{.kind = Type::Kind::Opaque};
+							m_types[id] = Type{.kind = Type::Kind::SampledImage, .element = args[0]};
 							break;
 						case SpvOpConstantTrue:
 						case SpvOpConstantFalse:
@@ -752,6 +796,7 @@ namespace amdcomp
 					}
 					case SpvStorageClassUniform:
 					case SpvStorageClassStorageBuffer:
+					case SpvStorageClassUniformConstant:
 						return AddDescriptorVariable(id, storageClass, pointerType->element);
 					default:
 						m_unsupportedVariables[id] = storageClass;
@@ -768,16 +813,75 @@ namespace amdcomp
 					return Fail("runtime arrays of descriptors aren't supported");
 				const bool isArray = type->kind == Type::Kind::Array;
 				const uint32_t block = isArray ? type->element : pointee;
-				const bool storage = storageClass == SpvStorageClassStorageBuffer || Decoration(block, SpvDecorationBufferBlock).has_value();
+				const Type* element = TypeOf(block);
+				if (!element)
+					return false;
+				DescriptorKind kind = DescriptorKind::UniformBuffer;
+				switch (element->kind)
+				{
+					case Type::Kind::Struct:
+						kind = storageClass == SpvStorageClassStorageBuffer || Decoration(block, SpvDecorationBufferBlock).has_value() ? DescriptorKind::StorageBuffer
+																																	   : DescriptorKind::UniformBuffer;
+						break;
+					case Type::Kind::SampledImage:
+						kind = DescriptorKind::CombinedImageSampler;
+						break;
+					case Type::Kind::Image:
+						if (element->dim == SpvDimBuffer)
+							return Fail("texel buffers aren't supported yet");
+						kind = element->sampled == 2 ? DescriptorKind::StorageImage : DescriptorKind::SampledImage;
+						break;
+					case Type::Kind::Sampler:
+						kind = DescriptorKind::Sampler;
+						break;
+					default:
+						return Fail("unexpected descriptor type");
+				}
 				m_descriptorVariables[id] = DescriptorVariable{
 					.set = Decoration(id, SpvDecorationDescriptorSet).value_or(0),
 					.binding = Decoration(id, SpvDecorationBinding).value_or(0),
-					.kind = storage ? DescriptorKind::StorageBuffer : DescriptorKind::UniformBuffer,
+					.kind = kind,
 					.block = block,
 					.count = isArray ? type->count : 1,
 					.isArray = isArray,
 				};
 				return true;
+			}
+
+			static uint32_t DescriptorBytes(DescriptorKind kind)
+			{
+				switch (kind)
+				{
+					case DescriptorKind::SampledImage:
+					case DescriptorKind::StorageImage:
+						return 32;
+					case DescriptorKind::CombinedImageSampler:
+						return 48;
+					default:
+						return 16;
+				}
+			}
+
+			static bool IsBuffer(DescriptorKind kind)
+			{
+				return kind == DescriptorKind::UniformBuffer || kind == DescriptorKind::StorageBuffer;
+			}
+
+			llvm::Value* LoadDescriptor(llvm::Value* pointer, const Type& type, llvm::Type* valueType)
+			{
+				auto load = [&](unsigned dwords, uint64_t offset)
+				{
+					llvm::LoadInst* descriptor =
+						m_builder.CreateAlignedLoad(llvm::FixedVectorType::get(m_builder.getInt32Ty(), dwords), OffsetPointer(pointer, offset), llvm::Align(16));
+					descriptor->setMetadata(llvm::LLVMContext::MD_invariant_load, llvm::MDNode::get(m_context, {}));
+					return descriptor;
+				};
+				if (type.kind == Type::Kind::Image)
+					return load(8, 0);
+				if (type.kind == Type::Kind::Sampler)
+					return load(4, 0);
+				llvm::Value* result = m_builder.CreateInsertValue(llvm::PoisonValue::get(valueType), load(8, 0), {0});
+				return m_builder.CreateInsertValue(result, load(4, 32), {1});
 			}
 
 			bool AssignDescriptorOffsets(ComputeLayout& layout)
@@ -794,7 +898,7 @@ namespace amdcomp
 					if (variable->set >= kMaxDescriptorSets)
 						return Fail(std::format("descriptor set {} is beyond the {} sets Vkd supports", variable->set, kMaxDescriptorSets));
 					variable->offset = tableBytes[variable->set];
-					tableBytes[variable->set] += variable->count * kBufferDescriptorBytes;
+					tableBytes[variable->set] += variable->count * DescriptorBytes(variable->kind);
 					layout.descriptors.push_back(Descriptor{variable->set, variable->binding, variable->kind, variable->offset, variable->count});
 					if (std::find(m_usedSets.begin(), m_usedSets.end(), variable->set) == m_usedSets.end())
 						m_usedSets.push_back(variable->set);
@@ -1045,6 +1149,10 @@ namespace amdcomp
 						return m_builder.CreateAlignedLoad(valueType, pointer, llvm::Align(type->width / 8));
 					case Type::Kind::Pointer:
 						return m_builder.CreateIntToPtr(m_builder.CreateAlignedLoad(m_builder.getInt64Ty(), pointer, llvm::Align(4)), valueType);
+					case Type::Kind::Image:
+					case Type::Kind::Sampler:
+					case Type::Kind::SampledImage:
+						return LoadDescriptor(pointer, *type, valueType);
 					case Type::Kind::Vector:
 					{
 						const Type& element = m_types.at(type->element);
@@ -1234,7 +1342,8 @@ namespace amdcomp
 				uint32_t type = 0;
 				llvm::Value* records = nullptr;
 				size_t first = 1;
-				if (auto descriptor = m_descriptorVariables.find(args[0]); descriptor != m_descriptorVariables.end() && descriptor->second.isArray)
+				if (auto descriptor = m_descriptorVariables.find(args[0]);
+					descriptor != m_descriptorVariables.end() && descriptor->second.isArray && IsBuffer(descriptor->second.kind))
 				{
 					if (hasElement || args.size() < 2)
 						return Fail("unsupported access chain into an array of descriptors");
@@ -1817,6 +1926,32 @@ namespace amdcomp
 					case SpvOpExtInst:
 						return LowerExtInst(id, resultType, args);
 
+					case SpvOpSampledImage:
+					{
+						llvm::Value* image = operand(0);
+						llvm::Value* sampler = operand(1);
+						if (!image || !sampler)
+							return false;
+						return Set(id, m_builder.CreateInsertValue(m_builder.CreateInsertValue(llvm::PoisonValue::get(resultType), image, {0}), sampler, {1}));
+					}
+					case SpvOpImage:
+						return unary([&](llvm::Value* a)
+									 { return m_builder.CreateExtractValue(a, {0}); });
+					case SpvOpImageSampleImplicitLod:
+					case SpvOpImageSampleExplicitLod:
+					case SpvOpImageSampleDrefImplicitLod:
+					case SpvOpImageSampleDrefExplicitLod:
+						return LowerImageSample(instruction.m_opcode, id, resultType, args);
+					case SpvOpImageFetch:
+					case SpvOpImageRead:
+						return LowerImageLoad(id, resultType, args);
+					case SpvOpImageWrite:
+						return LowerImageStore(args);
+					case SpvOpImageQuerySizeLod:
+					case SpvOpImageQuerySize:
+					case SpvOpImageQueryLevels:
+						return LowerImageQuery(instruction.m_opcode, id, resultType, args);
+
 					case SpvOpArrayLength:
 					{
 						if (!Value(args[0]))
@@ -1929,6 +2064,294 @@ namespace amdcomp
 				if (fence)
 					m_builder.CreateFence(llvm::AtomicOrdering::Acquire, SyncScope(static_cast<uint32_t>(*memoryScope)));
 				return true;
+			}
+
+			struct ImageShape
+			{
+				const char* name;
+				uint32_t coordinates;
+				uint32_t gradients;
+				bool arrayed;
+			};
+
+			const Type* ImageTypeOf(uint32_t valueId)
+			{
+				const Type* type = TypeOf(ResultType(valueId));
+				if (type && type->kind == Type::Kind::SampledImage)
+					type = TypeOf(type->element);
+				if (!type || type->kind != Type::Kind::Image)
+				{
+					Fail("image instruction on a value that isn't an image");
+					return nullptr;
+				}
+				return type;
+			}
+
+			std::optional<ImageShape> ShapeOf(const Type& image)
+			{
+				switch (image.dim)
+				{
+					case SpvDim1D:
+						return ImageShape{image.arrayed ? "1darray" : "1d", image.arrayed ? 2u : 1u, 1, image.arrayed};
+					case SpvDim2D:
+					case SpvDimRect:
+						if (image.multisampled)
+							return ImageShape{image.arrayed ? "2darraymsaa" : "2dmsaa", image.arrayed ? 3u : 2u, 2, image.arrayed};
+						return ImageShape{image.arrayed ? "2darray" : "2d", image.arrayed ? 3u : 2u, 2, image.arrayed};
+					case SpvDim3D:
+						return ImageShape{"3d", 3, 3, false};
+					default:
+						Fail(std::format("image dimension {} not supported yet", image.dim));
+						return std::nullopt;
+				}
+			}
+
+			std::vector<llvm::Value*> Components(llvm::Value* value, uint32_t count, llvm::Type* type)
+			{
+				std::vector<llvm::Value*> result;
+				auto* vectorType = llvm::dyn_cast<llvm::FixedVectorType>(value->getType());
+				for (uint32_t i = 0; i < count; ++i)
+				{
+					llvm::Value* component = nullptr;
+					if (vectorType && i < vectorType->getNumElements())
+						component = m_builder.CreateExtractElement(value, i);
+					else if (!vectorType && i == 0)
+						component = value;
+					else
+						component = llvm::Constant::getNullValue(type);
+					if (component->getType() != type)
+						component = m_builder.CreateBitCast(component, type);
+					result.push_back(component);
+				}
+				return result;
+			}
+
+			llvm::Value* PackOffset(llvm::Value* offset)
+			{
+				std::vector<llvm::Value*> components = Components(offset, 3, m_builder.getInt32Ty());
+				llvm::Value* packed = m_builder.getInt32(0);
+				for (uint32_t i = 0; i < 3; ++i)
+					packed = m_builder.CreateOr(packed, m_builder.CreateShl(m_builder.CreateAnd(components[i], 0x3F), 8 * i));
+				return packed;
+			}
+
+			llvm::Value* CallImageIntrinsic(const std::string& name, llvm::ArrayRef<llvm::Type*> overloads, llvm::ArrayRef<llvm::Value*> callArgs)
+			{
+				const llvm::Intrinsic::ID intrinsic = llvm::Function::lookupIntrinsicID(name);
+				if (intrinsic == llvm::Intrinsic::not_intrinsic)
+				{
+					Fail("no intrinsic " + name);
+					return nullptr;
+				}
+				return m_builder.CreateCall(llvm::Intrinsic::getDeclaration(m_module.get(), intrinsic, overloads), callArgs);
+			}
+
+			llvm::Value* ToResultType(llvm::Value* value, llvm::Type* resultType)
+			{
+				auto* vectorType = llvm::dyn_cast<llvm::FixedVectorType>(resultType);
+				llvm::Type* scalar = vectorType ? vectorType->getElementType() : resultType;
+				const unsigned count = vectorType ? vectorType->getNumElements() : 1;
+				llvm::Value* result = vectorType ? static_cast<llvm::Value*>(llvm::PoisonValue::get(resultType)) : nullptr;
+				for (unsigned i = 0; i < count; ++i)
+				{
+					llvm::Value* component = value->getType()->isVectorTy() ? m_builder.CreateExtractElement(value, i) : value;
+					if (component->getType() != scalar)
+						component = m_builder.CreateBitCast(component, scalar);
+					if (!vectorType)
+						return component;
+					result = m_builder.CreateInsertElement(result, component, uint64_t{i});
+				}
+				return result;
+			}
+
+			bool LowerImageSample(uint32_t opcode, uint32_t id, llvm::Type* resultType, std::span<const uint32_t> args)
+			{
+				const bool dref = opcode == SpvOpImageSampleDrefImplicitLod || opcode == SpvOpImageSampleDrefExplicitLod;
+				llvm::Value* sampledImage = Value(args[0]);
+				llvm::Value* coordinate = Value(args[1]);
+				const Type* image = ImageTypeOf(args[0]);
+				if (!sampledImage || !coordinate || !image)
+					return false;
+				const std::optional<ImageShape> shape = ShapeOf(*image);
+				if (!shape)
+					return false;
+
+				size_t next = 2;
+				llvm::Value* zcompare = dref ? Value(args[next++]) : nullptr;
+				const uint32_t mask = next < args.size() ? args[next++] : 0;
+				llvm::Value* bias = nullptr;
+				llvm::Value* lod = nullptr;
+				llvm::Value* dx = nullptr;
+				llvm::Value* dy = nullptr;
+				llvm::Value* offset = nullptr;
+				if (mask & SpvImageOperandsBiasMask)
+					bias = Value(args[next++]);
+				if (mask & SpvImageOperandsLodMask)
+					lod = Value(args[next++]);
+				if (mask & SpvImageOperandsGradMask)
+				{
+					dx = Value(args[next++]);
+					dy = Value(args[next++]);
+				}
+				if (mask & (SpvImageOperandsConstOffsetMask | SpvImageOperandsOffsetMask))
+					offset = PackOffset(Value(args[next++]));
+				if (mask & (SpvImageOperandsConstOffsetsMask | SpvImageOperandsSampleMask | SpvImageOperandsMinLodMask))
+					return Fail("image sample operand not supported yet");
+
+				std::string name = "llvm.amdgcn.image.sample";
+				if (dref)
+					name += ".c";
+				if (dx)
+					name += ".d";
+				else if (lod)
+					name += ".l";
+				else if (bias)
+					name += ".b";
+				else if (!m_fragmentStage)
+					name += ".lz";
+				if (offset)
+					name += ".o";
+				name += std::string(".") + shape->name;
+
+				llvm::Type* floatType = m_builder.getFloatTy();
+				std::vector<llvm::Value*> callArgs{m_builder.getInt32(dref ? 1 : 0xF)};
+				if (offset)
+					callArgs.push_back(offset);
+				if (bias)
+					callArgs.push_back(bias);
+				if (zcompare)
+					callArgs.push_back(zcompare);
+				if (dx)
+				{
+					for (llvm::Value* component : Components(dx, shape->gradients, floatType))
+						callArgs.push_back(component);
+					for (llvm::Value* component : Components(dy, shape->gradients, floatType))
+						callArgs.push_back(component);
+				}
+				std::vector<llvm::Value*> coordinates = Components(coordinate, shape->coordinates, floatType);
+				if (shape->arrayed)
+					coordinates.back() = m_builder.CreateUnaryIntrinsic(llvm::Intrinsic::roundeven, coordinates.back());
+				callArgs.insert(callArgs.end(), coordinates.begin(), coordinates.end());
+				if (lod && !dx)
+					callArgs.push_back(lod);
+				callArgs.push_back(m_builder.CreateExtractValue(sampledImage, {0}));
+				callArgs.push_back(m_builder.CreateExtractValue(sampledImage, {1}));
+				callArgs.push_back(m_builder.getFalse());
+				callArgs.push_back(m_builder.getInt32(0));
+				callArgs.push_back(m_builder.getInt32(0));
+
+				llvm::Type* returnType = dref ? floatType : static_cast<llvm::Type*>(llvm::FixedVectorType::get(floatType, 4));
+				std::vector<llvm::Type*> overloads{returnType};
+				if (dx)
+					overloads.push_back(floatType);
+				overloads.push_back(floatType);
+				llvm::Value* result = CallImageIntrinsic(name, overloads, callArgs);
+				return result && Set(id, ToResultType(result, resultType));
+			}
+
+			std::vector<llvm::Value*> IntegerCoordinates(llvm::Value* coordinate, const ImageShape& shape, llvm::Value* sample)
+			{
+				const bool msaa = std::string_view(shape.name).find("msaa") != std::string_view::npos;
+				std::vector<llvm::Value*> coordinates = Components(coordinate, shape.coordinates, m_builder.getInt32Ty());
+				if (msaa)
+					coordinates.push_back(sample ? sample : m_builder.getInt32(0));
+				return coordinates;
+			}
+
+			bool LowerImageLoad(uint32_t id, llvm::Type* resultType, std::span<const uint32_t> args)
+			{
+				llvm::Value* image = Value(args[0]);
+				llvm::Value* coordinate = Value(args[1]);
+				const Type* imageType = ImageTypeOf(args[0]);
+				if (!image || !coordinate || !imageType)
+					return false;
+				const std::optional<ImageShape> shape = ShapeOf(*imageType);
+				if (!shape)
+					return false;
+				size_t next = 2;
+				const uint32_t mask = next < args.size() ? args[next++] : 0;
+				llvm::Value* lod = nullptr;
+				llvm::Value* sample = nullptr;
+				if (mask & SpvImageOperandsLodMask)
+					lod = Value(args[next++]);
+				if (mask & SpvImageOperandsSampleMask)
+					sample = Value(args[next++]);
+				if (mask & (SpvImageOperandsBiasMask | SpvImageOperandsGradMask | SpvImageOperandsConstOffsetMask | SpvImageOperandsOffsetMask |
+							SpvImageOperandsConstOffsetsMask | SpvImageOperandsMinLodMask))
+					return Fail("image load operand not supported yet");
+
+				std::vector<llvm::Value*> callArgs{m_builder.getInt32(0xF)};
+				std::vector<llvm::Value*> coordinates = IntegerCoordinates(coordinate, *shape, sample);
+				callArgs.insert(callArgs.end(), coordinates.begin(), coordinates.end());
+				if (lod)
+					callArgs.push_back(m_builder.CreateSExtOrTrunc(lod, m_builder.getInt32Ty()));
+				callArgs.push_back(image->getType()->isStructTy() ? m_builder.CreateExtractValue(image, {0}) : image);
+				callArgs.push_back(m_builder.getInt32(0));
+				callArgs.push_back(m_builder.getInt32(0));
+				const std::string name = std::string(lod ? "llvm.amdgcn.image.load.mip." : "llvm.amdgcn.image.load.") + shape->name;
+				llvm::Type* returnType = llvm::FixedVectorType::get(m_builder.getFloatTy(), 4);
+				llvm::Value* result = CallImageIntrinsic(name, {returnType, m_builder.getInt32Ty()}, callArgs);
+				return result && Set(id, ToResultType(result, resultType));
+			}
+
+			bool LowerImageStore(std::span<const uint32_t> args)
+			{
+				llvm::Value* image = Value(args[0]);
+				llvm::Value* coordinate = Value(args[1]);
+				llvm::Value* texel = Value(args[2]);
+				const Type* imageType = ImageTypeOf(args[0]);
+				if (!image || !coordinate || !texel || !imageType)
+					return false;
+				const std::optional<ImageShape> shape = ShapeOf(*imageType);
+				if (!shape)
+					return false;
+				llvm::Value* sample = nullptr;
+				if (args.size() > 3 && (args[3] & SpvImageOperandsSampleMask))
+					sample = Value(args[4]);
+				llvm::Type* dataType = llvm::FixedVectorType::get(m_builder.getFloatTy(), 4);
+				llvm::Value* data = llvm::PoisonValue::get(dataType);
+				std::vector<llvm::Value*> components = Components(texel, 4, m_builder.getFloatTy());
+				for (uint32_t i = 0; i < 4; ++i)
+					data = m_builder.CreateInsertElement(data, components[i], uint64_t{i});
+				std::vector<llvm::Value*> callArgs{data, m_builder.getInt32(0xF)};
+				std::vector<llvm::Value*> coordinates = IntegerCoordinates(coordinate, *shape, sample);
+				callArgs.insert(callArgs.end(), coordinates.begin(), coordinates.end());
+				callArgs.push_back(image);
+				callArgs.push_back(m_builder.getInt32(0));
+				callArgs.push_back(m_builder.getInt32(0));
+				return CallImageIntrinsic(std::string("llvm.amdgcn.image.store.") + shape->name, {dataType, m_builder.getInt32Ty()}, callArgs) != nullptr;
+			}
+
+			bool LowerImageQuery(uint32_t opcode, uint32_t id, llvm::Type* resultType, std::span<const uint32_t> args)
+			{
+				llvm::Value* image = Value(args[0]);
+				const Type* imageType = ImageTypeOf(args[0]);
+				if (!image || !imageType)
+					return false;
+				const std::optional<ImageShape> shape = ShapeOf(*imageType);
+				if (!shape)
+					return false;
+				llvm::Value* lod = m_builder.getInt32(0);
+				if (opcode == SpvOpImageQuerySizeLod)
+				{
+					lod = Value(args[1]);
+					if (!lod)
+						return false;
+					lod = m_builder.CreateSExtOrTrunc(lod, m_builder.getInt32Ty());
+				}
+				if (image->getType()->isStructTy())
+					image = m_builder.CreateExtractValue(image, {0});
+				llvm::Type* returnType = llvm::FixedVectorType::get(m_builder.getFloatTy(), 4);
+				llvm::Value* info = CallImageIntrinsic(std::string("llvm.amdgcn.image.getresinfo.") + shape->name, {returnType, m_builder.getInt32Ty()},
+													   {m_builder.getInt32(0xF), lod, image, m_builder.getInt32(0), m_builder.getInt32(0)});
+				if (!info)
+					return false;
+				info = m_builder.CreateBitCast(info, llvm::FixedVectorType::get(m_builder.getInt32Ty(), 4));
+				if (opcode == SpvOpImageQueryLevels)
+					return Set(id, m_builder.CreateExtractElement(info, uint64_t{3}));
+				if (imageType->dim == SpvDim1D && imageType->arrayed)
+					info = m_builder.CreateInsertElement(info, m_builder.CreateExtractElement(info, uint64_t{2}), uint64_t{1});
+				return Set(id, ToResultType(info, resultType));
 			}
 
 			std::optional<llvm::AtomicOrdering> AtomicOrdering(uint32_t semanticsId)
@@ -2385,6 +2808,7 @@ namespace amdcomp
 
 			llvm::Function* m_currentFunction = nullptr;
 			llvm::Function* m_constantFolder = nullptr;
+			bool m_fragmentStage = false;
 			std::unordered_map<uint32_t, llvm::Value*> m_values;
 			std::unordered_map<uint32_t, llvm::BasicBlock*> m_blocks;
 			std::vector<PendingPhi> m_pendingPhis;
