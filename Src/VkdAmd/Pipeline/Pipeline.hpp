@@ -43,9 +43,9 @@ namespace vkd::amd
 		DepthBias depthBias;
 	};
 
-	// A pipeline owns its shaders' GFX11 code in a GPU allocation. There's no SPIR-V compiler yet:
-	// the code comes from the precompiled tables (PrecompiledShaders.hpp, PrecompiledGraphics.hpp),
-	// and a pipeline whose modules aren't in them has no code -- its dispatches/draws are skipped.
+	// A pipeline owns its shaders' GFX11 code in a GPU allocation. The code comes from the
+	// precompiled tables (PrecompiledShaders.hpp, PrecompiledGraphics.hpp, AMDVLK's code), else from
+	// amd-compiler for compute shaders; a pipeline without code has its dispatches/draws skipped.
 	class Pipeline : public vkd::Pipeline
 	{
 	public:
@@ -81,8 +81,11 @@ namespace vkd::amd
 
 	private:
 		VkResult UploadCode(vkd::Device& owner, std::span<const uint32_t> first, std::span<const uint32_t> second = {});
+		const PrecompiledComputeShader* CompileComputeShader(const VkPipelineShaderStageCreateInfo& stage, std::span<const uint32_t> spirv);
 
 		const PrecompiledComputeShader* m_computeShader = nullptr;
+		std::vector<uint32_t> m_compiledCode;
+		PrecompiledComputeShader m_compiledShader = {};
 		const PrecompiledGraphicsPipeline* m_graphics = nullptr;
 		GraphicsPipelineState m_graphicsState;
 		uint64_t m_psCodeOffset = 0;

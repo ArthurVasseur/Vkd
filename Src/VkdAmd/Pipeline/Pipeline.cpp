@@ -10,6 +10,7 @@
 
 #include "Vkd/ShaderModule/ShaderModule.hpp"
 
+#include "AmdCompiler/Compiler.hpp"
 #include "VkdAmd/Device/Device.hpp"
 #include "VkdAmd/PrivateData.hpp"
 
@@ -34,6 +35,13 @@ namespace vkd::amd
 			std::fclose(file);
 			cct::Logger::Info("AmdPipeline: SPIR-V written to {}", path);
 		}
+
+		bool EnvironmentFlag(const char* name)
+		{
+			char value[8] = {};
+			size_t length = 0;
+			return getenv_s(&length, value, sizeof(value), name) == 0 && length > 1 && value[0] == '1';
+		}
 	} // namespace
 
 	VkResult Pipeline::CreateComputePipeline(vkd::Device& owner, const VkComputePipelineCreateInfo& info,
@@ -48,16 +56,67 @@ namespace vkd::amd
 			return VK_SUCCESS;
 		const auto& spirv = module->GetCode();
 		const std::span<const uint32_t> code(spirv.data(), spirv.size());
-		m_computeShader = FindPrecompiledComputeShader(code);
+		if (!EnvironmentFlag("VKD_AMD_COMPILE_ALL"))
+			m_computeShader = FindPrecompiledComputeShader(code);
+		if (!m_computeShader)
+			m_computeShader = CompileComputeShader(info.stage, code);
 		if (!m_computeShader)
 		{
-			cct::Logger::Warning("AmdPipeline: no GFX11 code for this compute shader (SPIR-V hash 0x{:016X}), its dispatches are skipped",
-								 HashSpirv(code));
 			DumpUnknownSpirv(code, HashSpirv(code));
 			return VK_SUCCESS;
 		}
 
 		return UploadCode(owner, m_computeShader->code);
+	}
+
+	const PrecompiledComputeShader* Pipeline::CompileComputeShader(const VkPipelineShaderStageCreateInfo& stage, std::span<const uint32_t> spirv)
+	{
+		std::vector<amdcomp::SpecializationConstant> specialization;
+		if (const VkSpecializationInfo* info = stage.pSpecializationInfo)
+		{
+			for (uint32_t i = 0; i < info->mapEntryCount; ++i)
+			{
+				const VkSpecializationMapEntry& entry = info->pMapEntries[i];
+				uint64_t value = 0;
+				const size_t size = std::min<size_t>(entry.size, sizeof(value));
+				if (entry.offset + size <= info->dataSize)
+					std::memcpy(&value, static_cast<const uint8_t*>(info->pData) + entry.offset, size);
+				specialization.push_back({.id = entry.constantID, .value = value, .size = static_cast<uint32_t>(size)});
+			}
+		}
+
+		std::string error;
+		std::optional<amdcomp::ComputeShader> compiled =
+			amdcomp::CompileComputeShader(spirv, amdcomp::CompileOptions{.entryPoint = stage.pName, .specialization = specialization}, error);
+		if (!compiled)
+		{
+			cct::Logger::Warning("AmdPipeline: can't compile compute shader (SPIR-V hash 0x{:016X}), its dispatches are skipped: {}", HashSpirv(spirv),
+								 error);
+			return nullptr;
+		}
+		if (EnvironmentFlag("VKD_AMD_DUMP_ISA"))
+		{
+			cct::Logger::Info("AmdPipeline: compute shader 0x{:016X}:\n{}", HashSpirv(spirv),
+							  amdcomp::Disassemble(compiled->code, (compiled->dispatchInitiator & 0x8000u) == 0));
+		}
+
+		m_compiledCode = std::move(compiled->code);
+		m_compiledShader = PrecompiledComputeShader{
+			.spirvHash = HashSpirv(spirv),
+			.code = m_compiledCode,
+			.pgmRsrc1 = compiled->pgmRsrc1,
+			.pgmRsrc2 = compiled->pgmRsrc2,
+			.pgmRsrc3 = compiled->pgmRsrc3,
+			.numThreadX = compiled->numThreadX,
+			.numThreadY = compiled->numThreadY,
+			.numThreadZ = compiled->numThreadZ,
+			.dispatchInitiator = compiled->dispatchInitiator,
+			.pushConstantUserData = compiled->pushConstantUserData,
+			.pushConstantDwords = compiled->pushConstantDwords,
+		};
+		for (uint32_t set = 0; set < kMaxPrecompiledSets && set < amdcomp::kMaxDescriptorSets; ++set)
+			m_compiledShader.setTableUserData[set] = compiled->setTableUserData[set];
+		return &m_compiledShader;
 	}
 
 	VkResult Pipeline::CreateGraphicsPipeline(vkd::Device& owner, const VkGraphicsPipelineCreateInfo& info,
