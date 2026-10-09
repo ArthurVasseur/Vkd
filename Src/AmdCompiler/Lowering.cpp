@@ -180,6 +180,11 @@ namespace amdcomp
 
 				if (!LowerGlobals() || !ReadLocalSize(*entryPoint, layout.localSize) || !AssignDescriptorOffsets(layout) || !DeclareFunctions())
 					return false;
+				if (m_constantFolder)
+				{
+					m_constantFolder->eraseFromParent();
+					m_constantFolder = nullptr;
+				}
 				for (const spirv::Function& function : m_spirv.m_functions)
 				{
 					if (!LowerFunction(function))
@@ -582,10 +587,41 @@ namespace amdcomp
 							if (!LowerGlobalVariable(instruction, args))
 								return false;
 							break;
+						case SpvOpSpecConstantOp:
+							if (!LowerSpecConstantOp(instruction, args))
+								return false;
+							break;
 						default:
 							return Unsupported(instruction);
 					}
 				}
+				return true;
+			}
+
+			bool LowerSpecConstantOp(const spirv::Instruction& instruction, std::span<const uint32_t> args)
+			{
+				if (!m_constantFolder)
+				{
+					m_constantFolder = llvm::Function::Create(llvm::FunctionType::get(m_builder.getVoidTy(), false), llvm::GlobalValue::InternalLinkage,
+															  "spirv.constants", *m_module);
+					llvm::BasicBlock::Create(m_context, "", m_constantFolder);
+				}
+				spirv::Instruction operation{.m_opcode = args[0], .m_resultId = instruction.m_resultId, .m_typeId = instruction.m_typeId};
+				operation.m_operands = {instruction.m_typeId, instruction.m_resultId};
+				operation.m_operands.insert(operation.m_operands.end(), args.begin() + 1, args.end());
+
+				llvm::Function* previous = m_currentFunction;
+				m_currentFunction = m_constantFolder;
+				m_builder.SetInsertPoint(&m_constantFolder->getEntryBlock());
+				const bool lowered = LowerInstruction(operation);
+				m_currentFunction = previous;
+				if (!lowered)
+					return false;
+				auto* constant = llvm::dyn_cast<llvm::Constant>(m_values[instruction.m_resultId]);
+				m_values.erase(instruction.m_resultId);
+				if (!constant)
+					return Fail(std::format("OpSpecConstantOp {} doesn't fold to a constant", SpvOpToString(static_cast<SpvOp>(args[0]))));
+				SetGlobal(instruction.m_resultId, instruction.m_typeId, constant);
 				return true;
 			}
 
@@ -1334,6 +1370,18 @@ namespace amdcomp
 				return scalar;
 			}
 
+			llvm::Value* QuantizeToF16(llvm::Value* value)
+			{
+				llvm::Type* halfType = m_builder.getHalfTy();
+				if (auto* vectorType = llvm::dyn_cast<llvm::FixedVectorType>(value->getType()))
+					halfType = llvm::FixedVectorType::get(halfType, vectorType->getNumElements());
+				llvm::Value* quantized = m_builder.CreateFPExt(m_builder.CreateFPTrunc(value, halfType), value->getType());
+				llvm::Value* magnitude = m_builder.CreateUnaryIntrinsic(llvm::Intrinsic::fabs, quantized);
+				llvm::Value* subnormal = m_builder.CreateFCmpOLT(magnitude, llvm::ConstantFP::get(value->getType(), 6.103515625e-05));
+				llvm::Value* zero = m_builder.CreateBinaryIntrinsic(llvm::Intrinsic::copysign, llvm::ConstantFP::get(value->getType(), 0.0), value);
+				return m_builder.CreateSelect(subnormal, zero, quantized);
+			}
+
 			llvm::Value* ReduceBool(llvm::Value* vector, bool all)
 			{
 				auto* vectorType = llvm::dyn_cast<llvm::FixedVectorType>(vector->getType());
@@ -1533,6 +1581,9 @@ namespace amdcomp
 					case SpvOpFNegate:
 						return unary([&](llvm::Value* a)
 									 { return m_builder.CreateFNeg(a); });
+					case SpvOpQuantizeToF16:
+						return unary([&](llvm::Value* a)
+									 { return QuantizeToF16(a); });
 					case SpvOpVectorTimesScalar:
 						return binary([&](llvm::Value* v, llvm::Value* s)
 									  { return m_builder.CreateFMul(v, Splat(s, v->getType())); });
@@ -2333,6 +2384,7 @@ namespace amdcomp
 			std::unordered_map<uint32_t, llvm::Function*> m_functions;
 
 			llvm::Function* m_currentFunction = nullptr;
+			llvm::Function* m_constantFolder = nullptr;
 			std::unordered_map<uint32_t, llvm::Value*> m_values;
 			std::unordered_map<uint32_t, llvm::BasicBlock*> m_blocks;
 			std::vector<PendingPhi> m_pendingPhis;
