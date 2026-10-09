@@ -73,6 +73,7 @@ namespace amdcomp
 		{
 			uint32_t matrixStride = 0;
 			bool rowMajor = false;
+			uint32_t componentStride = 0;
 		};
 
 		struct InvocationVariable
@@ -416,11 +417,6 @@ namespace amdcomp
 
 			std::optional<uint64_t> ColumnStride(uint32_t matrixTypeId, const PointerInfo& info)
 			{
-				if (info.rowMajor)
-				{
-					Fail("row-major matrices in memory aren't supported yet");
-					return std::nullopt;
-				}
 				if (info.matrixStride != 0)
 					return info.matrixStride;
 				const std::optional<Layout> column = LayoutOf(m_types.at(matrixTypeId).element);
@@ -1015,6 +1011,18 @@ namespace amdcomp
 					case Type::Kind::Vector:
 					{
 						const Type& element = m_types.at(type->element);
+						if (info.componentStride != 0)
+						{
+							llvm::Value* result = llvm::PoisonValue::get(valueType);
+							for (uint32_t i = 0; i < type->count; ++i)
+							{
+								llvm::Value* component = LoadMemory(OffsetPointer(pointer, uint64_t{info.componentStride} * i), type->element, {});
+								if (!component)
+									return nullptr;
+								result = m_builder.CreateInsertElement(result, component, uint64_t{i});
+							}
+							return result;
+						}
 						if (element.kind == Type::Kind::Bool)
 						{
 							auto* stored = llvm::FixedVectorType::get(m_builder.getInt32Ty(), type->count);
@@ -1068,6 +1076,16 @@ namespace amdcomp
 					case Type::Kind::Vector:
 					{
 						const Type& element = m_types.at(type->element);
+						if (info.componentStride != 0)
+						{
+							for (uint32_t i = 0; i < type->count; ++i)
+							{
+								if (!StoreMemory(OffsetPointer(pointer, uint64_t{info.componentStride} * i), type->element,
+												 m_builder.CreateExtractElement(value, uint64_t{i}), {}))
+									return false;
+							}
+							return true;
+						}
 						if (element.kind == Type::Kind::Bool)
 						{
 							m_builder.CreateAlignedStore(m_builder.CreateZExt(value, llvm::FixedVectorType::get(m_builder.getInt32Ty(), type->count)), pointer,
@@ -1119,6 +1137,20 @@ namespace amdcomp
 					case Type::Kind::Matrix:
 					{
 						elementType = type.element;
+						elementInfo = {};
+						if (info.rowMajor)
+						{
+							const std::optional<Layout> component = LayoutOf(m_types.at(type.element).element);
+							if (!component)
+								return std::nullopt;
+							if (info.matrixStride == 0)
+							{
+								Fail("row-major matrix without a MatrixStride");
+								return std::nullopt;
+							}
+							elementInfo.componentStride = info.matrixStride;
+							return component->size * i;
+						}
 						const std::optional<uint64_t> stride = ColumnStride(typeId, info);
 						if (!stride)
 							return std::nullopt;
@@ -1127,6 +1159,9 @@ namespace amdcomp
 					case Type::Kind::Vector:
 					{
 						elementType = type.element;
+						elementInfo = {};
+						if (info.componentStride != 0)
+							return uint64_t{info.componentStride} * i;
 						const std::optional<Layout> element = LayoutOf(type.element);
 						if (!element)
 							return std::nullopt;
