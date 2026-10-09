@@ -2876,6 +2876,19 @@ namespace amdcomp
 				llvm::Value* vertexIndex = m_builder.CreateAdd(entry->getArg(sgprs + 5), entry->getArg(kSystemSgprs + layout.baseVertexUserData));
 				llvm::Value* instanceIndex = m_builder.CreateAdd(entry->getArg(sgprs + 8), entry->getArg(kSystemSgprs + layout.baseInstanceUserData));
 				llvm::Value* vertexBufferTable = vertexBuffers ? TablePointer(entry->getArg(kSystemSgprs + layout.vertexBufferTableUserData)) : nullptr;
+				std::vector<llvm::Value*> setTables;
+				for (const uint32_t set : m_usedSets)
+					setTables.push_back(TablePointer(entry->getArg(kSystemSgprs + layout.setTableUserData[set])));
+				llvm::Value* activeVertex = m_builder.CreateICmpULT(thread, vertexCount);
+
+				llvm::BasicBlock* shaderBlock = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* primitiveTest = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* primitiveBlock = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* afterPrimitive = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* vertexBlock = llvm::BasicBlock::Create(m_context, "", entry);
+				llvm::BasicBlock* end = llvm::BasicBlock::Create(m_context, "", entry);
+				m_builder.CreateCondBr(activeVertex, shaderBlock, primitiveTest);
+				m_builder.SetInsertPoint(shaderBlock);
 
 				std::vector<llvm::Value*> storage;
 				for (const InvocationVariable& variable : m_invocationVariables)
@@ -2934,9 +2947,19 @@ namespace amdcomp
 							return false;
 					}
 				}
-				for (const uint32_t set : m_usedSets)
-					storage.push_back(TablePointer(entry->getArg(kSystemSgprs + layout.setTableUserData[set])));
-				m_builder.CreateCall(m_functions.at(m_entryFunctionId), storage);
+				std::vector<llvm::Value*> arguments = storage;
+				arguments.insert(arguments.end(), setTables.begin(), setTables.end());
+				m_builder.CreateCall(m_functions.at(m_entryFunctionId), arguments);
+				m_builder.CreateBr(primitiveTest);
+
+				m_builder.SetInsertPoint(primitiveTest);
+				m_builder.CreateCondBr(m_builder.CreateICmpULT(thread, primitiveCount), primitiveBlock, afterPrimitive);
+				m_builder.SetInsertPoint(primitiveBlock);
+				Export(20, 1, {entry->getArg(sgprs)}, true, false);
+				m_builder.CreateBr(afterPrimitive);
+				m_builder.SetInsertPoint(afterPrimitive);
+				m_builder.CreateCondBr(activeVertex, vertexBlock, end);
+				m_builder.SetInsertPoint(vertexBlock);
 
 				llvm::Value* position = nullptr;
 				std::vector<std::pair<uint32_t, llvm::Value*>> outputs;
@@ -2982,20 +3005,6 @@ namespace amdcomp
 				if (!position)
 					position = llvm::Constant::getNullValue(llvm::FixedVectorType::get(m_builder.getFloatTy(), 4));
 
-				llvm::BasicBlock* primitiveBlock = llvm::BasicBlock::Create(m_context, "", entry);
-				llvm::BasicBlock* afterPrimitive = llvm::BasicBlock::Create(m_context, "", entry);
-				llvm::BasicBlock* vertexBlock = llvm::BasicBlock::Create(m_context, "", entry);
-				llvm::BasicBlock* end = llvm::BasicBlock::Create(m_context, "", entry);
-				m_builder.CreateCondBr(m_builder.CreateICmpULT(thread, primitiveCount), primitiveBlock, afterPrimitive);
-
-				m_builder.SetInsertPoint(primitiveBlock);
-				Export(20, 1, {entry->getArg(sgprs)}, true, false);
-				m_builder.CreateBr(afterPrimitive);
-
-				m_builder.SetInsertPoint(afterPrimitive);
-				m_builder.CreateCondBr(m_builder.CreateICmpULT(thread, vertexCount), vertexBlock, end);
-
-				m_builder.SetInsertPoint(vertexBlock);
 				if (!outputs.empty())
 				{
 					llvm::LoadInst* ring = m_builder.CreateAlignedLoad(llvm::FixedVectorType::get(m_builder.getInt32Ty(), 4),
