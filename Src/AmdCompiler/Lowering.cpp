@@ -2763,6 +2763,46 @@ namespace amdcomp
 				return result;
 			}
 
+			struct InterfaceSlot
+			{
+				uint64_t offset;
+				uint32_t typeId;
+			};
+
+			bool InterfaceSlots(uint32_t typeId, uint64_t offset, std::vector<InterfaceSlot>& slots)
+			{
+				const Type* type = TypeOf(typeId);
+				if (!type)
+					return false;
+				if (IsScalarOrVector(typeId))
+				{
+					slots.push_back({offset, typeId});
+					return true;
+				}
+				if (type->kind == Type::Kind::Matrix && IsScalarOrVector(type->element))
+				{
+					const std::optional<Layout> column = LayoutOf(type->element);
+					if (!column)
+						return false;
+					for (uint32_t i = 0; i < type->count; ++i)
+						slots.push_back({offset + i * AlignUp(column->size, column->align), type->element});
+					return true;
+				}
+				if (type->kind == Type::Kind::Array)
+				{
+					const std::optional<uint64_t> stride = ArrayStride(typeId);
+					if (!stride)
+						return false;
+					for (uint32_t i = 0; i < type->count; ++i)
+					{
+						if (!InterfaceSlots(type->element, offset + i * *stride, slots))
+							return false;
+					}
+					return true;
+				}
+				return false;
+			}
+
 			bool IsScalarOrVector(uint32_t typeId)
 			{
 				const Type* type = TypeOf(typeId);
@@ -2910,19 +2950,24 @@ namespace amdcomp
 						const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
 						if (!location)
 							return Fail("vertex input without a location");
-						if (!IsScalarOrVector(variable.pointee) || Decoration(variable.id, SpvDecorationComponent))
-							return Fail("vertex inputs other than 32-bit scalars and vectors aren't supported yet");
-						auto attribute =
-							std::find_if(attributes.begin(), attributes.end(), [&](const VertexAttribute& a)
-										 { return a.location == *location; });
-						if (attribute == attributes.end())
-							return Fail(std::format("vertex input location {} has no attribute in the pipeline", *location));
-						if (attribute->perInstance)
-							layout.instanceIndex = true;
-						llvm::Value* value =
-							FetchVertexAttribute(*attribute, variable.pointee, vertexBufferTable, attribute->perInstance ? instanceIndex : vertexIndex);
-						if (!StoreMemory(alloca, variable.pointee, value, {}))
-							return false;
+						std::vector<InterfaceSlot> slots;
+						if (Decoration(variable.id, SpvDecorationComponent) || !InterfaceSlots(variable.pointee, 0, slots))
+							return Fail("vertex inputs other than 32-bit scalars, vectors, matrices and arrays of them aren't supported yet");
+						for (size_t k = 0; k < slots.size(); ++k)
+						{
+							const uint32_t slotLocation = *location + static_cast<uint32_t>(k);
+							auto attribute =
+								std::find_if(attributes.begin(), attributes.end(), [&](const VertexAttribute& a)
+											 { return a.location == slotLocation; });
+							if (attribute == attributes.end())
+								return Fail(std::format("vertex input location {} has no attribute in the pipeline", slotLocation));
+							if (attribute->perInstance)
+								layout.instanceIndex = true;
+							llvm::Value* value =
+								FetchVertexAttribute(*attribute, slots[k].typeId, vertexBufferTable, attribute->perInstance ? instanceIndex : vertexIndex);
+							if (!StoreMemory(OffsetPointer(alloca, slots[k].offset), slots[k].typeId, value, {}))
+								return false;
+						}
 					}
 					else if (variable.storageClass == SpvStorageClassInput && InEntryInterface(variable.id))
 					{
@@ -2991,12 +3036,16 @@ namespace amdcomp
 					const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
 					if (!location)
 						continue;
-					if (!IsScalarOrVector(variable.pointee) || Decoration(variable.id, SpvDecorationComponent))
-						return Fail("vertex outputs other than 32-bit scalars and vectors aren't supported yet");
-					llvm::Value* value = LoadMemory(storage[i], variable.pointee, {});
-					if (!value)
-						return false;
-					outputs.push_back({*location, AsVec4Float(value, 0.0f)});
+					std::vector<InterfaceSlot> slots;
+					if (Decoration(variable.id, SpvDecorationComponent) || !InterfaceSlots(variable.pointee, 0, slots))
+						return Fail("vertex outputs other than 32-bit scalars, vectors, matrices and arrays of them aren't supported yet");
+					for (size_t k = 0; k < slots.size(); ++k)
+					{
+						llvm::Value* value = LoadMemory(OffsetPointer(storage[i], slots[k].offset), slots[k].typeId, {});
+						if (!value)
+							return false;
+						outputs.push_back({*location + static_cast<uint32_t>(k), AsVec4Float(value, 0.0f)});
+					}
 				}
 				std::sort(outputs.begin(), outputs.end(), [](const auto& a, const auto& b)
 						  { return a.first < b.first; });
@@ -3076,7 +3125,13 @@ namespace amdcomp
 				constexpr unsigned kPerspSample = 0, kPerspCenter = 1, kPerspCentroid = 2, kLinearSample = 4, kLinearCenter = 5, kLinearCentroid = 6;
 				constexpr unsigned kPosX = 8, kFrontFace = 12;
 
-				std::vector<std::pair<uint32_t, size_t>> inputVariables;
+				struct InputSlot
+				{
+					uint32_t location;
+					size_t variable;
+					InterfaceSlot slot;
+				};
+				std::vector<InputSlot> inputSlots;
 				for (size_t i = 0; i < m_invocationVariables.size(); ++i)
 				{
 					const InvocationVariable& variable = m_invocationVariables[i];
@@ -3085,12 +3140,14 @@ namespace amdcomp
 					const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
 					if (!location)
 						return Fail("fragment input without a Location");
-					inputVariables.push_back({*location, i});
+					std::vector<InterfaceSlot> slots;
+					if (Decoration(variable.id, SpvDecorationComponent) || !InterfaceSlots(variable.pointee, 0, slots))
+						return Fail("fragment inputs other than 32-bit scalars, vectors, matrices and arrays of them aren't supported yet");
+					for (size_t k = 0; k < slots.size(); ++k)
+						inputSlots.push_back({*location + static_cast<uint32_t>(k), i, slots[k]});
 				}
-				std::sort(inputVariables.begin(), inputVariables.end());
-				std::unordered_map<size_t, uint32_t> attributeOf;
-				for (size_t k = 0; k < inputVariables.size(); ++k)
-					attributeOf[inputVariables[k].second] = static_cast<uint32_t>(k);
+				std::sort(inputSlots.begin(), inputSlots.end(), [](const InputSlot& a, const InputSlot& b)
+						  { return a.location < b.location; });
 
 				std::vector<llvm::Value*> storage;
 				for (size_t i = 0; i < m_invocationVariables.size(); ++i)
@@ -3135,12 +3192,6 @@ namespace amdcomp
 					}
 					else
 					{
-						if (!IsScalarOrVector(variable.pointee) || Decoration(variable.id, SpvDecorationComponent))
-							return Fail("fragment inputs other than 32-bit scalars and vectors aren't supported yet");
-						const Type* type = TypeOf(variable.pointee);
-						const Type* scalar = type->kind == Type::Kind::Vector ? TypeOf(type->element) : type;
-						const unsigned count = type->kind == Type::Kind::Vector ? type->count : 1;
-						const bool flat = Decoration(variable.id, SpvDecorationFlat).has_value() || scalar->kind == Type::Kind::Int;
 						const bool linear = Decoration(variable.id, SpvDecorationNoPerspective).has_value();
 						unsigned barycentric = linear ? kLinearCenter : kPerspCenter;
 						if (Decoration(variable.id, SpvDecorationCentroid))
@@ -3149,31 +3200,42 @@ namespace amdcomp
 							barycentric = linear ? kLinearSample : kPerspSample;
 						llvm::Value* baryI = m_builder.CreateExtractElement(vgpr(barycentric), uint64_t{0});
 						llvm::Value* baryJ = m_builder.CreateExtractElement(vgpr(barycentric), uint64_t{1});
-						const uint32_t attribute = attributeOf.at(i);
-						layout.inputs.push_back({inputVariables[attribute].first, flat});
-						std::vector<llvm::Value*> components;
-						for (unsigned c = 0; c < count; ++c)
+						for (size_t attribute = 0; attribute < inputSlots.size(); ++attribute)
 						{
-							llvm::Value* parameter =
-								m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_lds_param_load, {}, {m_builder.getInt32(c), m_builder.getInt32(attribute), primitiveMask});
-							llvm::Value* component =
-								flat ? m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p10, {}, {parameter, llvm::ConstantFP::get(f32, 0.0), parameter})
-									 : m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p2, {},
-																 {parameter, baryJ,
-																  m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p10, {}, {parameter, baryI, parameter})});
-							components.push_back(component);
-						}
-						llvm::Type* valueType = ValueType(variable.pointee);
-						if (count == 1)
-							value = components[0];
-						else
-						{
-							value = llvm::PoisonValue::get(llvm::FixedVectorType::get(f32, count));
+							if (inputSlots[attribute].variable != i)
+								continue;
+							const uint32_t typeId = inputSlots[attribute].slot.typeId;
+							const Type* type = TypeOf(typeId);
+							const Type* scalar = type->kind == Type::Kind::Vector ? TypeOf(type->element) : type;
+							const unsigned count = type->kind == Type::Kind::Vector ? type->count : 1;
+							const bool flat = Decoration(variable.id, SpvDecorationFlat).has_value() || scalar->kind == Type::Kind::Int;
+							layout.inputs.push_back({inputSlots[attribute].location, flat});
+							std::vector<llvm::Value*> components;
 							for (unsigned c = 0; c < count; ++c)
-								value = m_builder.CreateInsertElement(value, components[c], uint64_t{c});
+							{
+								llvm::Value* parameter = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_lds_param_load, {},
+																				   {m_builder.getInt32(c), m_builder.getInt32(static_cast<uint32_t>(attribute)), primitiveMask});
+								llvm::Value* component =
+									flat ? m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p10, {}, {parameter, llvm::ConstantFP::get(f32, 0.0), parameter})
+										 : m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p2, {},
+																	 {parameter, baryJ,
+																	  m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_interp_inreg_p10, {}, {parameter, baryI, parameter})});
+								components.push_back(component);
+							}
+							llvm::Type* valueType = ValueType(typeId);
+							llvm::Value* slotValue = components[0];
+							if (count > 1)
+							{
+								slotValue = llvm::PoisonValue::get(llvm::FixedVectorType::get(f32, count));
+								for (unsigned c = 0; c < count; ++c)
+									slotValue = m_builder.CreateInsertElement(slotValue, components[c], uint64_t{c});
+							}
+							if (slotValue->getType() != valueType)
+								slotValue = m_builder.CreateBitCast(slotValue, valueType);
+							if (!StoreMemory(OffsetPointer(alloca, inputSlots[attribute].slot.offset), typeId, slotValue, {}))
+								return false;
 						}
-						if (value->getType() != valueType)
-							value = m_builder.CreateBitCast(value, valueType);
+						continue;
 					}
 					if (!StoreMemory(alloca, variable.pointee, value, {}))
 						return false;
