@@ -70,6 +70,20 @@ namespace amdcomp
 		Float32
 	};
 
+	inline constexpr uint8_t kVertexSwizzleZero = 4;
+	inline constexpr uint8_t kVertexSwizzleOne = 5;
+
+	struct VertexAttribute
+	{
+		uint32_t location = 0;
+		uint32_t binding = 0;
+		uint32_t offset = 0;
+		uint32_t format = 0;
+		uint32_t channels = 4;
+		uint8_t swizzle[4] = {0, 1, 2, 3};
+		bool perInstance = false;
+	};
+
 	struct GraphicsStageCode
 	{
 		std::vector<uint32_t> code;
@@ -82,6 +96,9 @@ namespace amdcomp
 		GraphicsStageCode vertex;
 		GraphicsStageCode fragment;
 		bool instanceIndex = false;
+		uint32_t vertexBufferTableUserData = 0;
+		uint32_t baseVertexUserData = 0;
+		uint32_t baseInstanceUserData = 0;
 		uint32_t vsOutConfig = 0;
 		uint32_t numInterpolants = 0;
 		std::vector<uint32_t> psInputCntl;
@@ -100,6 +117,7 @@ namespace amdcomp
 		CompileOptions vertex;
 		CompileOptions fragment;
 		std::span<const ColorExportFormat> colorExports = {};
+		std::span<const VertexAttribute> vertexAttributes = {};
 	};
 
 	std::optional<GraphicsShaders> CompileGraphicsShaders(std::span<const uint32_t> vertexSpirv, std::span<const uint32_t> fragmentSpirv,

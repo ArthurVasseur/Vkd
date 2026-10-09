@@ -127,6 +127,28 @@ TEST_CASE("vkd-test-app's pipeline compiles", "[amd-compiler][graphics]")
 	CHECK(Disassemble(shaders->fragment.code, true).find("image_sample") != std::string::npos);
 }
 
+TEST_CASE("vertex buffers compile", "[amd-compiler][graphics]")
+{
+	const VertexAttribute attributes[] = {
+		{.location = 0, .binding = 0, .offset = 0, .format = 0x32, .channels = 2, .swizzle = {0, 1, kVertexSwizzleZero, kVertexSwizzleOne}},
+		{.location = 1, .binding = 0, .offset = 8, .format = 0x3C, .channels = 3, .swizzle = {0, 1, 2, kVertexSwizzleOne}},
+		{.location = 2, .binding = 1, .offset = 0, .format = 0x32, .channels = 2, .swizzle = {0, 1, kVertexSwizzleZero, kVertexSwizzleOne}, .perInstance = true},
+	};
+	std::string error;
+	const std::optional<GraphicsShaders> shaders =
+		CompileGraphicsShaders(tests::kVertexBuffersVertSpirv, tests::kPushConstantFragSpirv, GraphicsOptions{.vertexAttributes = attributes}, error);
+	INFO(error);
+	REQUIRE(shaders.has_value());
+	CHECK(shaders->vertexBufferTableUserData == 1);
+	CHECK(shaders->baseVertexUserData == 2);
+	CHECK(shaders->baseInstanceUserData == 3);
+	CHECK(shaders->instanceIndex);
+	CHECK(((shaders->vertex.pgmRsrc2 >> 1) & 0x1F) == 4);
+	const std::string code = Disassemble(shaders->vertex.code, true);
+	CHECK(code.find("format:[BUF_FMT_32_32_32_FLOAT] idxen offset:8") != std::string::npos);
+	CHECK(code.find("format:[BUF_FMT_32_32_FLOAT] idxen") != std::string::npos);
+}
+
 TEST_CASE("print the compiled graphics test shaders", "[.][amd-compiler][dump-graphics]")
 {
 	const std::pair<std::span<const uint32_t>, std::span<const uint32_t>> pipelines[] = {

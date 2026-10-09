@@ -175,7 +175,7 @@ namespace amdcomp
 		std::optional<backend::Output> vertex;
 		{
 			llvm::LLVMContext context;
-			vertex = GenerateStage(LowerVertexShader(*vertexModule, options.vertex, layout, context, *tm, vertexLayout, error), *tm, options.vertex, error);
+			vertex = GenerateStage(LowerVertexShader(*vertexModule, options.vertex, layout, options.vertexAttributes, context, *tm, vertexLayout, error), *tm, options.vertex, error);
 		}
 		if (!vertex)
 			return std::nullopt;
@@ -192,9 +192,12 @@ namespace amdcomp
 		GraphicsShaders shaders;
 		shaders.vertex.code = std::move(vertex->code);
 		shaders.vertex.pgmRsrc1 = vertex->registers[backend::kGsPgmRsrc1] | kRsrc1GsVgprCompCntOne;
-		shaders.vertex.pgmRsrc2 = (vertex->registers[backend::kGsPgmRsrc2] & ~kRsrc2UserSgprMask) | (kVertexUserSgprs << kRsrc2UserSgprShift) |
+		shaders.vertex.pgmRsrc2 = (vertex->registers[backend::kGsPgmRsrc2] & ~kRsrc2UserSgprMask) | (vertexLayout.userSgprs << kRsrc2UserSgprShift) |
 								  (vertexLayout.instanceIndex ? kRsrc2EsVgprCompCntInstance : 0);
 		shaders.instanceIndex = vertexLayout.instanceIndex;
+		shaders.vertexBufferTableUserData = vertexLayout.vertexBufferTableUserData;
+		shaders.baseVertexUserData = vertexLayout.baseVertexUserData;
+		shaders.baseInstanceUserData = vertexLayout.baseInstanceUserData;
 		shaders.fragment.code = std::move(fragment->code);
 		shaders.fragment.pgmRsrc1 = fragment->registers[backend::kPsPgmRsrc1];
 		shaders.fragment.pgmRsrc2 = (fragment->registers[backend::kPsPgmRsrc2] & ~kRsrc2UserSgprMask) | (fragmentLayout.userSgprs << kRsrc2UserSgprShift);

@@ -160,9 +160,10 @@ namespace amdcomp
 				return std::move(m_module);
 			}
 
-			std::unique_ptr<llvm::Module> LowerVertex(std::span<const Descriptor> descriptorLayout, VertexLayout& layout, std::string& error)
+			std::unique_ptr<llvm::Module> LowerVertex(std::span<const Descriptor> descriptorLayout, std::span<const VertexAttribute> attributes, VertexLayout& layout,
+													  std::string& error)
 			{
-				if (!Prepare(SpvExecutionModelVertex, descriptorLayout, layout.descriptors) || !CreateVertexEntry(layout))
+				if (!Prepare(SpvExecutionModelVertex, descriptorLayout, layout.descriptors) || !CreateVertexEntry(attributes, layout))
 				{
 					error = m_error.empty() ? "SPIR-V lowering failed" : m_error;
 					return nullptr;
@@ -2772,13 +2773,62 @@ namespace amdcomp
 				return type && (type->kind == Type::Kind::Int || type->kind == Type::Kind::Float) && type->width == 32;
 			}
 
-			bool CreateVertexEntry(VertexLayout& layout)
+			bool IsVertexAttribute(const InvocationVariable& variable)
+			{
+				return variable.storageClass == SpvStorageClassInput && InEntryInterface(variable.id) && !Decoration(variable.id, SpvDecorationBuiltIn);
+			}
+
+			llvm::Value* FetchVertexAttribute(const VertexAttribute& attribute, uint32_t typeId, llvm::Value* table, llvm::Value* index)
+			{
+				const Type* type = TypeOf(typeId);
+				const uint32_t count = type->kind == Type::Kind::Vector ? type->count : 1;
+				const Type* component = type->kind == Type::Kind::Vector ? TypeOf(type->element) : type;
+				llvm::LoadInst* descriptor = m_builder.CreateAlignedLoad(llvm::FixedVectorType::get(m_builder.getInt32Ty(), 4),
+																		 OffsetPointer(table, uint64_t{attribute.binding} * 16), llvm::Align(16));
+				descriptor->setMetadata(llvm::LLVMContext::MD_invariant_load, llvm::MDNode::get(m_context, {}));
+				llvm::Type* fetchType = attribute.channels == 1 ? static_cast<llvm::Type*>(m_builder.getInt32Ty())
+																: llvm::FixedVectorType::get(m_builder.getInt32Ty(), attribute.channels);
+				llvm::Value* fetched = m_builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_struct_tbuffer_load, {fetchType},
+																 {descriptor, index, m_builder.getInt32(attribute.offset), m_builder.getInt32(0),
+																  m_builder.getInt32(attribute.format), m_builder.getInt32(0)});
+				const bool isFloat = component->kind == Type::Kind::Float;
+				llvm::Type* elementType = isFloat ? m_builder.getFloatTy() : m_builder.getInt32Ty();
+				llvm::Value* result = count == 1 ? nullptr : llvm::PoisonValue::get(llvm::FixedVectorType::get(elementType, count));
+				for (uint32_t i = 0; i < count; ++i)
+				{
+					const uint8_t source = attribute.swizzle[i];
+					llvm::Value* value = nullptr;
+					if (source == kVertexSwizzleOne)
+						value = m_builder.getInt32(isFloat ? 0x3F800000u : 1u);
+					else if (source >= attribute.channels)
+						value = m_builder.getInt32(0);
+					else
+						value = attribute.channels == 1 ? fetched : m_builder.CreateExtractElement(fetched, uint64_t{source});
+					value = m_builder.CreateBitCast(value, elementType);
+					if (count == 1)
+						return value;
+					result = m_builder.CreateInsertElement(result, value, uint64_t{i});
+				}
+				return result;
+			}
+
+			bool CreateVertexEntry(std::span<const VertexAttribute> attributes, VertexLayout& layout)
 			{
 				if (!m_usedSets.empty())
 					return Fail("descriptors in vertex shaders aren't supported yet");
+				const bool vertexBuffers = std::any_of(m_invocationVariables.begin(), m_invocationVariables.end(),
+													   [&](const InvocationVariable& variable)
+													   { return IsVertexAttribute(variable); });
+				if (vertexBuffers)
+				{
+					layout.userSgprs = 4;
+					layout.vertexBufferTableUserData = 1;
+					layout.baseVertexUserData = 2;
+					layout.baseInstanceUserData = 3;
+				}
 				constexpr unsigned kSystemSgprs = 8;
 				constexpr unsigned kVgprs = 9;
-				const unsigned sgprs = kSystemSgprs + kVertexUserSgprs;
+				const unsigned sgprs = kSystemSgprs + layout.userSgprs;
 				std::vector<llvm::Type*> parameters(sgprs + kVgprs, m_builder.getInt32Ty());
 				auto* entry = llvm::Function::Create(llvm::FunctionType::get(m_builder.getVoidTy(), parameters, false), llvm::GlobalValue::ExternalLinkage,
 													 "_amdgpu_gs_main", *m_module);
@@ -2797,8 +2847,9 @@ namespace amdcomp
 				llvm::Value* thread = m_builder.CreateAdd(m_builder.CreateMul(wave, m_builder.getInt32(64)), lane);
 				llvm::Value* vertexCount = m_builder.CreateAnd(m_builder.CreateLShr(entry->getArg(2), 12), 0x1FF);
 				llvm::Value* primitiveCount = m_builder.CreateAnd(m_builder.CreateLShr(entry->getArg(2), 22), 0x1FF);
-				llvm::Value* vertexIndex = m_builder.CreateAdd(entry->getArg(sgprs + 5), entry->getArg(kSystemSgprs + 1));
-				llvm::Value* instanceIndex = m_builder.CreateAdd(entry->getArg(sgprs + 8), entry->getArg(kSystemSgprs + 2));
+				llvm::Value* vertexIndex = m_builder.CreateAdd(entry->getArg(sgprs + 5), entry->getArg(kSystemSgprs + layout.baseVertexUserData));
+				llvm::Value* instanceIndex = m_builder.CreateAdd(entry->getArg(sgprs + 8), entry->getArg(kSystemSgprs + layout.baseInstanceUserData));
+				llvm::Value* vertexBufferTable = vertexBuffers ? TablePointer(entry->getArg(kSystemSgprs + layout.vertexBufferTableUserData)) : nullptr;
 
 				std::vector<llvm::Value*> storage;
 				for (const InvocationVariable& variable : m_invocationVariables)
@@ -2810,11 +2861,28 @@ namespace amdcomp
 					storage.push_back(alloca);
 					if (variable.storageClass == SpvStorageClassPushConstant)
 						return Fail("push constants in vertex shaders aren't supported yet");
-					if (variable.storageClass == SpvStorageClassInput && InEntryInterface(variable.id))
+					if (IsVertexAttribute(variable))
+					{
+						const std::optional<uint32_t> location = Decoration(variable.id, SpvDecorationLocation);
+						if (!location)
+							return Fail("vertex input without a location");
+						if (!IsScalarOrVector(variable.pointee) || Decoration(variable.id, SpvDecorationComponent))
+							return Fail("vertex inputs other than 32-bit scalars and vectors aren't supported yet");
+						auto attribute =
+							std::find_if(attributes.begin(), attributes.end(), [&](const VertexAttribute& a)
+										 { return a.location == *location; });
+						if (attribute == attributes.end())
+							return Fail(std::format("vertex input location {} has no attribute in the pipeline", *location));
+						if (attribute->perInstance)
+							layout.instanceIndex = true;
+						llvm::Value* value =
+							FetchVertexAttribute(*attribute, variable.pointee, vertexBufferTable, attribute->perInstance ? instanceIndex : vertexIndex);
+						if (!StoreMemory(alloca, variable.pointee, value, {}))
+							return false;
+					}
+					else if (variable.storageClass == SpvStorageClassInput && InEntryInterface(variable.id))
 					{
 						const std::optional<uint32_t> builtIn = Decoration(variable.id, SpvDecorationBuiltIn);
-						if (!builtIn)
-							return Fail("vertex inputs aren't supported yet");
 						llvm::Value* value = nullptr;
 						if (*builtIn == SpvBuiltInVertexIndex)
 							value = vertexIndex;
@@ -3292,10 +3360,11 @@ namespace amdcomp
 	}
 
 	std::unique_ptr<llvm::Module> LowerVertexShader(const see::spirv::Module& spirv, const CompileOptions& options, std::span<const Descriptor> descriptorLayout,
+													std::span<const VertexAttribute> attributes,
 													llvm::LLVMContext& context, llvm::TargetMachine& tm, VertexLayout& layout, std::string& error)
 	{
 		Lowering lowering(spirv, options, context, tm);
-		return lowering.LowerVertex(descriptorLayout, layout, error);
+		return lowering.LowerVertex(descriptorLayout, attributes, layout, error);
 	}
 
 	std::unique_ptr<llvm::Module> LowerFragmentShader(const see::spirv::Module& spirv, const CompileOptions& options,
