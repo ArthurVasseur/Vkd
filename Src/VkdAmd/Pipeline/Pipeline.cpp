@@ -106,6 +106,35 @@ namespace vkd::amd
 		constexpr uint32_t kSpiPsInControlNumInterpMask = 0x3F;
 		constexpr RegPatch kSetTablePatches[] = {RegPatch::SetTable0, RegPatch::SetTable1, RegPatch::SetTable2, RegPatch::SetTable3};
 
+		uint32_t PrimitiveType(VkPrimitiveTopology topology)
+		{
+			switch (topology)
+			{
+				case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+					return 0x1;
+				case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+					return 0x2;
+				case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+					return 0x3;
+				case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+					return 0x6;
+				case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+					return 0x5;
+				case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+					return 0xA;
+				case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+					return 0xB;
+				case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+					return 0xC;
+				case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
+					return 0xD;
+				case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+					return 0x9;
+				default:
+					return 0x4;
+			}
+		}
+
 		bool GetVertexAttributes(const VkPipelineVertexInputStateCreateInfo* input, std::vector<amdcomp::VertexAttribute>& attributes, std::string& error)
 		{
 			if (!input)
@@ -300,6 +329,11 @@ namespace vkd::amd
 				m_graphicsState.vertexStrides[binding.binding] = binding.stride;
 				m_graphicsState.vertexBindingCount = std::max(m_graphicsState.vertexBindingCount, binding.binding + 1);
 			}
+		}
+		if (states.inputAssembly)
+		{
+			m_graphicsState.primitiveType = PrimitiveType(states.inputAssembly->topology);
+			m_graphicsState.primitiveRestart = states.inputAssembly->primitiveRestartEnable;
 		}
 		if (states.rasterization)
 		{

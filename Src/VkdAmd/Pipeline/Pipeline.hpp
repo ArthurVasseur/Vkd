@@ -21,6 +21,8 @@ namespace vkd::amd
 		bool dynamicScissor = false;
 		VkCullModeFlags cullMode = VK_CULL_MODE_NONE;
 		VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		uint32_t primitiveType = 4;
+		bool primitiveRestart = false;
 		// Vertex input bindings: stride per binding, bindings [0, vertexBindingCount) in the table.
 		static constexpr uint32_t kMaxVertexBindings = 32;
 		uint32_t vertexStrides[kMaxVertexBindings] = {};

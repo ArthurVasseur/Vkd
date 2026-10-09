@@ -40,6 +40,10 @@ namespace vkd::amd
 		constexpr uint64_t kMaxDmaBytes = 1ull << 20;
 		// The IB starts at 64KB and doubles when a command buffer doesn't fit, up to this size.
 		constexpr uint64_t kMaxIbBytes = 16ull << 20;
+		constexpr uint32_t kVgtPrimitiveType = 0xC242;
+		constexpr uint32_t kGeMultiPrimIbResetEn = 0xC24B;
+		constexpr uint32_t kGeMultiPrimIbResetDisableForAutoIndex = 1u << 2;
+		constexpr uint32_t kVgtMultiPrimIbResetIndx = 0xA103;
 
 		const amd::DeviceMemory* AmdMemory(const vkd::DeviceMemory* memory)
 		{
@@ -1709,6 +1713,9 @@ namespace vkd::amd
 			stream.SetContextReg(kCbTargetMask, gs.blend.cbTargetMask);
 			stream.SetContextReg(kSxBlendOptControl, gs.blend.sxBlendOptControl);
 			stream.SetContextReg(kCbColorControl, gs.cbColorControl);
+			stream.SetUconfigReg(kVgtPrimitiveType, gs.primitiveType);
+			stream.SetUconfigReg(kGeMultiPrimIbResetEn, kGeMultiPrimIbResetDisableForAutoIndex | (op.indexed && gs.primitiveRestart ? 1u : 0u));
+			stream.SetContextReg(kVgtMultiPrimIbResetIndx, 0xFFFFFFFFu);
 			const float* constants = gs.dynamicBlendConstants ? state.blendConstants : gs.blendConstants;
 			const uint32_t constantBits[4] = {FloatBits(constants[0]), FloatBits(constants[1]), FloatBits(constants[2]), FloatBits(constants[3])};
 			stream.SetContextRegs(kCbBlendRed, constantBits, 4);
