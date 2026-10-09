@@ -55,6 +55,7 @@ namespace amdcomp
 		std::string_view entryPoint = "main";
 		std::span<const SpecializationConstant> specialization = {};
 		std::string* llvmIr = nullptr;
+		std::string* optimizedLlvmIr = nullptr;
 	};
 
 	std::optional<ComputeShader> CompileComputeShader(std::span<const uint32_t> spirv, const CompileOptions& options, std::string& error);

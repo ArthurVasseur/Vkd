@@ -195,7 +195,7 @@ namespace amdcomp::backend
 																				std::nullopt, std::nullopt, llvm::CodeGenOptLevel::Default));
 	}
 
-	std::optional<Output> Generate(llvm::Module& module, llvm::TargetMachine& tm, std::string& error)
+	std::optional<Output> Generate(llvm::Module& module, llvm::TargetMachine& tm, std::string& error, std::string* optimizedIr)
 	{
 		Diagnostics diagnostics;
 		module.getContext().setDiagnosticHandlerCallBack(OnDiagnostic, &diagnostics);
@@ -222,6 +222,11 @@ namespace amdcomp::backend
 			builder.crossRegisterProxies(lam, fam, cgam, mam);
 			llvm::ModulePassManager passes = builder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
 			passes.run(module, mam);
+		}
+		if (optimizedIr)
+		{
+			llvm::raw_string_ostream os(*optimizedIr);
+			module.print(os, nullptr);
 		}
 
 		llvm::SmallVector<char, 0> object;

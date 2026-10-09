@@ -1,3 +1,7 @@
+#include <cstring>
+#include <fstream>
+#include <iterator>
+
 #include "AmdCompiler/Compiler.hpp"
 #include "AmdCompiler/Tests/TestShaders.hpp"
 #include <catch2/catch_test_macros.hpp>
@@ -65,3 +69,24 @@ TEST_CASE("print the compiled test shaders", "[.][amd-compiler][dump]")
 	}
 }
 
+TEST_CASE("compile the SPIR-V file in AMDCOMP_SPIRV", "[.][amd-compiler][file]")
+{
+	char path[512] = {};
+	size_t length = 0;
+	REQUIRE((getenv_s(&length, path, sizeof(path), "AMDCOMP_SPIRV") == 0 && length > 1));
+	std::ifstream file(path, std::ios::binary);
+	REQUIRE(file);
+	const std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	std::vector<uint32_t> spirv(bytes.size() / 4);
+	std::memcpy(spirv.data(), bytes.data(), spirv.size() * 4);
+
+	std::string error;
+	std::string ir;
+	std::string optimized;
+	const std::optional<ComputeShader> shader = CompileComputeShader(spirv, CompileOptions{.llvmIr = &ir, .optimizedLlvmIr = &optimized}, error);
+	WARN(ir);
+	WARN(optimized);
+	WARN(error);
+	if (shader)
+		WARN(Disassemble(shader->code, true));
+}

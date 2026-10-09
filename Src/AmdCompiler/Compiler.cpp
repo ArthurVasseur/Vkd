@@ -45,7 +45,7 @@ namespace amdcomp
 			ir->print(os, nullptr);
 		}
 
-		std::optional<backend::Output> output = backend::Generate(*ir, *tm, error);
+		std::optional<backend::Output> output = backend::Generate(*ir, *tm, error, options.optimizedLlvmIr);
 		if (!output)
 			return std::nullopt;
 		const uint32_t rsrc2 = output->registers[backend::kComputePgmRsrc2];
