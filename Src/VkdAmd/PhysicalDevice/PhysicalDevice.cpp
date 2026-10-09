@@ -207,6 +207,8 @@ namespace vkd::amd
 	void PhysicalDevice::GetFormatProperties(VkFormat format, VkFormatProperties& properties) const
 	{
 		vkd::PhysicalDevice::GetFormatProperties(format, properties);
+		if (gfx11::ImageFormat vertexFormat{}; gfx11::GetVertexFormat(format, vertexFormat))
+			properties.bufferFeatures |= VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT;
 		if (vkuFormatIsDepthAndStencil(format))
 		{
 			// Combined depth/stencil: tiled planes only (a linear texel interleaves the aspects).

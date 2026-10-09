@@ -226,6 +226,11 @@ namespace vkd::amd::gfx11
 		return false;
 	}
 
+	inline bool GetVertexFormat(VkFormat format, ImageFormat& out)
+	{
+		return format != VK_FORMAT_D16_UNORM && format != VK_FORMAT_D32_SFLOAT && GetImageFormat(format, out) && out.imgFmt <= 0x3F;
+	}
+
 	inline uint32_t ComposeSwizzle(VkComponentSwizzle component, uint32_t channel, const uint32_t (&formatSwizzle)[4])
 	{
 		switch (component)

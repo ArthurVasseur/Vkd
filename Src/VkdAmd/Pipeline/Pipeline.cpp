@@ -19,6 +19,7 @@
 #include "AmdCompiler/Compiler.hpp"
 #include "VkdAmd/Device/Device.hpp"
 #include "VkdAmd/PrivateData.hpp"
+#include "VkdAmd/Shader/Gfx11Descriptors.hpp"
 
 namespace vkd::amd
 {
@@ -91,6 +92,8 @@ namespace vkd::amd
 		constexpr uint32_t kSpiShaderUserDataPs0 = 0x2C0C;
 		constexpr uint32_t kSpiShaderUserDataPsLast = 0x2C2B;
 		constexpr uint32_t kSpiShaderPgmChksumGs = 0x2C80;
+		constexpr uint32_t kSpiShaderUserDataGs0 = 0x2C8C;
+		constexpr uint32_t kSpiShaderUserDataGsLast = 0x2CAB;
 		constexpr uint32_t kSpiShaderPgmRsrc1Gs = 0x2C8A;
 		constexpr uint32_t kSpiShaderPgmRsrc2Gs = 0x2C8B;
 		constexpr uint32_t kSpiPsInputCntl0 = 0xA191;
@@ -102,6 +105,42 @@ namespace vkd::amd
 		constexpr uint32_t kSpiShaderColFormat = 0xA1C5;
 		constexpr uint32_t kSpiPsInControlNumInterpMask = 0x3F;
 		constexpr RegPatch kSetTablePatches[] = {RegPatch::SetTable0, RegPatch::SetTable1, RegPatch::SetTable2, RegPatch::SetTable3};
+
+		bool GetVertexAttributes(const VkPipelineVertexInputStateCreateInfo* input, std::vector<amdcomp::VertexAttribute>& attributes, std::string& error)
+		{
+			if (!input)
+				return true;
+			for (uint32_t i = 0; i < input->vertexAttributeDescriptionCount; ++i)
+			{
+				const VkVertexInputAttributeDescription& description = input->pVertexAttributeDescriptions[i];
+				gfx11::ImageFormat format{};
+				if (!gfx11::GetVertexFormat(description.format, format))
+				{
+					error = std::format("vertex attribute format {} isn't supported", static_cast<int>(description.format));
+					return false;
+				}
+				amdcomp::VertexAttribute attribute{.location = description.location, .binding = description.binding, .offset = description.offset, .format = format.imgFmt};
+				attribute.channels = 0;
+				for (uint32_t c = 0; c < 4; ++c)
+				{
+					const uint32_t select = format.swizzle[c];
+					if (select >= gfx11::kSelX)
+					{
+						attribute.swizzle[c] = static_cast<uint8_t>(select - gfx11::kSelX);
+						++attribute.channels;
+					}
+					else
+						attribute.swizzle[c] = select == gfx11::kSel1 ? amdcomp::kVertexSwizzleOne : amdcomp::kVertexSwizzleZero;
+				}
+				for (uint32_t b = 0; b < input->vertexBindingDescriptionCount; ++b)
+				{
+					if (input->pVertexBindingDescriptions[b].binding == description.binding)
+						attribute.perInstance = input->pVertexBindingDescriptions[b].inputRate == VK_VERTEX_INPUT_RATE_INSTANCE;
+				}
+				attributes.push_back(attribute);
+			}
+			return true;
+		}
 
 		struct CompiledComputeShader
 		{
@@ -361,10 +400,14 @@ namespace vkd::amd
 		const std::vector<amdcomp::SpecializationConstant> vertexSpecialization = Specialization(vertexStage.pSpecializationInfo);
 		const std::vector<amdcomp::SpecializationConstant> fragmentSpecialization = Specialization(fragmentStage.pSpecializationInfo);
 		const amdcomp::ColorExportFormat colorExports[] = {amdcomp::ColorExportFormat::Float16};
+		std::vector<amdcomp::VertexAttribute> vertexAttributes;
+		if (!GetVertexAttributes(vkd::GetGraphicsPipelineStates(info).vertexInput, vertexAttributes, error))
+			return nullptr;
 		amdcomp::GraphicsOptions options{
 			.vertex = {.entryPoint = vertexStage.pName, .specialization = vertexSpecialization},
 			.fragment = {.entryPoint = fragmentStage.pName, .specialization = fragmentSpecialization},
 			.colorExports = colorExports,
+			.vertexAttributes = vertexAttributes,
 		};
 		std::optional<amdcomp::GraphicsShaders> compiled = amdcomp::CompileGraphicsShaders(vertexSpirv, fragmentSpirv, options, error);
 		if (!compiled)
@@ -420,9 +463,14 @@ namespace vkd::amd
 			}
 			const bool psInputCntl = w.kind == RegKind::Context && w.reg >= kSpiPsInputCntl0 && w.reg <= kSpiPsInputCntl31;
 			const bool psUserData = w.kind == RegKind::Sh && w.reg > kSpiShaderUserDataPs0 && w.reg <= kSpiShaderUserDataPsLast;
-			if (!psInputCntl && !psUserData)
+			const bool gsUserData = w.kind == RegKind::Sh && w.reg > kSpiShaderUserDataGs0 && w.reg <= kSpiShaderUserDataGsLast;
+			if (!psInputCntl && !psUserData && !gsUserData)
 				m_compiledDrawState.push_back(w);
 		}
+		if (compiled->vertexBufferTableUserData != 0)
+			m_compiledDrawState.push_back({RegKind::Sh, RegPatch::VertexBufferTable, kSpiShaderUserDataGs0 + compiled->vertexBufferTableUserData, 0});
+		m_compiledDrawState.push_back({RegKind::Sh, RegPatch::BaseVertex, kSpiShaderUserDataGs0 + compiled->baseVertexUserData, 0});
+		m_compiledDrawState.push_back({RegKind::Sh, RegPatch::BaseInstance, kSpiShaderUserDataGs0 + compiled->baseInstanceUserData, 0});
 		for (size_t i = 0; i < compiled->psInputCntl.size(); ++i)
 			m_compiledDrawState.push_back({RegKind::Context, RegPatch::None, kSpiPsInputCntl0 + static_cast<uint32_t>(i), compiled->psInputCntl[i]});
 		for (uint32_t set = 0; set < amdcomp::kMaxDescriptorSets; ++set)
