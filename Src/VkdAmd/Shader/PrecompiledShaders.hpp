@@ -59,7 +59,7 @@ namespace vkd::amd
 
 	// layout(local_size_x = 64); push constants { uint64 dst; uint mul; uint count; };
 	// if (i < count) dst[i] = i * mul + 0xC0DE0000 -- glslc --target-env=vulkan1.3 -O
-	// (Amd/Src/WddmDump/Tests/DispatchRE.cpp). Wave32; s0 = global table (unused), s1..s4 = push
+	// (Amd/Src/WddmDump/Tests/DispatchRE.cpp). Wave64; s0 = global table (unused), s1..s4 = push
 	// constants, s5.. = workgroup ids. Ends in s_endpgm, then s_code_end padding for prefetch.
 	inline constexpr uint32_t kFillBufferAddressCode[] = {
 		0x360000ff,
