@@ -39,6 +39,9 @@ namespace vkd
 		virtual void GetFormatProperties(VkFormat format, VkFormatProperties& properties) const;
 		virtual VkResult GetImageFormatProperties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage,
 												  VkImageCreateFlags flags, VkImageFormatProperties& properties) const;
+		// Core features behind vkGetPhysicalDeviceFeatures(2), and what vkCreateDevice accepts. The
+		// default is robustBufferAccess only (required by the spec).
+		virtual void GetFeatures(VkPhysicalDeviceFeatures& features) const;
 
 		Instance& GetOwner()
 		{

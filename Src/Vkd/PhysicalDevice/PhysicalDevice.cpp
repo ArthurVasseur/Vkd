@@ -55,25 +55,16 @@ namespace vkd
 		CCT_ASSERT(physicalDevice, "Invalid VkPhysicalDevice pointer");
 		CCT_ASSERT(pFeatures, "pFeatures cannot be null");
 
-		// Initialize all features to VK_FALSE
 		std::memset(pFeatures, 0, sizeof(VkPhysicalDeviceFeatures));
+		physicalDevice->GetFeatures(*pFeatures);
+	}
 
-		// robustBufferAccess is required by the Vulkan specification
-		// All implementations must support this feature
-		pFeatures->robustBufferAccess = VK_TRUE;
-
-		// Enable basic compute shader support for simple compute pipelines
-		// This is necessary for vkCmdDispatch and compute operations
-		pFeatures->shaderFloat64 = VK_FALSE; // 64-bit floats not required for basic compute
-		pFeatures->shaderInt64 = VK_FALSE; // 64-bit integers not required for basic compute
-
-		// All other features remain VK_FALSE:
-		// - No tessellation/geometry shader support (CPU backend)
-		// - No advanced image operations (focus on buffers)
-		// - No dual source blending, logic operations, etc. (no rendering pipeline)
-		// - No sparse resources (not needed for basic CPU backend)
-		// This minimal feature set supports vkCmdFillBuffer, vkCmdCopyBuffer,
-		// and basic compute shaders for a software-based Vulkan implementation
+	void PhysicalDevice::GetFeatures(VkPhysicalDeviceFeatures& features) const
+	{
+		// robustBufferAccess is required by the Vulkan specification. Everything else stays VK_FALSE:
+		// no tessellation/geometry shaders, no sparse resources, no 64-bit shader types, no dual-source
+		// blending or logic ops.
+		features.robustBufferAccess = VK_TRUE;
 	}
 
 	void PhysicalDevice::GetPhysicalDeviceFeatures2(VkPhysicalDevice pPhysicalDevice,
