@@ -31,6 +31,7 @@ namespace vkd::amd
 		void GetFormatProperties(VkFormat format, VkFormatProperties& properties) const override;
 		VkResult GetImageFormatProperties(VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage,
 										  VkImageCreateFlags flags, VkImageFormatProperties& properties) const override;
+		void GetFeatures(VkPhysicalDeviceFeatures& features) const override;
 
 		[[nodiscard]] const wddm::AdapterInfo& GetAdapterInfo() const
 		{

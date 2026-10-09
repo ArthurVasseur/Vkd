@@ -296,6 +296,15 @@ namespace vkd::amd
 		return VK_SUCCESS;
 	}
 
+	void PhysicalDevice::GetFeatures(VkPhysicalDeviceFeatures& features) const
+	{
+		vkd::PhysicalDevice::GetFeatures(features);
+		// Fixed-function DB state (DepthStencil.hpp, EmitDepthStencilTarget), checked against AMDVLK
+		// ([draw][vkd][depth]: depth bounds static/dynamic, depth bias with a clamp).
+		features.depthBounds = VK_TRUE;
+		features.depthBiasClamp = VK_TRUE;
+	}
+
 	DispatchableObjectResult<vkd::Device> PhysicalDevice::CreateDevice()
 	{
 		auto* amdDevice = mem::NewDeviceDispatchable<AmdDevice>(GetAllocationCallbacks());
